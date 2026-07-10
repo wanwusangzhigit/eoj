@@ -45,7 +45,7 @@ blogs.get('/', async (c) => {
 
 // GET /blogs/:id — 详情（浏览数 +1）
 blogs.get('/:id', async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const blog = await c.env.DB.prepare(
     `SELECT b.*, u.username, u.avatar_url
      FROM blogs b JOIN users u ON b.user_id = u.id WHERE b.id = ?`
@@ -80,7 +80,7 @@ blogs.post('/', authMiddleware, async (c) => {
 // PUT /blogs/:id — 编辑（owner）
 blogs.put('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const blog = await c.env.DB.prepare('SELECT user_id FROM blogs WHERE id = ?').bind(id).first();
 
   if (!blog) {
@@ -105,7 +105,7 @@ blogs.put('/:id', authMiddleware, async (c) => {
 // DELETE /blogs/:id — 删除
 blogs.delete('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const blog = await c.env.DB.prepare('SELECT user_id FROM blogs WHERE id = ?').bind(id).first();
 
   if (!blog) {
@@ -122,7 +122,7 @@ blogs.delete('/:id', authMiddleware, async (c) => {
 // POST /blogs/:id/like — 点赞（已点则取消）
 blogs.post('/:id/like', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const blog = await c.env.DB.prepare('SELECT user_id FROM blogs WHERE id = ?').bind(id).first();
   if (!blog) {
@@ -147,7 +147,7 @@ blogs.post('/:id/like', authMiddleware, async (c) => {
 // GET /blogs/:id/like-status — 当前用户是否已点赞
 blogs.get('/:id/like-status', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const existing = await c.env.DB.prepare(
     'SELECT 1 FROM blog_likes WHERE blog_id = ? AND user_id = ?'
   ).bind(id, user.userId).first();
@@ -156,7 +156,7 @@ blogs.get('/:id/like-status', authMiddleware, async (c) => {
 
 // GET /blogs/:id/comments — 评论列表
 blogs.get('/:id/comments', async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
   const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '50')));
   const offset = (page - 1) * pageSize;

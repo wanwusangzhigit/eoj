@@ -195,7 +195,7 @@ solutions.get('/admin/review', authMiddleware, adminMiddleware, async (c) => {
 // POST /solutions/admin/:id/approve — 通过审核
 solutions.post('/admin/:id/approve', authMiddleware, adminMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const solution = await c.env.DB.prepare('SELECT user_id, title FROM solutions WHERE id = ?').bind(id).first();
   if (!solution) {
@@ -222,7 +222,7 @@ solutions.post('/admin/:id/approve', authMiddleware, adminMiddleware, async (c) 
 // POST /solutions/admin/:id/reject — 驳回
 solutions.post('/admin/:id/reject', authMiddleware, adminMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { reason } = body;
 

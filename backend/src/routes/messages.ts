@@ -30,7 +30,7 @@ messages.get('/conversations', authMiddleware, async (c) => {
 // GET /messages/conversations/:id — 会话内消息（分页，倒序）
 messages.get('/conversations/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
   const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '50')));
   const offset = (page - 1) * pageSize;
@@ -129,7 +129,7 @@ messages.post('/conversations', authMiddleware, async (c) => {
 // POST /messages/conversations/:id/read — 更新 last_read_at
 messages.post('/conversations/:id/read', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   await c.env.DB.prepare(
     'UPDATE conversation_participants SET last_read_at = CURRENT_TIMESTAMP WHERE conversation_id = ? AND user_id = ?'

@@ -797,7 +797,7 @@ problems.delete('/:id/favorite', authMiddleware, async (c) => {
 // POST /problems/:id/reports — 提交举报
 problems.post('/:id/reports', authMiddleware, async (c) => {
   const user = c.get('user');
-  const problemId = parseInt(c.req.param('id'));
+  const problemId = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { type, description } = body;
 
@@ -862,7 +862,7 @@ problems.get('/admin/reports', authMiddleware, adminMiddleware, async (c) => {
 
 // PUT /problems/admin/reports/:id — 处理举报（admin）
 problems.put('/admin/reports/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { status, admin_reply } = body;
 
