@@ -185,7 +185,7 @@ blogs.get('/:id/comments', async (c) => {
 // POST /blogs/:id/comments — 评论
 blogs.post('/:id/comments', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { content } = body;
 
