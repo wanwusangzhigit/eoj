@@ -10,7 +10,8 @@ import YAML from 'yaml'
 const isProduction = process.env.NODE_ENV === 'production' || !!process.env.VITE_ASSETS_MODE;
 
 // 读取 config.yaml
-const configPath = resolve(__dirname, 'config.yaml');
+const ROOT_DIR = resolve(__dirname, '.');
+const configPath = resolve(ROOT_DIR, 'config.yaml');
 let siteConfig: Record<string, unknown> = {};
 if (existsSync(configPath)) {
   try {
@@ -22,6 +23,8 @@ if (existsSync(configPath)) {
 }
 
 export default defineConfig({
+  root: ROOT_DIR,
+  publicDir: resolve(ROOT_DIR, 'public'),
   plugins: [
     react(),
     {

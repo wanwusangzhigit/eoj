@@ -1,71 +1,7 @@
 # OJ System
 
-基于 Cloudflare Workers 的轻量级在线判题系统。
+这是一个基于 Cloudflare Workers 的在线判题系统，覆盖题目管理、用户认证、提交评测、竞赛、讨论、题单、后台管理与可选广告位配置。
 
-## 功能概览
-
-### 题目系统
-- 题目列表（搜索、标签筛选、难度分级、分页）
-- 题目详情（Markdown 渲染、样例展示、统计信息）
-- 7 种语言代码模板（Python / C++ / Java / JavaScript / C / Go / Rust）
-- CodeMirror 代码编辑器（语法高亮）
-- 题目收藏、提交状态追踪（已通过 / 已尝试 / 未开始）
-- Special Judge（自定义评判逻辑）支持
-
-### 用户与认证
-- GitHub OAuth / CpOAuth / 用户名密码 三种登录方式
-- 用户个人页（统计数据、已解决题目、最近提交）
-- 查看其他用户资料（`/users/:username`）
-- 管理员角色与细粒度权限控制
-
-### 提交与评测
-- 实时代码提交与结果轮询
-- 详细测试用例结果（输入、期望输出、实际输出、错误信息）
-- GitHub Actions 沙箱评测引擎
-- 支持状态：pending / running / accepted / wrong_answer / TLE / MLE / runtime_error / compile_error
-
-### 竞赛系统
-- 创建竞赛（设定起止时间、关联题目、分值）
-- 竞赛排行榜
-- 竞赛报名与参与
-
-### 题解与讨论
-- 题解发布与投票
-- 题目讨论区（回复、置顶）
-- 全站题解/讨论浏览
-
-### 题单系统
-- 创建题单（关联题目、排序、备注）
-- 公开/私有题单
-- 题单进度追踪
-
-### 工单系统
-- 提交工单（bug / 建议 / 问题）
-- 工单状态流转（open → in_progress → resolved → closed）
-- 优先级管理（low / normal / high / urgent）
-- 管理员回复
-
-### 排行榜
-- 全站用户排名（按已解决题目数）
-- 前三名奖牌视觉效果
-
-### 管理后台
-- 仪表盘（用户数、题目数、提交数统计）
-- 题目管理（CRUD、测试用例管理）
-- 用户管理（角色、权限分配）
-- 竞赛管理
-- 工单管理
-- 公告管理
-- 站点设置（注册开关、邮箱后缀限制、强制邮箱）
-- SQL 控制台
-
-### 站点自定义
-- 通过 `frontend/config.yaml` 配置站点名称、图标、页脚、登录页内容
-- 构建时注入，无需重新编译即可通过修改 YAML 定制外观
-
-### 国际化
-- 中文 / 英文 双语支持
-- 动态页面标题（浏览器标签页显示当前页面名称）
 
 ## 技术栈
 
@@ -79,59 +15,6 @@
 | 代码编辑器 | CodeMirror 6 |
 | 评测引擎 | GitHub Actions |
 | 样式 | CSS Variables + 自定义 CSS |
-
-## 项目结构
-
-```
-oj-system/
-├── backend/                          # Cloudflare Workers 后端
-│   ├── migrations/                   # D1 数据库迁移文件（0001-0010）
-│   ├── public/                       # 前端构建产物（ASSETS 绑定）
-│   ├── src/
-│   │   ├── middleware/
-│   │   │   ├── auth.ts              # JWT 认证 + 管理员中间件
-│   │   │   └── rateLimit.ts         # 请求限流
-│   │   ├── routes/
-│   │   │   ├── auth.ts              # 认证（OAuth + 注册 + 登录）
-│   │   │   ├── problems.ts          # 题目 CRUD + 收藏
-│   │   │   ├── submissions.ts       # 提交管理
-│   │   │   ├── rankings.ts          # 排行榜
-│   │   │   ├── users.ts             # 用户资料
-│   │   │   ├── contests.ts          # 竞赛
-│   │   │   ├── tickets.ts           # 工单
-│   │   │   ├── problemLists.ts      # 题单
-│   │   │   ├── solutions.ts         # 题解
-│   │   │   ├── discussions.ts       # 讨论
-│   │   │   ├── settings.ts          # 站点设置
-│   │   │   ├── admin.ts             # 管理接口
-│   │   │   └── internal.ts          # 判题回调
-│   │   ├── utils/
-│   │   │   ├── jwt.ts               # JWT 签发/验证
-│   │   │   └── helpers.ts           # 工具函数
-│   │   ├── types.ts                 # 类型定义
-│   │   ├── seed.ts                  # 种子数据
-│   │   └── index.ts                 # 入口
-│   ├── wrangler.toml                 # Workers 配置
-│   └── package.json
-│
-├── frontend/                         # React 前端
-│   ├── config.yaml                   # 站点自定义配置
-│   ├── scripts/
-│   │   └── copy-to-backend.mjs      # 构建后复制到 backend/public
-│   ├── src/
-│   │   ├── api/client.ts            # API 客户端
-│   │   ├── components/              # 共享组件
-│   │   ├── hooks/                   # 自定义 Hooks
-│   │   ├── i18n/                    # 国际化（zh/en）
-│   │   ├── pages/                   # 页面组件
-│   │   ├── store/                   # Zustand 状态
-│   │   ├── styles/                  # 全局样式
-│   │   └── App.tsx                  # 路由配置
-│   ├── vite.config.ts               # Vite 配置（含 YAML 注入）
-│   └── package.json
-│
-└── README.md
-```
 
 ## 部署指南
 
