@@ -10,6 +10,12 @@
   gap: 16px;
 }
 
+.submission-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .submission-header h1 {
   font-size: 22px;
   font-weight: 700;
@@ -183,4 +189,169 @@
 
 .source-code-editor .cm-editor .cm-scroller {
   max-height: 500px;
+}
+
+/* Testcase Results Table */
+.testcase-table-wrapper {
+  overflow-x: auto;
+}
+
+.testcase-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+}
+
+.testcase-table thead {
+  background: var(--bg-tertiary);
+}
+
+.testcase-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.testcase-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-primary);
+  vertical-align: middle;
+}
+
+.testcase-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.testcase-row.passed {
+  border-left: 3px solid var(--success);
+}
+
+.testcase-row.failed {
+  border-left: 3px solid var(--error);
+}
+
+.tc-idx {
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 40px;
+}
+
+.tc-detail-cell {
+  max-width: 300px;
+}
+
+.tc-detail-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+.tc-detail-toggle:hover {
+  color: var(--text-primary);
+}
+
+/* Judge Logs Section */
+.judge-logs-section {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.judge-logs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.judge-logs-header:hover {
+  background: var(--bg-tertiary);
+}
+
+.judge-logs-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.judge-logs-content {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.judge-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  line-height: 1.5;
+}
+
+.log-type-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.log-result .log-type-badge {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.log-error .log-type-badge {
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.log-warning .log-type-badge {
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.log-message {
+  flex: 1;
+  color: var(--text-primary);
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+.log-time {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }

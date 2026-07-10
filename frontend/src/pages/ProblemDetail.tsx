@@ -12,8 +12,9 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { useThemeStore } from '../store/theme';
 import { useToastStore } from '../store/toast';
 import StatusBadge from '../components/StatusBadge';
-import { Send, Clock, MemoryStick, ChevronLeft, ChevronRight, Tag, Heart, CheckCircle, XCircle, AlertCircle, Users, BookOpen, MessageSquare, ThumbsUp, Eye, Plus, X } from 'lucide-react';
+import { Send, Clock, MemoryStick, ChevronLeft, ChevronRight, Tag, Heart, CheckCircle, XCircle, AlertCircle, Users, BookOpen, MessageSquare, ThumbsUp, Eye, Plus, X, Sparkles, Flag } from 'lucide-react';
 import { LANGUAGES, LANGUAGE_TEMPLATES, DIFFICULTY_COLORS } from '../constants';
+import RatingBadge from '../components/RatingBadge';
 import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -75,6 +76,20 @@ export default function ProblemDetail() {
   // Ref for polling cleanup (Bug 2 fix)
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+
+  // ── AI completion state ──
+  const [aiCompleting, setAiCompleting] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [aiInstruction, setAiInstruction] = useState('');
+  const [aiAllowedModels, setAiAllowedModels] = useState<{ model: string; display_name: string }[]>([]);
+  const [aiSelectedModel, setAiSelectedModel] = useState<string>('');
+
+  // ── Report modal state ──
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportType, setReportType] = useState('typo');
+  const [reportDescription, setReportDescription] = useState('');
+  const [reportSubmitting, setReportSubmitting] = useState(false);
+  const addToast = useToastStore((s) => s.addToast);
 
   // ── Fetch problem on slug change (Bug 8 fix: separate effects) ──
 
@@ -346,6 +361,34 @@ export default function ProblemDetail() {
     }
   };
 
+  const openReportModal = () => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    setReportType('typo');
+    setReportDescription('');
+    setShowReportModal(true);
+  };
+
+  const submitReport = async () => {
+    if (!problem?.id) return;
+    if (!reportDescription.trim()) {
+      addToast('error', t('reports.description'));
+      return;
+    }
+    setReportSubmitting(true);
+    try {
+      await api.createProblemReport(problem.id, reportType, reportDescription.trim());
+      addToast('success', t('reports.reportSubmitted'));
+      setShowReportModal(false);
+    } catch (e: any) {
+      addToast('error', e.message || t('common.error'));
+    } finally {
+      if (isMountedRef.current) setReportSubmitting(false);
+    }
+  };
+
   const handleLanguageChange = (lang: string) => {
     const isTemplate = Object.values(LANGUAGE_TEMPLATES).some(tmpl => tmpl === sourceCode);
     if (isTemplate) {
@@ -378,6 +421,51 @@ export default function ProblemDetail() {
       setLastStatus(null);
     } finally {
       if (isMountedRef.current) setSubmitting(false);
+    }
+  };
+
+  // ── AI code completion ──
+
+  // Fetch AI status on mount to get allowed models
+  useEffect(() => {
+    let cancelled = false;
+    api.aiStatus().then((data) => {
+      if (!cancelled && data.allowed_models && data.allowed_models.length > 0) {
+        setAiAllowedModels(data.allowed_models);
+        setAiSelectedModel(data.allowed_models[0].model);
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleAIComplete = async () => {
+    if (aiCompleting || !problem) return;
+    setAiCompleting(true);
+    setAiSuggestion(null);
+    try {
+      const result = await api.aiComplete({
+        code: sourceCode,
+        language,
+        problem_title: problem.title,
+        problem_description: problem.description,
+        instruction: aiInstruction || undefined,
+        model: aiSelectedModel || undefined,
+      });
+      if (isMountedRef.current) {
+        setAiSuggestion(result.content);
+      }
+    } catch (e: any) {
+      useToastStore.getState().addToast('error', e.message || t('ai.error'));
+    } finally {
+      if (isMountedRef.current) setAiCompleting(false);
+    }
+  };
+
+  const applyAISuggestion = () => {
+    if (aiSuggestion) {
+      handleSourceCodeChange(aiSuggestion);
+      setAiSuggestion(null);
+      setAiInstruction('');
     }
   };
 
@@ -536,12 +624,16 @@ export default function ProblemDetail() {
             </div>
           </div>
           <div className="problem-actions">
-            <div
-              className="difficulty-badge"
-              style={{ background: `${DIFFICULTY_COLORS[problem.difficulty]}20`, color: DIFFICULTY_COLORS[problem.difficulty], borderColor: DIFFICULTY_COLORS[problem.difficulty] }}
-            >
-              {problem.difficulty}
-            </div>
+            {problem.rating && problem.rating >= 800 ? (
+              <RatingBadge rating={problem.rating} size="lg" />
+            ) : (
+              <div
+                className="difficulty-badge"
+                style={{ background: `${DIFFICULTY_COLORS[problem.difficulty]}20`, color: DIFFICULTY_COLORS[problem.difficulty], borderColor: DIFFICULTY_COLORS[problem.difficulty] }}
+              >
+                {problem.difficulty}
+              </div>
+            )}
             <Link
               to={`/solutions?problem_id=${problem.id}&problem_title=${encodeURIComponent(problem.title)}`}
               className="action-btn-outline"
@@ -564,6 +656,15 @@ export default function ProblemDetail() {
                 title={isFavorited ? t('problemDetail.removeFromFavorites') : t('problemDetail.addToFavorites')}
               >
                 <Heart size={18} fill={isFavorited ? 'currentColor' : 'none'} />
+              </button>
+            )}
+            {user && (
+              <button
+                className="action-btn-outline"
+                onClick={openReportModal}
+                title={t('reports.reportProblem')}
+              >
+                <Flag size={16} />
               </button>
             )}
           </div>
@@ -1039,16 +1140,70 @@ export default function ProblemDetail() {
             ))}
           </select>
 
-          <button
-            className={`btn btn-primary ${submitting ? 'btn-loading' : ''}`}
-            onClick={handleSubmit}
-            disabled={submitting}
-            title="Ctrl+Enter"
-          >
-            <Send size={14} />
-            {submitting ? t('problemDetail.submitting') : t('problemDetail.submit')}
-          </button>
+          <div style={{display:'flex',gap:'8px',alignItems:'center'}}>
+            {aiAllowedModels.length > 0 && (
+              <select
+                className="language-select"
+                value={aiSelectedModel}
+                onChange={(e) => setAiSelectedModel(e.target.value)}
+                title={t('ai.selectModel')}
+                style={{fontSize:'12px',maxWidth:'160px'}}
+              >
+                {aiAllowedModels.map((m) => (
+                  <option key={m.model} value={m.model}>{m.display_name}</option>
+                ))}
+              </select>
+            )}
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleAIComplete}
+              disabled={aiCompleting}
+              title={t('ai.completeCode')}
+            >
+              <Sparkles size={14} />
+              {aiCompleting ? t('ai.completing') : t('ai.completeCode')}
+            </button>
+
+            <button
+              className={`btn btn-primary ${submitting ? 'btn-loading' : ''}`}
+              onClick={handleSubmit}
+              disabled={submitting}
+              title="Ctrl+Enter"
+            >
+              <Send size={14} />
+              {submitting ? t('problemDetail.submitting') : t('problemDetail.submit')}
+            </button>
+          </div>
         </div>
+
+        {aiCompleting && (
+          <div style={{padding:'8px 12px',display:'flex',alignItems:'center',gap:'8px',color:'var(--text-secondary)',fontSize:'14px'}}>
+            <div className="loading-spinner" style={{width:'16px',height:'16px',borderWidth:'2px'}} />
+            {t('ai.thinking')}
+          </div>
+        )}
+
+        {aiSuggestion !== null && (
+          <div style={{padding:'12px',borderBottom:'1px solid var(--border-color)',background:'var(--bg-hover)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+              <span style={{fontWeight:'600',fontSize:'14px',display:'flex',alignItems:'center',gap:'6px'}}>
+                <Sparkles size={14} />
+                {t('ai.aiSuggestion')}
+              </span>
+              <div style={{display:'flex',gap:'8px'}}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setAiSuggestion(null)}>
+                  {t('ai.dismiss')}
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={applyAISuggestion}>
+                  {t('ai.applyCode')}
+                </button>
+              </div>
+            </div>
+            <pre style={{margin:0,maxHeight:'300px',overflow:'auto',fontSize:'13px',lineHeight:'1.5',background:'var(--bg-code)',padding:'12px',borderRadius:'8px'}}>
+              {aiSuggestion}
+            </pre>
+          </div>
+        )}
 
         <div className="editor-wrapper">
           <CodeMirror
@@ -1085,6 +1240,55 @@ export default function ProblemDetail() {
             </div>
           </div>
         )}
+        </div>
+      )}
+
+      {showReportModal && (
+        <div className="modal-overlay" onClick={() => !reportSubmitting && setShowReportModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>{t('reports.reportProblem')}</h2>
+              <button className="modal-close" onClick={() => setShowReportModal(false)} disabled={reportSubmitting}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="form-group">
+                <label>{t('reports.reportType')}</label>
+                <select
+                  className="form-input"
+                  value={reportType}
+                  onChange={(e) => setReportType(e.target.value)}
+                  disabled={reportSubmitting}
+                >
+                  <option value="typo">{t('reports.typo')}</option>
+                  <option value="wrong_answer">{t('reports.wrong_answer')}</option>
+                  <option value="ambiguous">{t('reports.ambiguous')}</option>
+                  <option value="missing_data">{t('reports.missing_data')}</option>
+                  <option value="other">{t('reports.other')}</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>{t('reports.description')}</label>
+                <textarea
+                  className="form-textarea"
+                  value={reportDescription}
+                  onChange={(e) => setReportDescription(e.target.value)}
+                  placeholder={t('reports.descriptionPlaceholder')}
+                  rows={5}
+                  disabled={reportSubmitting}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={() => setShowReportModal(false)} disabled={reportSubmitting}>
+                {t('reports.cancel')}
+              </button>
+              <button className="btn btn-primary" onClick={submitReport} disabled={reportSubmitting}>
+                {reportSubmitting ? t('common.loading') : t('reports.submit')}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

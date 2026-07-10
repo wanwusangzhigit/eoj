@@ -9,6 +9,8 @@ settings.get('/', async (c) => {
   const results = await c.env.DB.prepare('SELECT key, value FROM settings').all();
   const data: Record<string, string> = {};
   for (const row of results.results as any[]) {
+    // Never expose API keys publicly
+    if (row.key === 'ai_api_key') continue;
     data[row.key] = row.value;
   }
   return c.json({ success: true, data });
@@ -17,6 +19,10 @@ settings.get('/', async (c) => {
 // GET /settings/:key - Get a specific setting (no auth required)
 settings.get('/:key', async (c) => {
   const key = c.req.param('key');
+  // Never expose API keys publicly
+  if (key === 'ai_api_key') {
+    return c.json({ success: true, data: { value: '' } });
+  }
   const result = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(key).first();
   if (!result) {
     return c.json({ success: true, data: { value: '' } });

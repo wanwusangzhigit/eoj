@@ -1,0 +1,87 @@
+.follow-list-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.follow-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.follow-list-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 20px;
+}
+
+.follow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.follow-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.15s;
+}
+
+.follow-card:hover {
+  border-color: var(--primary-color, #6366f1);
+  background: rgba(99, 102, 241, 0.06);
+}
+
+.follow-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.follow-avatar.placeholder {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.follow-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.follow-username {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.follow-bio {
+  font-size: 12px;
+  color: var(--text-secondary, #aaa);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary, #aaa);
+}

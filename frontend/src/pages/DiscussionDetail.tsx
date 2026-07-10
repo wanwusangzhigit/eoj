@@ -130,7 +130,7 @@ export default function DiscussionDetail() {
   };
 
   const isOwner = user && discussion && (user.id === discussion.user_id);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   if (loading) {
     return (

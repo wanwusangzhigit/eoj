@@ -41,6 +41,14 @@ interface SettingsState {
   getEmailRequired: () => boolean;
   getEmailSuffixes: () => string;
   getAnnouncement: () => string;
+  getAIEnabled: () => boolean;
+  getAIChatEnabled: () => boolean;
+  getAICompletionEnabled: () => boolean;
+  getAdsConfig: () => {
+    clientId: string;
+    enabled: boolean;
+    slots: Record<string, { slot: string; enabled: boolean }>;
+  };
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -94,5 +102,35 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   getAnnouncement: () => {
     const { settings } = get();
     return settings.announcement || '';
+  },
+
+  getAIEnabled: () => {
+    const { settings } = get();
+    return settings.ai_enabled === 'true';
+  },
+
+  getAIChatEnabled: () => {
+    const { settings } = get();
+    return settings.ai_chat_enabled !== 'false';
+  },
+
+  getAICompletionEnabled: () => {
+    const { settings } = get();
+    return settings.ai_completion_enabled !== 'false';
+  },
+
+  getAdsConfig: () => {
+    const { settings } = get();
+    return {
+      clientId: settings.ads_client_id || '',
+      enabled: settings.ads_enabled === 'true',
+      slots: {
+        home_top: { slot: settings.ads_slot_home_top || '', enabled: settings.ads_slot_home_top_enabled !== 'false' },
+        home_side: { slot: settings.ads_slot_home_side || '', enabled: settings.ads_slot_home_side_enabled !== 'false' },
+        problem_side: { slot: settings.ads_slot_problem_side || '', enabled: settings.ads_slot_problem_side_enabled !== 'false' },
+        blog_top: { slot: settings.ads_slot_blog_top || '', enabled: settings.ads_slot_blog_top_enabled !== 'false' },
+        blog_side: { slot: settings.ads_slot_blog_side || '', enabled: settings.ads_slot_blog_side_enabled !== 'false' },
+      },
+    };
   },
 }));

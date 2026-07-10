@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - develop
+  pull_request:
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  backend:
+    name: Backend typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+      - name: Run backend TypeScript check
+        run: npm run typecheck
+        working-directory: backend
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    needs: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+      - name: Build frontend site
+        run: npm run build:site
+        working-directory: frontend

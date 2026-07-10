@@ -123,7 +123,7 @@ export default function SolutionDetail() {
   };
 
   const isOwner = user && solution && user.id === solution.user_id;
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const canEdit = isOwner;
   const canDelete = isOwner || isAdmin;
 

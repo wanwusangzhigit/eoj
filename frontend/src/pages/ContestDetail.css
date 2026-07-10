@@ -709,3 +709,121 @@
     height: 28px;
   }
 }
+
+/* ── Contest Badges (type/rated/status) ── */
+.contest-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Virtual participant flag ── */
+.virtual-flag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  vertical-align: middle;
+}
+
+/* ── Rating Changes Table ── */
+.rating-changes-table {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  overflow-x: auto;
+}
+
+.rating-changes-header,
+.rating-change-row {
+  display: grid;
+  grid-template-columns: 50px 1fr 80px 30px 110px 90px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 16px;
+}
+
+.rating-changes-header {
+  background: var(--bg-tertiary);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.rating-change-row {
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+
+.rating-change-row:hover {
+  background: var(--bg-tertiary);
+}
+
+.rc-rank {
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.rc-user .user-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.rc-user .user-link:hover {
+  text-decoration: underline;
+}
+
+.rc-old,
+.rc-new {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+}
+
+.rc-arrow {
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.rc-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 700;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  justify-content: flex-end;
+}
+
+.rc-delta.positive {
+  color: var(--success);
+}
+
+.rc-delta.negative {
+  color: var(--danger);
+}
+
+.review-section h3 {
+  display: flex;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .rating-changes-header,
+  .rating-change-row {
+    grid-template-columns: 40px 1fr 60px 20px 80px 70px;
+    gap: 6px;
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+}
