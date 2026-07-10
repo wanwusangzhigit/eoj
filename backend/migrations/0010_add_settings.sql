@@ -4,4 +4,4 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TEXT DEFAULT (datetime('now'))
 );
 
-ALTER TABLE settings ADD COLUMN IF NOT EXISTS updated_at TEXT DEFAULT (datetime('now'));
+ALTER TABLE settings ADD COLUMN updated_at TEXT DEFAULT (datetime('now'));
