@@ -51,7 +51,7 @@ notifications.get('/unread-count', authMiddleware, async (c) => {
 // POST /notifications/:id/read — 标记单条已读
 notifications.post('/:id/read', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   await c.env.DB.prepare(
     'UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?'
   ).bind(id, user.userId).run();

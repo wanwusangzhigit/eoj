@@ -89,7 +89,7 @@ training.get('/', async (c) => {
 
 // GET /training/:id — 训练计划详情（含章节、题目，已登录则返回是否已解决标识）
 training.get('/:id', async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const user = c.get('user');
 
   const plan = await c.env.DB.prepare(
@@ -180,7 +180,7 @@ training.post('/', authMiddleware, async (c) => {
 // PUT /training/:id — 编辑训练计划（owner 或 admin）
 training.put('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const plan = await c.env.DB.prepare('SELECT user_id FROM training_plans WHERE id = ?').bind(id).first();
 
   if (!plan) {
@@ -215,7 +215,7 @@ training.put('/:id', authMiddleware, async (c) => {
 // DELETE /training/:id — 删除训练计划（owner 或 admin）
 training.delete('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const plan = await c.env.DB.prepare('SELECT user_id FROM training_plans WHERE id = ?').bind(id).first();
 
   if (!plan) {
@@ -233,7 +233,7 @@ training.delete('/:id', authMiddleware, async (c) => {
 // GET /training/:id/progress — 当前用户进度（自动统计实际 AC 数）
 training.get('/:id/progress', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   // 计算计划题目总数
   const totalResult = await c.env.DB.prepare(
@@ -272,7 +272,7 @@ training.get('/:id/progress', authMiddleware, async (c) => {
 // POST /training/:id/join — 加入训练（创建 progress 占位）
 training.post('/:id/join', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const plan = await c.env.DB.prepare('SELECT id FROM training_plans WHERE id = ?').bind(id).first();
   if (!plan) {
@@ -290,7 +290,7 @@ training.post('/:id/join', authMiddleware, async (c) => {
 
 // POST /training/:id/chapters — 新增章节（admin）
 training.post('/:id/chapters', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const plan = await c.env.DB.prepare('SELECT id FROM training_plans WHERE id = ?').bind(id).first();
   if (!plan) {
     return c.json({ success: false, error: { message: 'Training plan not found', code: 'NOT_FOUND' } }, 404);
@@ -312,7 +312,7 @@ training.post('/:id/chapters', authMiddleware, adminMiddleware, async (c) => {
 
 // PUT /training/chapters/:id — 编辑章节（admin）
 training.put('/chapters/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { title, description, sort_order } = body;
 
@@ -329,14 +329,14 @@ training.put('/chapters/:id', authMiddleware, adminMiddleware, async (c) => {
 
 // DELETE /training/chapters/:id — 删除章节（admin）
 training.delete('/chapters/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   await c.env.DB.prepare('DELETE FROM training_chapters WHERE id = ?').bind(id).run();
   return c.json({ success: true, data: { message: 'Chapter deleted' } });
 });
 
 // POST /training/chapters/:id/problems — 添加章节题目（admin）
 training.post('/chapters/:id/problems', authMiddleware, adminMiddleware, async (c) => {
-  const chapterId = parseInt(c.req.param('id'));
+  const chapterId = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { problem_id, note, sort_order } = body;
 
@@ -359,8 +359,8 @@ training.post('/chapters/:id/problems', authMiddleware, adminMiddleware, async (
 
 // DELETE /training/chapters/:id/problems/:problemId — 从章节移除题目（admin）
 training.delete('/chapters/:id/problems/:problemId', authMiddleware, adminMiddleware, async (c) => {
-  const chapterId = parseInt(c.req.param('id'));
-  const problemId = parseInt(c.req.param('problemId'));
+  const chapterId = parseInt(c.req.param('id') || '0');
+  const problemId = parseInt(c.req.param('problemId') || '0');
   await c.env.DB.prepare(
     'DELETE FROM training_chapter_problems WHERE chapter_id = ? AND problem_id = ?'
   ).bind(chapterId, problemId).run();

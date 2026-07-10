@@ -607,7 +607,7 @@ async function extractResponse(
     const errText = await response.text();
     throw new Error(`AI API error (${response.status}): ${errText}`);
   }
-  const data = await response.json();
+  const data: any = await response.json();
   if (provider === 'anthropic') {
     const content = data.content;
     if (!Array.isArray(content)) return { content: '', toolCalls: [] };

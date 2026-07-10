@@ -366,7 +366,7 @@ admin.delete('/sql/table/:name/row', authMiddleware, superAdminMiddleware, async
 
 // POST /admin/contests/:id/plagiarism-check — trigger plagiarism detection for a contest
 admin.post('/contests/:id/plagiarism-check', authMiddleware, adminMiddleware, async (c) => {
-  const contestId = parseInt(c.req.param('id'));
+  const contestId = parseInt(c.req.param('id') || '0');
 
   const contest = await c.env.DB.prepare('SELECT id FROM contests WHERE id = ?').bind(contestId).first();
   if (!contest) {
@@ -444,7 +444,7 @@ admin.post('/contests/:id/plagiarism-check', authMiddleware, adminMiddleware, as
 
 // GET /admin/contests/:id/plagiarism-reports — list plagiarism reports for a contest
 admin.get('/contests/:id/plagiarism-reports', authMiddleware, adminMiddleware, async (c) => {
-  const contestId = parseInt(c.req.param('id'));
+  const contestId = parseInt(c.req.param('id') || '0');
 
   const reports = await c.env.DB.prepare(
     `SELECT pr.id, pr.contest_id, pr.submission_a, pr.submission_b, pr.similarity, pr.method, pr.created_at,
@@ -466,7 +466,7 @@ admin.get('/contests/:id/plagiarism-reports', authMiddleware, adminMiddleware, a
 
 // GET /admin/plagiarism/:id — single report detail with full source code
 admin.get('/plagiarism/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const report = await c.env.DB.prepare(
     `SELECT pr.id, pr.contest_id, pr.submission_a, pr.submission_b, pr.similarity, pr.method, pr.created_at
@@ -548,7 +548,7 @@ admin.get('/blogs', authMiddleware, adminMiddleware, async (c) => {
 
 // GET /admin/blogs/:id — admin view single blog (no view increment)
 admin.get('/blogs/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const blog = await c.env.DB.prepare(
     `SELECT b.*, u.username, u.avatar_url
      FROM blogs b JOIN users u ON b.user_id = u.id WHERE b.id = ?`
@@ -561,7 +561,7 @@ admin.get('/blogs/:id', authMiddleware, adminMiddleware, async (c) => {
 
 // PUT /admin/blogs/:id/status — update blog status (admin force)
 admin.put('/blogs/:id/status', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const { status } = await c.req.json();
   const allowed = ['published', 'draft', 'archived', 'deleted'];
   if (!allowed.includes(status)) {
@@ -575,7 +575,7 @@ admin.put('/blogs/:id/status', authMiddleware, adminMiddleware, async (c) => {
 
 // DELETE /admin/blogs/:id — admin force delete
 admin.delete('/blogs/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   // cascade delete related rows
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM blog_likes WHERE blog_id = ?').bind(id),
@@ -629,7 +629,7 @@ admin.get('/teams', authMiddleware, adminMiddleware, async (c) => {
 
 // DELETE /admin/teams/:id — admin force delete a team
 admin.delete('/teams/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM team_members WHERE team_id = ?').bind(id),
     c.env.DB.prepare('DELETE FROM teams WHERE id = ?').bind(id),
@@ -639,7 +639,7 @@ admin.delete('/teams/:id', authMiddleware, adminMiddleware, async (c) => {
 
 // PUT /admin/teams/:id/visibility — toggle team public/private
 admin.put('/teams/:id/visibility', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const { is_public } = await c.req.json();
   await c.env.DB.prepare('UPDATE teams SET is_public = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     .bind(is_public ? 1 : 0, id).run();
@@ -705,7 +705,7 @@ admin.get('/messages/conversations', authMiddleware, adminMiddleware, async (c) 
 
 // GET /admin/messages/conversations/:id — view messages in a conversation
 admin.get('/messages/conversations/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
   const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '50')));
   const offset = (page - 1) * pageSize;
@@ -734,14 +734,14 @@ admin.get('/messages/conversations/:id', authMiddleware, adminMiddleware, async 
 
 // DELETE /admin/messages/:id — delete a single message
 admin.delete('/messages/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   await c.env.DB.prepare('DELETE FROM messages WHERE id = ?').bind(id).run();
   return c.json({ success: true, data: { message: 'Message deleted' } });
 });
 
 // DELETE /admin/messages/conversations/:id — delete entire conversation
 admin.delete('/messages/conversations/:id', authMiddleware, adminMiddleware, async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   await c.env.DB.batch([
     c.env.DB.prepare('DELETE FROM messages WHERE conversation_id = ?').bind(id),
     c.env.DB.prepare('DELETE FROM conversation_participants WHERE conversation_id = ?').bind(id),

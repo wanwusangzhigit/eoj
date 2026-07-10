@@ -11,7 +11,7 @@
 
 const K = 15; // K-gram length
 const W = 30; // window size
-const BASE = 257;
+const BASE = 257n;
 const MOD = 1_000_000_007n;
 
 // --- 1. Normalization -----------------------------------------------------
