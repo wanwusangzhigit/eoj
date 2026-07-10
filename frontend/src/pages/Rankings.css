@@ -40,6 +40,75 @@
   gap: 8px;
 }
 
+.rankings-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.mode-switcher {
+  display: inline-flex;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 3px;
+}
+
+.mode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: calc(var(--radius) - 2px);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+
+.mode-btn:hover {
+  color: var(--accent);
+}
+
+.mode-btn.active {
+  background: var(--accent);
+  color: white;
+}
+
+.header-rating,
+.rating-cell {
+  text-align: right;
+  min-width: 130px;
+}
+
+.rating-cell {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.rating-value {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.max-rating {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.rating-unrated {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .time-filter-btn {
   display: flex;
   align-items: center;
@@ -313,5 +382,19 @@
   .rankings-table-header,
   .rankings-row {
     grid-template-columns: 50px 1fr 80px;
+  }
+
+  /* Rating mode shows compact rating cell on mobile */
+  .rankings-row.rating-mode {
+    grid-template-columns: 50px 1fr auto;
+  }
+
+  .rating-cell {
+    min-width: 0;
+    gap: 4px;
+  }
+
+  .max-rating {
+    display: none;
   }
 }

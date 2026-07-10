@@ -2,36 +2,67 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
 }
 
 .main-content {
   flex: 1;
-  max-width: 1200px;
+  max-width: 1400px;
   width: 100%;
   margin: 0 auto;
-  padding: 24px;
+  padding: 32px 24px;
+  animation: fadeInUp 0.4s ease-out;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding: 24px 16px;
+  }
 }
 
 .site-footer {
   border-top: 1px solid var(--border);
-  background: var(--bg-secondary);
-  padding: 16px 24px;
+  background: rgba(10, 11, 15, 0.8);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  padding: 32px 24px;
   margin-top: auto;
+  margin-top: calc(auto + 48px);
+  position: relative;
+  overflow: hidden;
+}
+
+.site-footer::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
+}
+
+[data-theme="light"] .site-footer {
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .footer-inner {
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   flex-wrap: wrap;
 }
 
 .footer-text {
   font-size: 13px;
   color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .footer-links {
@@ -44,9 +75,29 @@
   font-size: 13px;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: color 0.2s;
+  transition: all var(--transition);
+  padding: 8px 12px;
+  border-radius: var(--radius);
+  position: relative;
+}
+
+.footer-links a::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 2px;
+  background: var(--accent);
+  transition: width var(--transition);
 }
 
 .footer-links a:hover {
-  color: var(--primary);
+  color: var(--accent);
+  background: var(--accent-light);
+}
+
+.footer-links a:hover::after {
+  width: 60%;
 }

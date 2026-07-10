@@ -1,5 +1,6 @@
 import * as bcrypt from 'bcryptjs';
 import { saveTestcases } from './utils/github-testcases';
+import { DEFAULT_AI_SYSTEM_PROMPT, DEFAULT_AI_SYSTEM_PROMPT_VERSION } from './ai-default-prompt';
 
 interface SeedTestcase {
   input: string;
@@ -140,6 +141,29 @@ export async function seedDatabase(db: D1Database, env: { GITHUB_TOKEN: string; 
       await saveTestcases(env, problemData.slug, testcases);
     }
   }
+
+  // Seed default AI settings (system prompt + feature flags).
+  // The system prompt is the canonical "OJ 导师" tutor prompt; admins can
+  // later override it from the settings UI. Storing it here ensures a fresh
+  // deploy has a working, well-designed default without manual config.
+  const now = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const aiDefaults: Record<string, string> = {
+    ai_system_prompt: DEFAULT_AI_SYSTEM_PROMPT,
+    ai_system_prompt_version: DEFAULT_AI_SYSTEM_PROMPT_VERSION,
+    ai_enabled: 'false',           // disabled by default; admin enables after configuring key
+    ai_chat_enabled: 'true',
+    ai_completion_enabled: 'true',
+    ai_provider: 'openai',
+    ai_max_tokens: '4096',
+    ai_temperature: '0.7',
+    ai_models_config: '[]',
+  };
+  for (const [key, value] of Object.entries(aiDefaults)) {
+    await db.prepare(
+      "INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO NOTHING"
+    ).bind(key, value, now).run();
+  }
+  console.log('Seeded default AI settings (system prompt + feature flags)');
 
   // Mark seed as done
   await db.prepare("INSERT INTO settings (key, value) VALUES ('seed_done', 'true')").run();

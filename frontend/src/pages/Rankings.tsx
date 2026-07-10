@@ -1,28 +1,38 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import { Trophy, Medal, Award, Crown, Target, TrendingUp, AlertCircle } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, Target, TrendingUp, AlertCircle, Star } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import RatingBadge from '../components/RatingBadge';
+import { getRatingColor } from '../utils/rating';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import './Rankings.css';
+
+type Mode = 'solved' | 'rating';
 
 export default function Rankings() {
   const [rankings, setRankings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState<'all' | 'week' | 'month'>('all');
+  const [mode, setMode] = useState<Mode>('solved');
   useDocumentTitle(t('rankings.title'));
 
   useEffect(() => {
     fetchRankings();
-  }, [timeRange]);
+  }, [timeRange, mode]);
 
   const fetchRankings = async () => {
     try {
       setLoadError(false);
-      const data = await api.getRankings(50, timeRange);
-      setRankings(data.rankings);
+      if (mode === 'rating') {
+        const data = await api.getRatingLeaderboard({ page: 1, pageSize: 50 });
+        setRankings(data.rankings);
+      } else {
+        const data = await api.getRankings(50, timeRange);
+        setRankings(data.rankings);
+      }
     } catch (e) {
       console.error('Failed to fetch rankings:', e);
       setLoadError(true);
@@ -67,26 +77,49 @@ export default function Rankings() {
           </div>
         </div>
 
-        <div className="time-filter">
-          {(['all', 'week', 'month'] as const).map((range) => (
+        <div className="rankings-controls">
+          <div className="mode-switcher">
             <button
-              key={range}
-              className={`time-filter-btn ${timeRange === range ? 'active' : ''}`}
-              onClick={() => setTimeRange(range)}
+              className={`mode-btn ${mode === 'solved' ? 'active' : ''}`}
+              onClick={() => setMode('solved')}
+              title={t('rankings.bySolved')}
             >
-              {range === 'all' && <TrendingUp size={14} />}
-              {range === 'all' && t('rankings.allTime')}
-              {range === 'week' && t('rankings.weekly')}
-              {range === 'month' && t('rankings.monthly')}
+              <Target size={14} />
+              {t('rankings.bySolved')}
             </button>
-          ))}
+            <button
+              className={`mode-btn ${mode === 'rating' ? 'active' : ''}`}
+              onClick={() => setMode('rating')}
+              title={t('rankings.byRating')}
+            >
+              <Star size={14} />
+              {t('rankings.byRating')}
+            </button>
+          </div>
+
+          {mode === 'solved' && (
+            <div className="time-filter">
+              {(['all', 'week', 'month'] as const).map((range) => (
+                <button
+                  key={range}
+                  className={`time-filter-btn ${timeRange === range ? 'active' : ''}`}
+                  onClick={() => setTimeRange(range)}
+                >
+                  {range === 'all' && <TrendingUp size={14} />}
+                  {range === 'all' && t('rankings.allTime')}
+                  {range === 'week' && t('rankings.weekly')}
+                  {range === 'month' && t('rankings.monthly')}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
       {rankings.length === 0 ? (
         <div className="empty-state">
           <Target size={48} className="empty-icon" />
-          <h3>{t('rankings.noSubmissionsYet')}</h3>
+          <h3>{mode === 'rating' ? t('rankings.noRatingsYet') : t('rankings.noSubmissionsYet')}</h3>
           <p>{t('rankings.beTheFirst')}</p>
         </div>
       ) : (
@@ -94,34 +127,57 @@ export default function Rankings() {
           <div className="rankings-table-header">
             <span className="header-rank">{t('rankings.rank')}</span>
             <span className="header-user">{t('rankings.user')}</span>
-            <span className="header-score">{t('rankings.solved')}</span>
+            {mode === 'solved' && <span className="header-score">{t('rankings.solved')}</span>}
+            {mode === 'rating' && <span className="header-rating">{t('rankings.rating')}</span>}
           </div>
-          {rankings.map((user) => (
-            <Link
-              key={user.id}
-              to={`/users/${user.username}`}
-              className={`rankings-row ${getRankClass(user.rank)}`}
-            >
-              <div className="rank-cell">{getRankIcon(user.rank)}</div>
-              <div className="user-cell">
-                {user.avatar_url && (
-                  <img src={user.avatar_url} alt={user.username} className="user-avatar" />
-                )}
-                <div className="user-info">
-                  <span className="username">{user.username}</span>
-                  {user.rank <= 3 && (
-                    <span className={`rank-badge ${getRankClass(user.rank)}`}>
-                      {user.rank === 1 ? t('rankings.champion') : user.rank === 2 ? t('rankings.runnerUp') : t('rankings.thirdPlace')}
-                    </span>
+          {rankings.map((user) => {
+            const rank = mode === 'rating' ? user.rank : user.rank;
+            return (
+              <Link
+                key={`${user.id}-${mode}`}
+                to={`/users/${user.username}`}
+                className={`rankings-row ${mode === 'rating' ? 'rating-mode' : ''} ${getRankClass(rank)}`}
+              >
+                <div className="rank-cell">{getRankIcon(rank)}</div>
+                <div className="user-cell">
+                  {user.avatar_url && (
+                    <img src={user.avatar_url} alt={user.username} className="user-avatar" />
                   )}
+                  <div className="user-info">
+                    <span className="username">{user.username}</span>
+                    {rank <= 3 && (
+                      <span className={`rank-badge ${getRankClass(rank)}`}>
+                        {rank === 1 ? t('rankings.champion') : rank === 2 ? t('rankings.runnerUp') : t('rankings.thirdPlace')}
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className="score-cell">
-                <span className="score">{user.solved_count}</span>
-                <span className="score-label">{t('rankings.problems')}</span>
-              </div>
-            </Link>
-          ))}
+                {mode === 'solved' && (
+                  <div className="score-cell">
+                    <span className="score">{user.solved_count}</span>
+                    <span className="score-label">{t('rankings.problems')}</span>
+                  </div>
+                )}
+                {mode === 'rating' && (
+                  <div className="rating-cell">
+                    {user.rating > 0 ? (
+                      <>
+                        <span className="rating-value" style={{ color: getRatingColor(user.rating) }}>
+                          {user.rating}
+                        </span>
+                        {user.max_rating > 0 && (
+                          <span className="max-rating">/ {user.max_rating}</span>
+                        )}
+                        <RatingBadge rating={user.rating} showLabel={false} size="sm" />
+                      </>
+                    ) : (
+                      <span className="rating-unrated">{t('rankings.unrated')}</span>
+                    )}
+                  </div>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

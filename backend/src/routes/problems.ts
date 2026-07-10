@@ -1,13 +1,24 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware, problemAdminMiddleware } from '../middleware/auth';
+import { authMiddleware, problemAdminMiddleware, adminMiddleware } from '../middleware/auth';
 import { validateSlug } from '../utils/validator';
 import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
 import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
+import { sendNotification, NotificationType } from '../utils/notify';
 
 const VALID_SPJ_LANGUAGES = ['python', 'cpp', 'java', 'javascript', 'c', 'go', 'rust'];
 
 const problems = new Hono<AppType>();
+
+// GET /problems/tags - All unique tags from public problems
+problems.get('/tags', async (c) => {
+  const results = await c.env.DB.prepare(
+    "SELECT DISTINCT json_extract(value, '$') as tag FROM problems, json_each(tags) WHERE is_public = 1"
+  ).all();
+
+  const tags = (results.results as any[]).map((r) => r.tag).filter(Boolean).sort();
+  return c.json({ success: true, data: { tags } });
+});
 
 problems.get('/', async (c) => {
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
@@ -80,6 +91,126 @@ problems.get('/', async (c) => {
 });
 
 // ── Literal-path routes BEFORE /:slug to avoid shadowing ──
+
+// GET /problems/recommend — personalized recommendations for logged-in user
+problems.get('/recommend', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const limit = Math.min(20, Math.max(1, parseInt(c.req.query('limit') || '10')));
+
+  // 1. Fetch the user's solved problem ids and rating
+  const solvedRows = await c.env.DB.prepare(
+    "SELECT DISTINCT problem_id FROM submissions WHERE user_id = ? AND status = 'accepted'"
+  ).bind(user.userId).all();
+  const solvedIds = new Set((solvedRows.results as any[]).map((r) => r.problem_id));
+
+  // 2. Get the user's tag profile (count of solved problems per tag)
+  const tagRows = await c.env.DB.prepare(
+    `SELECT json_extract(value, '$') as tag, COUNT(DISTINCT s.problem_id) as cnt
+     FROM submissions s, problems p, json_each(p.tags)
+     WHERE s.user_id = ? AND s.status = 'accepted' AND s.problem_id = p.id
+     GROUP BY tag ORDER BY cnt DESC LIMIT 5`
+  ).bind(user.userId).all();
+  const topTags = (tagRows.results as any[]).map((r) => r.tag).filter(Boolean);
+
+  // 3. Get user's current rating (or 0 if unrated)
+  const ratingRow = await c.env.DB.prepare(
+    'SELECT rating FROM user_ratings WHERE user_id = ?'
+  ).bind(user.userId).first();
+  const userRating = (ratingRow as any)?.rating || 0;
+
+  // 4. Get the user's attempted-but-not-solved problems (the most natural "next step")
+  const attemptedRows = await c.env.DB.prepare(
+    "SELECT DISTINCT problem_id FROM submissions WHERE user_id = ? AND status != 'accepted'"
+  ).bind(user.userId).all();
+  const attemptedIds = new Set((attemptedRows.results as any[]).map((r) => r.problem_id));
+
+  // 5. Query candidate problems: not solved, public, with rating close to user's
+  //    Score each candidate: rating closeness, tag overlap, pass_rate signal (mid-range is better for learning)
+  const candidates = await c.env.DB.prepare(
+    `SELECT id, title, slug, tags, difficulty, rating
+     FROM problems
+     WHERE is_public = 1`
+  ).all();
+
+  const recommendations: any[] = [];
+  for (const p of candidates.results as any[]) {
+    if (solvedIds.has(p.id)) continue;
+
+    let score = 0;
+    let reason = '';
+
+    // Rating closeness: prefer problems within ±200 of user's rating
+    const pRating = p.rating || 0;
+    if (userRating > 0 && pRating > 0) {
+      const diff = Math.abs(pRating - userRating);
+      if (diff <= 100) {
+        score += 50;
+        reason = '难度适中';
+      } else if (diff <= 200) {
+        score += 30;
+      } else if (diff <= 400) {
+        score += 10;
+      } else {
+        score -= 20; // too far from user's level
+      }
+    } else if (pRating > 0) {
+      // User has no rating, but problem does; give a small bonus to entry-level problems
+      if (pRating <= 1200) score += 15;
+    }
+
+    // Tag overlap: prefer problems in user's strong tags
+    if (topTags.length > 0 && p.tags) {
+      try {
+        const tags = JSON.parse(p.tags);
+        const overlap = tags.filter((t: string) => topTags.includes(t));
+        if (overlap.length > 0) {
+          score += overlap.length * 15;
+          reason = reason || `擅长方向：${overlap.join(', ')}`;
+        }
+      } catch { /* ignore */ }
+    }
+
+    // Difficulty progression: if user has solved many easy, prefer medium; etc.
+    if (userRating === 0 && p.difficulty === 'Easy') {
+      score += 10; // brand-new users → easy problems
+    }
+
+    // Bonus for problems the user has attempted but not solved (clearly on their radar)
+    if (attemptedIds.has(p.id)) {
+      score += 20;
+      reason = reason || '已尝试但未通过';
+    }
+
+    // Small randomization to keep recommendations fresh
+    score += Math.random() * 5;
+
+    if (score > 0) {
+      recommendations.push({
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        tags: p.tags,
+        difficulty: p.difficulty,
+        rating: pRating,
+        score: Math.round(score * 10) / 10,
+        reason: reason || '基于你的做题记录',
+      });
+    }
+  }
+
+  // Sort by score desc, take top N
+  recommendations.sort((a, b) => b.score - a.score);
+  const top = recommendations.slice(0, limit);
+
+  return c.json({
+    success: true,
+    data: {
+      recommendations: top,
+      user_rating: userRating,
+      top_tags: topTags,
+    },
+  });
+});
 
 problems.get('/user/solved', authMiddleware, async (c) => {
   const user = c.get('user');
@@ -354,9 +485,13 @@ problems.put('/:id', authMiddleware, problemAdminMiddleware, async (c) => {
   const values: any[] = [];
 
   for (const [key, value] of Object.entries(body)) {
-    if (['title', 'description', 'input_format', 'output_format', 'time_limit', 'memory_limit', 'difficulty', 'is_public'].includes(key)) {
+    if (['title', 'description', 'input_format', 'output_format', 'time_limit', 'memory_limit', 'difficulty'].includes(key)) {
       fields.push(`${key} = ?`);
-      values.push(key === 'tags' ? JSON.stringify(value) : value);
+      values.push(value);
+    }
+    if (key === 'is_public') {
+      fields.push('is_public = ?');
+      values.push(value ? 1 : 0);
     }
     if (key === 'tags') {
       fields.push('tags = ?');
@@ -655,6 +790,106 @@ problems.delete('/:id/favorite', authMiddleware, async (c) => {
     .run();
 
   return c.json({ success: true, data: { message: 'Favorite removed' } });
+});
+
+// === 题目举报/纠错 ===
+
+// POST /problems/:id/reports — 提交举报
+problems.post('/:id/reports', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const problemId = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+  const { type, description } = body;
+
+  if (!type || !description) {
+    return c.json({ success: false, error: { message: 'type and description are required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const validTypes = ['typo', 'wrong_answer', 'ambiguous', 'missing_data', 'other'];
+  if (!validTypes.includes(type)) {
+    return c.json({ success: false, error: { message: 'Invalid type', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const problem = await c.env.DB.prepare('SELECT id, title FROM problems WHERE id = ?').bind(problemId).first();
+  if (!problem) {
+    return c.json({ success: false, error: { message: 'Problem not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  const result = await c.env.DB.prepare(
+    'INSERT INTO problem_reports (problem_id, user_id, type, description) VALUES (?, ?, ?, ?)'
+  ).bind(problemId, user.userId, type, description).run();
+
+  return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Report submitted' } }, 201);
+});
+
+// GET /problems/admin/reports — 举报列表（admin）
+problems.get('/admin/reports', authMiddleware, adminMiddleware, async (c) => {
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const status = c.req.query('status');
+  const offset = (page - 1) * pageSize;
+
+  let where = '1=1';
+  const binds: any[] = [];
+  if (status) {
+    where += ' AND pr.status = ?';
+    binds.push(status);
+  }
+
+  const countResult = await c.env.DB.prepare(
+    `SELECT COUNT(*) as total FROM problem_reports pr WHERE ${where}`
+  ).bind(...binds).first();
+  const total = (countResult as any)?.total || 0;
+
+  const results = await c.env.DB.prepare(
+    `SELECT pr.id, pr.problem_id, pr.user_id, pr.type, pr.description, pr.status, pr.admin_reply, pr.created_at, pr.updated_at,
+       u.username as reporter_name, p.title as problem_title, p.slug as problem_slug
+     FROM problem_reports pr
+     JOIN users u ON pr.user_id = u.id
+     JOIN problems p ON pr.problem_id = p.id
+     WHERE ${where}
+     ORDER BY pr.created_at DESC LIMIT ? OFFSET ?`
+  ).bind(...binds, pageSize, offset).all();
+
+  return c.json({
+    success: true,
+    data: {
+      reports: results.results,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    },
+  });
+});
+
+// PUT /problems/admin/reports/:id — 处理举报（admin）
+problems.put('/admin/reports/:id', authMiddleware, adminMiddleware, async (c) => {
+  const id = parseInt(c.req.param('id'));
+  const body = await c.req.json();
+  const { status, admin_reply } = body;
+
+  if (!['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+    return c.json({ success: false, error: { message: 'Invalid status', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const report = await c.env.DB.prepare('SELECT user_id, problem_id FROM problem_reports WHERE id = ?').bind(id).first();
+  if (!report) {
+    return c.json({ success: false, error: { message: 'Report not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  await c.env.DB.prepare(
+    'UPDATE problem_reports SET status = ?, admin_reply = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+  ).bind(status, admin_reply || '', id).run();
+
+  // 通知举报者
+  await sendNotification(
+    c.env.DB,
+    (report as any).user_id,
+    NotificationType.REPORT,
+    '举报处理更新',
+    `你的举报 #${id} 已被处理：${status}`,
+    `/problems/${(report as any).problem_id}`
+  );
+
+  return c.json({ success: true, data: { message: 'Report updated' } });
 });
 
 export default problems;

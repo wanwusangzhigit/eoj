@@ -6,8 +6,8 @@ export type Permission = typeof ALL_PERMISSIONS[number];
 export function usePermissions() {
   const { user } = useAuthStore();
 
-  const isSuperAdmin = user?.id === 1;
-  const isAdmin = user?.role === 'admin';
+  const isSuperAdmin = user?.id === 1 || user?.role === 'super_admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Full admin or super admin has all permissions
   const hasAllPermissions = isAdmin || isSuperAdmin;
