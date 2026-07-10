@@ -3,3 +3,5 @@ backend/wrangler.toml
 frontend/dist
 backend/node_modules
 frontend/node_modules
+.wrangler/
+frontend/pnpm-lock.yaml"
