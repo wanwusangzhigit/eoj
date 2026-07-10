@@ -5,9 +5,8 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "db:migrate": "wrangler d1 execute oj-database --file=./migrations/0001_initial.sql",
-    "db:migrate:local": "wrangler d1 execute oj-database --local --file=./migrations/0001_initial.sql",
-    "db:migrate:0003:local": "wrangler d1 execute oj-database --local --file=./migrations/0003_add_password_hash.sql",
+    "db:migrate": "wrangler d1 migrations apply DB --remote",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

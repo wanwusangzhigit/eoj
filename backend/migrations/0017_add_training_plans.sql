@@ -58,10 +58,52 @@ CREATE INDEX IF NOT EXISTS idx_training_progress_user ON training_progress(user_
 CREATE INDEX IF NOT EXISTS idx_training_progress_plan ON training_progress(plan_id);
 
 -- 预置官方训练计划：算法入门
-INSERT INTO training_plans (title, description, category, difficulty, user_id, is_official, sort_order) VALUES
-  ('算法入门训练', '从基础的循环结构到经典算法，系统化提升算法能力。每个章节循序渐进，适合刚入门的选手。', 'algorithm', 'beginner', 1, 1, 1);
+INSERT INTO training_plans (title, description, category, difficulty, user_id, is_official, sort_order)
+SELECT
+  '算法入门训练',
+  '从基础的循环结构到经典算法，系统化提升算法能力。每个章节循序渐进，适合刚入门的选手。',
+  'algorithm',
+  'beginner',
+  u.id,
+  1,
+  1
+FROM users u
+WHERE u.id = (SELECT id FROM users ORDER BY id LIMIT 1)
+  AND NOT EXISTS (
+    SELECT 1 FROM training_plans
+    WHERE title = '算法入门训练'
+      AND is_official = 1
+  );
 
-INSERT INTO training_chapters (plan_id, title, description, sort_order) VALUES
-  (1, '第 1 章：基础输入输出', '熟悉变量、循环与基本输入输出操作。', 1),
-  (1, '第 2 章：枚举与贪心', '掌握简单枚举与贪心思想。', 2),
-  (1, '第 3 章：二分与排序', '掌握二分查找与排序算法。', 3);
+INSERT INTO training_chapters (plan_id, title, description, sort_order)
+SELECT tp.id, '第 1 章：基础输入输出', '熟悉变量、循环与基本输入输出操作。', 1
+FROM training_plans tp
+WHERE tp.title = '算法入门训练'
+  AND tp.is_official = 1
+  AND NOT EXISTS (
+    SELECT 1 FROM training_chapters
+    WHERE plan_id = tp.id
+      AND title = '第 1 章：基础输入输出'
+  );
+
+INSERT INTO training_chapters (plan_id, title, description, sort_order)
+SELECT tp.id, '第 2 章：枚举与贪心', '掌握简单枚举与贪心思想。', 2
+FROM training_plans tp
+WHERE tp.title = '算法入门训练'
+  AND tp.is_official = 1
+  AND NOT EXISTS (
+    SELECT 1 FROM training_chapters
+    WHERE plan_id = tp.id
+      AND title = '第 2 章：枚举与贪心'
+  );
+
+INSERT INTO training_chapters (plan_id, title, description, sort_order)
+SELECT tp.id, '第 3 章：二分与排序', '掌握二分查找与排序算法。', 3
+FROM training_plans tp
+WHERE tp.title = '算法入门训练'
+  AND tp.is_official = 1
+  AND NOT EXISTS (
+    SELECT 1 FROM training_chapters
+    WHERE plan_id = tp.id
+      AND title = '第 3 章：二分与排序'
+  );
