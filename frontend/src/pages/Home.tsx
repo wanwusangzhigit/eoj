@@ -233,9 +233,13 @@ export default function Home() {
                   {p.reason && (
                     <div className="recommend-card-reason">{p.reason}</div>
                   )}
-                  {p.tags && p.tags.length > 0 && (
+                  {p.tags && (
                     <div className="recommend-card-tags">
-                      {p.tags.slice(0, 3).map((tag: string, i: number) => (
+                      {(
+                        Array.isArray(p.tags)
+                          ? p.tags
+                          : (typeof p.tags === 'string' ? p.tags.split(',') : [])
+                      ).slice(0, 3).map((tag: string, i: number) => (
                         <span key={i} className="recommend-tag">#{tag}</span>
                       ))}
                     </div>
