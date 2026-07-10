@@ -24,10 +24,10 @@ jobs:
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
       - name: Install backend dependencies
-        run: npm install
+        run: npm ci
         working-directory: backend
       - name: Run backend TypeScript check
-        run: npm exec tsc -- -p tsconfig.json --noEmit
+        run: npm run typecheck
         working-directory: backend
 
   frontend:
@@ -42,7 +42,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
       - name: Install frontend dependencies
-        run: npm install
+        run: npm ci
         working-directory: frontend
       - name: Build frontend site
         run: npm run build:site
