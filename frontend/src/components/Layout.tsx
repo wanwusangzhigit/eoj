@@ -35,32 +35,40 @@ export default function Layout({ children }: { children: ReactNode }) {
       <main className="main-content">
         {children}
       </main>
-      {config.footer.enabled && (
-        <footer className="site-footer">
-          <div className="footer-inner">
+      <footer className="site-footer">
+        <div className="footer-inner">
+          <div className="footer-text footer-text-multi">
+            <span>
+              Build by <a href="https://github.com/wanwusangzhigit/eoj/" target="_blank" rel="noopener noreferrer">https://github.com/wanwusangzhigit/eoj/</a>
+            </span>
+            {config.contact.email && (
+              <span>
+                Contact: <a href={`mailto:${config.contact.email}`}>{config.contact.email}</a>
+              </span>
+            )}
             {config.footer.text && (
-              <div className="footer-text" dangerouslySetInnerHTML={{ __html: config.footer.text }} />
+              <span className="footer-custom-text" dangerouslySetInnerHTML={{ __html: config.footer.text }} />
             )}
             {!config.footer.text && (
-              <div className="footer-text">
+              <span>
                 &copy; {new Date().getFullYear()} {config.site.name}
-              </div>
+              </span>
             )}
-            <div className="footer-links">
-              {FOOTER_INTERNAL_LINKS.map((link) => (
-                <Link key={link.to} to={link.to}>
-                  {t(link.label)}
-                </Link>
-              ))}
-              {config.footer.links.map((link, i) => (
-                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer">
-                  {link.name}
-                </a>
-              ))}
-            </div>
           </div>
-        </footer>
-      )}
+          <div className="footer-links">
+            {FOOTER_INTERNAL_LINKS.map((link) => (
+              <Link key={link.to} to={link.to}>
+                {t(link.label)}
+              </Link>
+            ))}
+            {config.footer.links.map((link, i) => (
+              <a key={i} href={link.url} target="_blank" rel="noopener noreferrer">
+                {link.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      </footer>
       <Toast />
     </div>
   );

@@ -20,4 +20,7 @@ export interface SiteConfig {
   home: {
     title: string;
   };
+  contact: {
+    email: string;
+  };
 }

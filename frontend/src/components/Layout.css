@@ -65,6 +65,15 @@
   gap: 8px;
 }
 
+.footer-text-multi {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.footer-custom-text {
+  white-space: pre-wrap;
+}
+
 .footer-links {
   display: flex;
   gap: 16px;
