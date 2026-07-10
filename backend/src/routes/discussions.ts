@@ -167,7 +167,7 @@ discussions.delete('/:id', authMiddleware, async (c) => {
 
   // Only author or admin can delete
   const isOwner = (discussion as any).user_id === user.userId;
-  const isAdmin = user.role === 'admin' || user.userId === 1;
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1;
   if (!isOwner && !isAdmin) {
     return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
   }
@@ -223,7 +223,7 @@ discussions.delete('/:id/replies/:replyId', authMiddleware, async (c) => {
 
   // Only author or admin can delete
   const isOwner = (reply as any).user_id === user.userId;
-  const isAdmin = user.role === 'admin' || user.userId === 1;
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1;
   if (!isOwner && !isAdmin) {
     return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
   }

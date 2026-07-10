@@ -8,43 +8,107 @@ import { createRateLimiter } from '../middleware/rateLimit';
 
 const auth = new Hono<AppType>();
 
+async function getOAuthCallbackBase(c: any): Promise<string> {
+  try {
+    const urlRow: any = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('oauth_callback_url').first();
+    if (urlRow && urlRow.value) {
+      return urlRow.value.replace(/\/$/, '');
+    }
+
+    const protocolRow: any = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind('oauth_protocol').first();
+    const origin = new URL(c.req.url).origin;
+    
+    if (protocolRow && protocolRow.value) {
+      const url = new URL(origin);
+      url.protocol = protocolRow.value;
+      return url.origin;
+    }
+  } catch {
+    // ignore
+  }
+  
+  return new URL(c.req.url).origin;
+}
+
 // CP OAuth with PKCE
+// base64url 编码工具函数
+function base64url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 auth.get('/cpoauth', async (c) => {
   const clientId = c.env.CPOAUTH_CLIENT_ID;
-  const redirectUri = `${new URL(c.req.url).origin}/api/v1/auth/cpoauth/callback`;
+  const callbackBase = await getOAuthCallbackBase(c);
+  const redirectUri = `${callbackBase}/api/v1/auth/cpoauth/callback`;
 
-  // Generate PKCE code_verifier (43-128 chars, URL-safe)
-  const codeVerifier = crypto.randomUUID() + crypto.randomUUID() + crypto.randomUUID();
+  // 生成 PKCE code_verifier: 32 字节随机数的 base64url 编码
+  const verifierBytes = new Uint8Array(32);
+  crypto.getRandomValues(verifierBytes);
+  const codeVerifier = base64url(verifierBytes.buffer as ArrayBuffer);
 
-  // Compute code_challenge = BASE64URL(SHA256(code_verifier))
-  const encoder = new TextEncoder();
-  const data = encoder.encode(codeVerifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(digest)))
-    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // 计算 code_challenge = BASE64URL(SHA256(code_verifier))
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+  const codeChallenge = base64url(digest);
 
-  const state = crypto.randomUUID();
+  // 生成 state 防止 CSRF
+  const stateBytes = new Uint8Array(16);
+  crypto.getRandomValues(stateBytes);
+  const state = base64url(stateBytes.buffer as ArrayBuffer);
 
-  const cpoauthUrl = `https://www.cpoauth.com/api/oauth/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=openid+profile&state=${state}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+  const params = new URLSearchParams({
+    response_type: 'code',
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    scope: 'openid profile',
+    state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
+  });
+  const cpoauthUrl = `https://www.cpoauth.com/oauth/authorize?${params.toString()}`;
 
-  // Store code_verifier in cookie for callback
-  c.header('Set-Cookie', `cpoauth_verifier=${codeVerifier}; Path=/api/v1/auth/cpoauth/callback; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+  // 将 code_verifier + state 存入 cookie，回调时取出
+  const cookieOpts = 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
+  c.header('Set-Cookie', `cpoauth_cv=${codeVerifier}; ${cookieOpts}`);
+  c.header('Set-Cookie', `cpoauth_st=${state}; ${cookieOpts}`, { append: true });
   return c.redirect(cpoauthUrl);
 });
 
 auth.get('/cpoauth/callback', async (c) => {
   const code = c.req.query('code');
+  const state = c.req.query('state');
+  const error = c.req.query('error');
+  const errorDesc = c.req.query('error_description');
+
+  if (error) {
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(errorDesc || '')}`);
+  }
   if (!code) {
-    return c.json({ success: false, error: { message: 'Missing authorization code', code: 'BAD_REQUEST' } }, 400);
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=missing_code`);
   }
 
-  const redirectUri = `${new URL(c.req.url).origin}/api/v1/auth/cpoauth/callback`;
-
-  // Retrieve code_verifier from cookie
+  // 从 cookie 中取出 code_verifier 和 state
   const cookieHeader = c.req.header('Cookie') || '';
-  const codeVerifier = cookieHeader.split(';').map(c => c.trim()).find(c => c.startsWith('cpoauth_verifier='))?.split('=')[1];
+  const getCookie = (name: string) => {
+    const match = cookieHeader.split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
+    return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null;
+  };
+  const savedVerifier = getCookie('cpoauth_cv');
+  const savedState = getCookie('cpoauth_st');
 
-  // Exchange code for access token (use PKCE code_verifier)
+  // 验证 state 防止 CSRF
+  if (state && savedState && state !== savedState) {
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=state_mismatch`);
+  }
+
+  const callbackBase = await getOAuthCallbackBase(c);
+  const redirectUri = `${callbackBase}/api/v1/auth/cpoauth/callback`;
+
+  // 用授权码 + code_verifier 换取 access_token
   const tokenBody: Record<string, string> = {
     grant_type: 'authorization_code',
     code,
@@ -52,8 +116,8 @@ auth.get('/cpoauth/callback', async (c) => {
     client_id: c.env.CPOAUTH_CLIENT_ID,
     client_secret: c.env.CPOAUTH_CLIENT_SECRET,
   };
-  if (codeVerifier) {
-    tokenBody.code_verifier = codeVerifier;
+  if (savedVerifier) {
+    tokenBody.code_verifier = savedVerifier;
   }
 
   const tokenResponse = await fetch('https://www.cpoauth.com/api/oauth/token', {
@@ -64,11 +128,11 @@ auth.get('/cpoauth/callback', async (c) => {
 
   const tokenData = (await tokenResponse.json()) as { access_token?: string; error?: string; error_description?: string };
   if (!tokenData.access_token) {
-    console.error('CP OAuth token error:', tokenData);
-    return c.json({ success: false, error: { message: 'Failed to obtain access token from CP OAuth', code: 'BAD_REQUEST' } }, 400);
+    console.error('CP OAuth token error:', JSON.stringify(tokenData));
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=token_failed&detail=${encodeURIComponent(tokenData.error || 'unknown')}`);
   }
 
-  // Fetch user info
+  // 用 access_token 获取用户信息
   const userResponse = await fetch('https://www.cpoauth.com/api/oauth/userinfo', {
     headers: { Authorization: `Bearer ${tokenData.access_token}` },
   });
@@ -81,28 +145,29 @@ auth.get('/cpoauth/callback', async (c) => {
   };
 
   if (!cpUser.sub || !cpUser.username) {
-    return c.json({ success: false, error: { message: 'Failed to get user info from CP OAuth', code: 'BAD_REQUEST' } }, 400);
+    console.error('CP OAuth userinfo error: missing sub or username', JSON.stringify(cpUser));
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=userinfo_failed`);
   }
 
-  // Find or create user by cpoauth_id
+  // 根据 cpoauth_id 查找或创建用户
   let user: any = await c.env.DB.prepare('SELECT * FROM users WHERE cpoauth_id = ?')
     .bind(cpUser.sub)
     .first();
 
   if (!user) {
-    // Also check if username already exists (from a different login method)
+    // 检查用户名是否已存在（其他登录方式注册的）
     const existing: any = await c.env.DB.prepare('SELECT * FROM users WHERE username = ?')
       .bind(cpUser.username)
       .first();
 
     if (existing) {
-      // Link CP OAuth to existing account
+      // 关联 CP OAuth 到已有账户
       await c.env.DB.prepare('UPDATE users SET cpoauth_id = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?')
         .bind(cpUser.sub, cpUser.avatar_url || null, existing.id)
         .run();
       user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(existing.id).first();
     } else {
-      // Create new user
+      // 创建新用户
       const result = await c.env.DB.prepare(
         'INSERT INTO users (cpoauth_id, username, avatar_url, role) VALUES (?, ?, ?, ?)'
       )
@@ -113,7 +178,7 @@ auth.get('/cpoauth/callback', async (c) => {
         .first();
     }
   } else {
-    // Update avatar on subsequent logins
+    // 更新头像
     if (cpUser.avatar_url && user.avatar_url !== cpUser.avatar_url) {
       await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?')
         .bind(cpUser.avatar_url, user.id)
@@ -132,13 +197,18 @@ auth.get('/cpoauth/callback', async (c) => {
     c.env.JWT_SECRET
   );
 
+  // 清除 OAuth 临时 cookie
+  c.header('Set-Cookie', 'cpoauth_cv=; Path=/; Max-Age=0');
+  c.header('Set-Cookie', 'cpoauth_st=; Path=/; Max-Age=0', { append: true });
+
   return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?token=${token}`);
 });
 
 // GitHub OAuth (existing)
-auth.get('/github', (c) => {
+auth.get('/github', async (c) => {
   const clientId = c.env.GITHUB_CLIENT_ID;
-  const redirectUri = `${new URL(c.req.url).origin}/api/v1/auth/github/callback`;
+  const callbackBase = await getOAuthCallbackBase(c);
+  const redirectUri = `${callbackBase}/api/v1/auth/github/callback`;
   const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=user:email`;
   return c.redirect(githubAuthUrl);
 });
@@ -193,6 +263,14 @@ auth.get('/github/callback', async (c) => {
     user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?')
       .bind(result.meta.last_row_id)
       .first();
+  } else {
+    // Update avatar if changed
+    if (githubUser.avatar_url && user.avatar_url !== githubUser.avatar_url) {
+      await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?')
+        .bind(githubUser.avatar_url, user.id)
+        .run();
+      user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(user.id).first();
+    }
   }
 
   const token = await signJWT(
@@ -355,6 +433,16 @@ auth.get('/me', async (c) => {
   const payload = await verifyJWT(token, c.env.JWT_SECRET);
   if (!payload) {
     return c.json({ success: false, error: { message: 'Invalid or expired token', code: 'UNAUTHORIZED' } }, 401);
+  }
+
+  // Check if user is banned
+  if (payload.userId !== 1) {
+    try {
+      const row: any = await c.env.DB.prepare('SELECT banned FROM users WHERE id = ?').bind(payload.userId).first();
+      if (row && row.banned === 1) {
+        return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
+      }
+    } catch { /* ignore */ }
   }
 
   const user = await c.env.DB.prepare('SELECT id, username, avatar_url, role, created_at FROM users WHERE id = ?')

@@ -1,0 +1,299 @@
+.training-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.training-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.training-title-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.training-title-section .title-icon {
+  color: var(--primary-color, #6366f1);
+}
+
+.training-header .search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  min-width: 280px;
+}
+
+.training-header .search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: inherit;
+  outline: none;
+}
+
+.training-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+
+.training-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.training-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  border-color: var(--primary-color, #6366f1);
+}
+
+.training-card-cover {
+  height: 120px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(99, 102, 241, 0.12);
+}
+
+.training-card-cover.placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-color, #6366f1);
+}
+
+.training-card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+}
+
+.training-card-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.training-card-title-row h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.official-badge {
+  background: linear-gradient(135deg, #ffc800, #ff7c00);
+  color: #fff;
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.training-card-desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary, #aaa);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.5;
+}
+
+.training-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-secondary, #aaa);
+}
+
+.difficulty-tag {
+  padding: 2px 8px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.training-card-progress {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar {
+  height: 6px;
+  background: var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progress-bar-inner {
+  height: 100%;
+  background: linear-gradient(90deg, #52c41a, #3498db);
+  transition: width 0.4s;
+}
+
+.progress-text {
+  font-size: 11px;
+  color: var(--text-secondary, #aaa);
+}
+
+/* Detail page */
+.training-detail-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.training-detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 24px;
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+}
+
+.training-detail-header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.training-detail-header .meta-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-secondary, #aaa);
+}
+
+.training-detail-header .progress-section {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chapter-item {
+  background: var(--card-bg, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.chapter-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  cursor: pointer;
+  user-select: none;
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.chapter-header:hover {
+  background: rgba(99, 102, 241, 0.1);
+}
+
+.chapter-header .chapter-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.chapter-problems {
+  padding: 12px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chapter-problem-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: inherit;
+  transition: background 0.15s;
+}
+
+.chapter-problem-row:hover {
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.chapter-problem-row.solved {
+  color: #52c41a;
+}
+
+.chapter-problem-row.attempted {
+  color: #ff7c00;
+}
+
+.chapter-problem-row .status-icon {
+  flex-shrink: 0;
+}
+
+.chapter-problem-row .problem-title {
+  flex: 1;
+}
+
+.chapter-problem-row .problem-meta {
+  font-size: 12px;
+  color: var(--text-secondary, #aaa);
+}
+
+.empty-chapter {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-secondary, #aaa);
+  font-size: 13px;
+}
+
+.training-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}

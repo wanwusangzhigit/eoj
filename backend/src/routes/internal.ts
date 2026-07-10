@@ -39,6 +39,64 @@ internal.post('/callback', async (c) => {
     return c.json({ success: false, error: { message: 'Submission not found', code: 'NOT_FOUND' } }, 404);
   }
 
+  // Parse and store testcases details
+  let testcaseList: any[] = [];
+  if (details) {
+    try {
+      testcaseList = typeof details === 'string' ? JSON.parse(details) : details;
+      if (!Array.isArray(testcaseList)) testcaseList = [];
+    } catch {
+      testcaseList = [];
+    }
+  }
+
+  // Delete old testcases and logs for this submission (supports rejudge)
+  await c.env.DB.prepare('DELETE FROM submission_testcases WHERE submission_id = ?')
+    .bind(submission_id)
+    .run();
+  await c.env.DB.prepare('DELETE FROM judge_logs WHERE submission_id = ?')
+    .bind(submission_id)
+    .run();
+
+  // Insert testcase details
+  for (let i = 0; i < testcaseList.length; i++) {
+    const tc = testcaseList[i];
+    await c.env.DB.prepare(
+      `INSERT INTO submission_testcases (submission_id, testcase_id, status, time_used, memory_used, score, detail, sort_order)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        submission_id,
+        tc.testcase_id || tc.id || null,
+        tc.status || status,
+        tc.time_used || 0,
+        tc.memory_used || 0,
+        tc.score || 0,
+        tc.detail || tc.message || '',
+        i
+      )
+      .run();
+  }
+
+  // Insert judge logs from callback
+  const logs = body.logs;
+  if (Array.isArray(logs)) {
+    for (const log of logs) {
+      await c.env.DB.prepare(
+        `INSERT INTO judge_logs (submission_id, log_type, message) VALUES (?, ?, ?)`
+      )
+        .bind(submission_id, log.log_type || 'info', log.message || '')
+        .run();
+    }
+  }
+
+  // Insert a summary log entry for the final status
+  await c.env.DB.prepare(
+    `INSERT INTO judge_logs (submission_id, log_type, message) VALUES (?, ?, ?)`
+  )
+    .bind(submission_id, 'result', `Judging finished: ${status}, score=${score || 0}, time=${time_used || 0}ms, memory=${memory_used || 0}KB`)
+    .run();
+
   await c.env.DB.prepare(
     `UPDATE submissions SET status = ?, score = ?, time_used = ?, memory_used = ?, details = ?, github_run_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
   )

@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
 import { api } from '../api/client';
@@ -29,6 +29,7 @@ export default function Login() {
   const [registrationOpen, setRegistrationOpen] = useState(true);
   const [emailRequired, setEmailRequired] = useState(false);
   const [emailSuffixes, setEmailSuffixes] = useState('');
+  const [agreed, setAgreed] = useState(false);
 
   useEffect(() => {
     setRegistrationOpen(getRegistrationOpen());
@@ -83,6 +84,10 @@ export default function Login() {
           setError(t('login.emailSuffixError'));
           return;
         }
+      }
+      if (!agreed) {
+        setError(t('login.mustAgree'));
+        return;
       }
     }
 
@@ -196,6 +201,24 @@ export default function Login() {
                   placeholder={t('login.confirmPasswordPlaceholder')}
                   required
                 />
+              </div>
+            )}
+
+            {mode === 'register' && (
+              <div className="form-agree">
+                <label className="agree-label">
+                  <input
+                    type="checkbox"
+                    checked={agreed}
+                    onChange={(e) => setAgreed(e.target.checked)}
+                  />
+                  <span>
+                    {t('login.agreePrefix')}
+                    <Link to="/privacy" target="_blank" rel="noopener noreferrer">{t('privacy.title')}</Link>
+                    {t('login.agreeAnd')}
+                    <Link to="/terms" target="_blank" rel="noopener noreferrer">{t('terms.title')}</Link>
+                  </span>
+                </label>
               </div>
             )}
 

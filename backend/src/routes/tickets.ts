@@ -17,7 +17,7 @@ tickets.get('/', authMiddleware, async (c) => {
   const category = c.req.query('category');
   const offset = (page - 1) * pageSize;
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1;
 
   let query = 'SELECT t.*, u.username FROM tickets t JOIN users u ON t.user_id = u.id WHERE 1=1';
   let countQuery = 'SELECT COUNT(*) as total FROM tickets WHERE 1=1';
@@ -153,7 +153,7 @@ tickets.post('/:id/replies', authMiddleware, ticketReplyLimiter, async (c) => {
   ).bind(id, user.userId, content).run();
 
   // Update ticket status
-  const newStatus = user.role === 'admin' ? 'in_progress' : 'open';
+  const newStatus = (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1) ? 'in_progress' : 'open';
   await c.env.DB.prepare(
     "UPDATE tickets SET status = ?, updated_at = datetime('now') WHERE id = ?"
   ).bind(newStatus, id).run();

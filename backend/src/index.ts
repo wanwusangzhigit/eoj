@@ -15,7 +15,17 @@ import solutions from './routes/solutions';
 import discussions from './routes/discussions';
 import settings from './routes/settings';
 import uploads from './routes/uploads';
+import ai from './routes/ai';
+import audit from './routes/audit';
+import tags from './routes/tags';
+import ratings from './routes/ratings';
+import training from './routes/training';
+import notifications from './routes/notifications';
+import messages from './routes/messages';
+import teams from './routes/teams';
+import blogs from './routes/blogs';
 import { seedDatabase } from './seed';
+import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 
 const app = new Hono<AppType>();
 
@@ -23,11 +33,15 @@ app.use('/api/*', async (c, next) => {
   const corsMiddleware = cors({
     origin: [c.env.FRONTEND_URL || 'http://localhost:5173'],
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowHeaders: ['Content-Type', 'Authorization'],
+    allowHeaders: ['Content-Type', 'Authorization', 'X-Device-Fingerprint'],
     credentials: true,
   });
   return corsMiddleware(c, next);
 });
+
+// Ban check + audit logging for all API routes
+app.use('/api/*', banCheckMiddleware);
+app.use('/api/*', auditMiddleware);
 
 app.onError((err, c) => {
   if (err instanceof SyntaxError && err.message.includes('JSON')) {
@@ -84,6 +98,15 @@ api.route('/solutions', solutions);
 api.route('/discussions', discussions);
 api.route('/uploads', uploads);
 api.route('/settings', settings);
+api.route('/ai', ai);
+api.route('/audit', audit);
+api.route('/tags', tags);
+api.route('/ratings', ratings);
+api.route('/training', training);
+api.route('/notifications', notifications);
+api.route('/messages', messages);
+api.route('/teams', teams);
+api.route('/blogs', blogs);
 
 app.route('/api/v1', api);
 

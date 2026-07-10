@@ -14,13 +14,25 @@ export async function authMiddleware(c: Context<AppType>, next: Next) {
     return c.json({ success: false, error: { message: 'Invalid or expired token', code: 'UNAUTHORIZED' } }, 401);
   }
 
+  // Check if user is banned (DB lookup, super admin id=1 is exempt)
+  if (payload.userId !== 1) {
+    try {
+      const row: any = await c.env.DB.prepare('SELECT banned FROM users WHERE id = ?').bind(payload.userId).first();
+      if (row && row.banned === 1) {
+        return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
+      }
+    } catch {
+      // If DB lookup fails (e.g. column missing during migration), continue gracefully
+    }
+  }
+
   c.set('user', payload);
   await next();
 }
 
 export async function adminMiddleware(c: Context<AppType>, next: Next) {
   const user = c.get('user');
-  if (!user || user.role !== 'admin') {
+  if (!user || (user.role !== 'admin' && user.role !== 'super_admin' && user.userId !== 1)) {
     return c.json({ success: false, error: { message: 'Forbidden: admin only', code: 'FORBIDDEN' } }, 403);
   }
   await next();
@@ -38,8 +50,8 @@ export async function superAdminMiddleware(c: Context<AppType>, next: Next) {
 function hasPermission(user: any, permission: string): boolean {
   // Super admin (user id=1) always has all permissions
   if (user.userId === 1) return true;
-  // Admin role has all permissions
-  if (user.role === 'admin') return true;
+  // Admin/super_admin role has all permissions
+  if (user.role === 'admin' || user.role === 'super_admin') return true;
   // Check specific permissions
   const permissions: string[] = user.permissions || [];
   return permissions.includes(permission);

@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { rateLimitMiddleware } from '../middleware/rateLimit';
 import { getLanguageExt } from '../utils/helpers';
 import { validateSourceCode, validateLanguage } from '../utils/validator';
@@ -98,7 +98,7 @@ submissions.get('/', authMiddleware, async (c) => {
   const language = c.req.query('language');
   const offset = (page - 1) * pageSize;
 
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
 
   let query = 'SELECT s.id, s.user_id, s.problem_id, s.language, s.status, s.score, s.time_used, s.memory_used, s.created_at, p.title as problem_title, p.slug as problem_slug, u.username FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id WHERE 1=1';
   let countQuery = 'SELECT COUNT(*) as total FROM submissions WHERE 1=1';
@@ -164,7 +164,7 @@ submissions.get('/', authMiddleware, async (c) => {
 submissions.get('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = user.role === 'admin';
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
 
   let query = `SELECT s.*, p.title as problem_title, p.slug as problem_slug, u.username
      FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id
@@ -184,6 +184,139 @@ submissions.get('/:id', authMiddleware, async (c) => {
   }
 
   return c.json({ success: true, data: { submission } });
+});
+
+// Get submission testcases detail (requires login)
+submissions.get('/:id/testcases', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const id = parseInt(c.req.param('id') || '0');
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  // Verify the submission belongs to the user (or user is admin)
+  const submission = await c.env.DB.prepare('SELECT id, user_id FROM submissions WHERE id = ?')
+    .bind(id)
+    .first();
+
+  if (!submission) {
+    return c.json({ success: false, error: { message: 'Submission not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  if (!isAdmin && (submission as any).user_id !== user.userId) {
+    return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+  }
+
+  const results = await c.env.DB.prepare(
+    'SELECT id, testcase_id, status, time_used, memory_used, score, detail, sort_order FROM submission_testcases WHERE submission_id = ? ORDER BY sort_order ASC'
+  )
+    .bind(id)
+    .all();
+
+  return c.json({ success: true, data: { testcases: results.results } });
+});
+
+// Get submission judge logs (requires login)
+submissions.get('/:id/logs', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const id = parseInt(c.req.param('id') || '0');
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  // Verify the submission belongs to the user (or user is admin)
+  const submission = await c.env.DB.prepare('SELECT id, user_id FROM submissions WHERE id = ?')
+    .bind(id)
+    .first();
+
+  if (!submission) {
+    return c.json({ success: false, error: { message: 'Submission not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  if (!isAdmin && (submission as any).user_id !== user.userId) {
+    return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+  }
+
+  const results = await c.env.DB.prepare(
+    'SELECT id, log_type, message, created_at FROM judge_logs WHERE submission_id = ? ORDER BY created_at ASC'
+  )
+    .bind(id)
+    .all();
+
+  return c.json({ success: true, data: { logs: results.results } });
+});
+
+// Rejudge endpoint (admin only)
+submissions.post('/:id/rejudge', authMiddleware, adminMiddleware, async (c) => {
+  const id = parseInt(c.req.param('id') || '0');
+
+  const submission: any = await c.env.DB.prepare(
+    'SELECT id, user_id, problem_id, language, source_code FROM submissions WHERE id = ?'
+  ).bind(id).first();
+
+  if (!submission) {
+    return c.json({ success: false, error: { message: 'Submission not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  // Reset submission status to pending
+  await c.env.DB.prepare(
+    "UPDATE submissions SET status = 'pending', score = NULL, time_used = NULL, memory_used = NULL, judge_message = NULL WHERE id = ?"
+  ).bind(id).run();
+
+  // Re-push source code to GitHub to trigger judging
+  const ext = getLanguageExt(submission.language);
+  const filePath = `submissions/${id}.${ext}`;
+
+  try {
+    const githubContent = btoa(unescape(encodeURIComponent(submission.source_code)));
+
+    // Delete existing file first (rejudge overwrites)
+    const existingFile: any = await c.env.DB.prepare('SELECT github_sha FROM submissions WHERE id = ?').bind(id).first();
+    const deleteBody: any = { message: `Rejudge #${id}`, sha: existingFile?.github_sha };
+
+    if (existingFile?.github_sha) {
+      await fetch(
+        `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${filePath}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
+            'User-Agent': 'OJ-System',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(deleteBody),
+        }
+      );
+    }
+
+    const githubResponse = await fetch(
+      `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${filePath}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
+          'User-Agent': 'OJ-System',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Rejudge #${id} for problem ${submission.problem_id}`,
+          content: githubContent,
+        }),
+      }
+    );
+
+    if (!githubResponse.ok) {
+      await c.env.DB.prepare("UPDATE submissions SET status = 'system_error' WHERE id = ?").bind(id).run();
+      return c.json({ success: false, error: { message: 'Failed to push code to judge repository', code: 'INTERNAL_ERROR' } }, 500);
+    }
+
+    const githubData = (await githubResponse.json()) as { content: { sha: string } };
+    await c.env.DB.prepare('UPDATE submissions SET github_sha = ? WHERE id = ?')
+      .bind(githubData.content.sha, id)
+      .run();
+  } catch (e) {
+    console.error('Rejudge GitHub push error:', e);
+    await c.env.DB.prepare("UPDATE submissions SET status = 'system_error' WHERE id = ?").bind(id).run();
+    return c.json({ success: false, error: { message: 'Failed to push code to judge repository', code: 'INTERNAL_ERROR' } }, 500);
+  }
+
+  return c.json({ success: true, data: { submission_id: id, status: 'pending', message: 'Rejudge triggered' } });
 });
 
 export default submissions;

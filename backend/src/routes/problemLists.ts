@@ -122,7 +122,7 @@ problemLists.put('/:id', authMiddleware, async (c) => {
 
   // Only creator or admin or list_admin can update
   const isOwner = (list as any).user_id === user.userId;
-  const hasListAdmin = (user.permissions || []).includes('list_admin') || user.role === 'admin' || user.userId === 1;
+  const hasListAdmin = (user.permissions || []).includes('list_admin') || user.role === 'admin' || user.role === 'super_admin' || user.userId === 1;
   if (!isOwner && !hasListAdmin) {
     return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
   }
@@ -164,7 +164,7 @@ problemLists.delete('/:id', authMiddleware, async (c) => {
   }
 
   const isOwner = (list as any).user_id === user.userId;
-  const hasListAdmin = (user.permissions || []).includes('list_admin') || user.role === 'admin' || user.userId === 1;
+  const hasListAdmin = (user.permissions || []).includes('list_admin') || user.role === 'admin' || user.role === 'super_admin' || user.userId === 1;
   if (!isOwner && !hasListAdmin) {
     return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
   }

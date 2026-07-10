@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import StatusBadge from '../components/StatusBadge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
+import RatingChart from '../components/RatingChart';
 import { DIFFICULTY_COLORS } from '../constants';
-import { Trophy, Target, Clock, Calendar, UserX, Swords, Edit3, Key, X, Check } from 'lucide-react';
+import RatingBadge from '../components/RatingBadge';
+import { getRatingColor, getRatingTier } from '../utils/rating';
+import { Trophy, Target, Clock, Calendar, UserX, Swords, Edit3, Key, X, Check, Mail, Users, TrendingUp } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import FollowButton from '../components/FollowButton';
 import './Profile.css';
 
 export default function Profile() {
@@ -18,7 +22,11 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
+  const [languageStats, setLanguageStats] = useState<{ language: string; total: number; accepted: number }[]>([]);
   const [contests, setContests] = useState<any[]>([]);
+  const [heatmap, setHeatmap] = useState<Record<string, number>>({});
+  const [ratingHistory, setRatingHistory] = useState<any[]>([]);
+  const [ratingInfo, setRatingInfo] = useState<{ rating: number; max_rating: number } | null>(null);
 
   // Edit profile state
   const [editing, setEditing] = useState(false);
@@ -60,14 +68,28 @@ export default function Profile() {
 
   useEffect(() => {
     const fetchExtraData = async () => {
-      // Fetch all submissions for language stats
-      try {
-        const subData = isOwnProfile
-          ? await api.getUserSubmissions({ page: 1, pageSize: 1000 })
-          : await api.getSubmissions({ user_id: String(data?.user?.id), pageSize: 1000 });
-        setAllSubmissions(subData.submissions);
-      } catch {
-        // ignore
+      // Fetch language stats via dedicated API (more efficient than pageSize:1000)
+      if (isOwnProfile) {
+        try {
+          const langData = await api.getUserLanguageStats();
+          setLanguageStats(langData.languages);
+        } catch {
+          // ignore
+        }
+        try {
+          const heatmapData = await api.getUserHeatmap();
+          setHeatmap(heatmapData.heatmap);
+        } catch {
+          // ignore
+        }
+      } else {
+        // For other users, fall back to fetching submissions
+        try {
+          const subData = await api.getSubmissions({ user_id: String(data?.user?.id), pageSize: 1000 });
+          setAllSubmissions(subData.submissions);
+        } catch {
+          // ignore
+        }
       }
       // Fetch user's contest history (contests they joined)
       try {
@@ -75,6 +97,18 @@ export default function Profile() {
         setContests(contestData.contests);
       } catch {
         // ignore
+      }
+
+      // Fetch rating history for the profile subject (works for both own and others')
+      try {
+        const targetUsername = isOwnProfile ? currentUser?.username : username;
+        if (targetUsername) {
+          const ratingData = await api.getUserRating(targetUsername);
+          setRatingInfo({ rating: ratingData.rating, max_rating: ratingData.max_rating });
+          setRatingHistory(ratingData.history || []);
+        }
+      } catch {
+        // user has no rating history yet — ignore
       }
     };
     if (data?.user) fetchExtraData();
@@ -156,22 +190,34 @@ export default function Profile() {
             </button>
           </div>
         )}
+        {!isOwnProfile && currentUser && profileUser && (
+          <div className="profile-actions">
+            <FollowButton username={profileUser.username} initialFollowing={!!data?.is_following} />
+            <Link to={`/messages?target=${profileUser.id}`} className="btn btn-secondary btn-sm">
+              <Mail size={14} />
+              {t('messages.sendMessage')}
+            </Link>
+          </div>
+        )}
 
         {editing ? (
           <div className="profile-edit-form">
             <div className="form-group">
-              <label>{t('profile.avatarUrl')}</label>
+              <label htmlFor="edit-avatar">{t('profile.avatarUrl')}</label>
               <input
+                id="edit-avatar"
                 type="text"
                 className="form-input"
                 value={editAvatar}
                 onChange={(e) => setEditAvatar(e.target.value)}
-                placeholder="https://..."
+                placeholder={t('profile.avatarUrlPlaceholder')}
+                autoComplete="off"
               />
             </div>
             <div className="form-group">
-              <label>{t('profile.bio')}</label>
+              <label htmlFor="edit-bio">{t('profile.bio')}</label>
               <textarea
+                id="edit-bio"
                 className="form-textarea"
                 value={editBio}
                 onChange={(e) => setEditBio(e.target.value)}
@@ -196,20 +242,40 @@ export default function Profile() {
         ) : (
           <div className="profile-info">
             {user.avatar_url && (
-              <img src={user.avatar_url} alt={user.username} className="profile-avatar" />
+              <img src={user.avatar_url} alt={user.username} className="profile-avatar" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
             )}
             <div className="profile-text">
-              <h1 className="profile-username">{user.username}</h1>
+              <h1 className="profile-username" style={user.rating && user.rating >= 800 ? { color: getRatingColor(user.rating) } : undefined}>{user.username}</h1>
+              {user.rating && user.rating >= 800 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                  <RatingBadge rating={user.rating} showLabel={false} size="md" />
+                  <span style={{ color: getRatingColor(user.rating), fontWeight: 600, fontSize: '13px' }}>{getRatingTier(user.rating)}</span>
+                </div>
+              )}
               {user.bio && <p className="profile-bio">{user.bio}</p>}
               <div className="profile-meta">
                 <span className="meta-item">
                   <Calendar size={14} />
-                  {t('profile.joined')} {new Date(user.created_at).toLocaleDateString()}
+                  {t('profile.joined')} {new Intl.DateTimeFormat().format(new Date(user.created_at))}
                 </span>
-                {user.role === 'admin' && (
+                {(user.role === 'admin' || user.role === 'super_admin') && (
                   <span className="badge admin-badge">{t('common.admin')}</span>
                 )}
               </div>
+              {(data?.followers_count !== undefined || data?.following_count !== undefined) && (
+                <div className="profile-follow-stats">
+                  <Link to={`/users/${user.username}/followers`} className="follow-stat">
+                    <Users size={14} />
+                    <strong>{data?.followers_count ?? 0}</strong>
+                    <span>{t('follow.followers')}</span>
+                  </Link>
+                  <Link to={`/users/${user.username}/following`} className="follow-stat">
+                    <Users size={14} />
+                    <strong>{data?.following_count ?? 0}</strong>
+                    <span>{t('follow.followingList')}</span>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -236,8 +302,67 @@ export default function Profile() {
               <div className="stat-label">{t('profile.totalSubmissions')}</div>
             </div>
           </div>
+          {ratingInfo && ratingInfo.rating > 0 && (
+            <div className="stat-card">
+              <TrendingUp size={24} className="stat-icon solved" />
+              <div className="stat-content">
+                <div className="stat-value" style={{ color: getRatingColor(ratingInfo.rating) }}>
+                  {ratingInfo.rating}
+                </div>
+                <div className="stat-label">Rating / Max {ratingInfo.max_rating}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+
+      {ratingHistory.length > 0 && (
+        <div className="profile-rating-section">
+          <h2 className="section-title">
+            <TrendingUp size={18} />
+            {t('profile.ratingHistory')}
+          </h2>
+          <RatingChart history={ratingHistory} />
+        </div>
+      )}
+
+      {isOwnProfile && Object.keys(heatmap).length > 0 && (
+        <div className="heatmap-section">
+          <h2 className="section-title">{t('profile.activityHeatmap')}</h2>
+          <div className="heatmap-grid">
+            {(() => {
+              const now = new Date();
+              const weeks = 53;
+              const days = weeks * 7;
+              const startDate = new Date(now);
+              startDate.setDate(startDate.getDate() - days + 1);
+              // Align to Sunday
+              startDate.setDate(startDate.getDate() - startDate.getDay());
+              const maxCount = Math.max(1, ...Object.values(heatmap));
+              const cells: React.ReactNode[] = [];
+              for (let i = 0; i < days; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const count = heatmap[key] || 0;
+                let level = 0;
+                if (count > 0) level = 1;
+                if (count > maxCount * 0.25) level = 2;
+                if (count > maxCount * 0.5) level = 3;
+                if (count > maxCount * 0.75) level = 4;
+                cells.push(
+                  <div
+                    key={key}
+                    className={`heatmap-cell heatmap-level-${level}`}
+                    title={`${key}: ${count} ${t('profile.submissions')}`}
+                  />
+                );
+              }
+              return cells;
+            })()}
+          </div>
+        </div>
+      )}
 
       {solvedProblems.length > 0 && (
         <div className="difficulty-distribution">
@@ -269,14 +394,33 @@ export default function Profile() {
         </div>
       )}
 
-      {(allSubmissions.length > 0 || (solvedProblems.length > 0 && recentSubmissions.length > 0)) && (
+      {(languageStats.length > 0 || allSubmissions.length > 0) && (
         <div className="language-distribution">
           <h2 className="section-title">{t('profile.languageStats')}</h2>
           <div className="language-bars">
             {(() => {
+              // Use dedicated API stats for own profile, else compute from submissions
+              if (languageStats.length > 0) {
+                const total = languageStats.reduce((s, l) => s + l.accepted, 0) || 1;
+                return languageStats
+                  .filter(l => l.accepted > 0)
+                  .map(({ language, accepted }) => {
+                    const pct = Math.round((accepted / total) * 100);
+                    return (
+                      <div key={language} className="language-bar-item">
+                        <div className="language-bar-header">
+                          <span className="language-bar-label">{language}</span>
+                          <span className="language-bar-count">{accepted} ({pct}%)</span>
+                        </div>
+                        <div className="difficulty-bar-track">
+                          <div className="difficulty-bar-fill" style={{ width: `${pct}%`, background: 'var(--accent)' }} />
+                        </div>
+                      </div>
+                    );
+                  });
+              }
               const langCounts: Record<string, number> = {};
-              const submissionsSource = allSubmissions.length > 0 ? allSubmissions : recentSubmissions;
-              submissionsSource.forEach((s: any) => {
+              allSubmissions.forEach((s: any) => {
                 if (s.status === 'accepted') {
                   langCounts[s.language] = (langCounts[s.language] || 0) + 1;
                 }
@@ -361,7 +505,7 @@ export default function Profile() {
                       {contest.title}
                     </div>
                     <div className="contest-history-meta">
-                      <span><Calendar size={12} /> {new Date(contest.start_time).toLocaleDateString()} - {new Date(contest.end_time).toLocaleDateString()}</span>
+                      <span><Calendar size={12} /> {new Intl.DateTimeFormat().format(new Date(contest.start_time))} - {new Intl.DateTimeFormat().format(new Date(contest.end_time))}</span>
                       <span>{contest.participant_count ?? 0} {t('contests.participants')}</span>
                     </div>
                   </div>
@@ -390,7 +534,7 @@ export default function Profile() {
                   <div className="submission-problem">{sub.title}</div>
                   <div className="submission-meta">
                     <span>{sub.language}</span>
-                    <span>{new Date(sub.created_at).toLocaleString()}</span>
+                    <span>{new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(sub.created_at))}</span>
                   </div>
                 </div>
                 <StatusBadge status={sub.status} />
@@ -411,29 +555,38 @@ export default function Profile() {
             </div>
             <div className="modal-body">
               <div className="form-group">
-                <label>{t('profile.oldPassword')}</label>
+                <label htmlFor="old-password">{t('profile.oldPassword')}</label>
                 <input
+                  id="old-password"
                   type="password"
                   className="form-input"
+                  name="old_password"
+                  autoComplete="current-password"
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
                 />
               </div>
               <div className="form-group">
-                <label>{t('profile.newPassword')}</label>
+                <label htmlFor="new-password">{t('profile.newPassword')}</label>
                 <input
+                  id="new-password"
                   type="password"
                   className="form-input"
+                  name="new_password"
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder={t('login.passwordTooShort')}
                 />
               </div>
               <div className="form-group">
-                <label>{t('login.confirmPassword')}</label>
+                <label htmlFor="confirm-password">{t('login.confirmPassword')}</label>
                 <input
+                  id="confirm-password"
                   type="password"
                   className="form-input"
+                  name="confirm_password"
+                  autoComplete="new-password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                 />

@@ -13,7 +13,7 @@ users.get('/list', authMiddleware, adminMiddleware, async (c) => {
   const offset = (page - 1) * pageSize;
 
   let countQuery = 'SELECT COUNT(*) as total FROM users';
-  let dataQuery = 'SELECT id, username, avatar_url, role, permissions, created_at FROM users';
+  let dataQuery = 'SELECT id, username, avatar_url, role, permissions, banned, created_at FROM users';
   const binds: any[] = [];
   const countBinds: any[] = [];
 
@@ -56,7 +56,7 @@ users.put('/:id/role', authMiddleware, adminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Cannot modify super admin role', code: 'FORBIDDEN' } }, 403);
   }
 
-  if (!['user', 'admin'].includes(role)) {
+  if (!['user', 'admin', 'super_admin'].includes(role)) {
     return c.json({ success: false, error: { message: 'Invalid role', code: 'BAD_REQUEST' } }, 400);
   }
 
@@ -89,12 +89,40 @@ users.put('/:id/permissions', authMiddleware, superAdminMiddleware, async (c) =>
   return c.json({ success: true, data: { message: 'Permissions updated' } });
 });
 
+// Admin only: Ban or unban a user
+users.put('/:id/ban', authMiddleware, adminMiddleware, async (c) => {
+  const userId = parseInt(c.req.param('id') || '0');
+  const body: any = await c.req.json();
+  const { banned } = body;
+
+  // Cannot ban super admin
+  if (userId === 1) {
+    return c.json({ success: false, error: { message: 'Cannot ban super admin', code: 'FORBIDDEN' } }, 403);
+  }
+
+  // Cannot ban/unban yourself
+  const currentUser = c.get('user');
+  if (currentUser.userId === userId) {
+    return c.json({ success: false, error: { message: 'Cannot ban/unban yourself', code: 'FORBIDDEN' } }, 403);
+  }
+
+  if (typeof banned !== 'boolean') {
+    return c.json({ success: false, error: { message: 'banned field must be boolean', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  await c.env.DB.prepare('UPDATE users SET banned = ? WHERE id = ?')
+    .bind(banned ? 1 : 0, userId)
+    .run();
+
+  return c.json({ success: true, data: { message: banned ? 'User banned' : 'User unbanned' } });
+});
+
 users.get('/profile', authMiddleware, async (c) => {
   const user = c.get('user');
   
   // Fetch full user details from DB since JWT only contains basic info
-  const fullUser: any = await c.env.DB.prepare('SELECT id, username, avatar_url, role, created_at FROM users WHERE id = ?')
-    .bind(user.id)
+  const fullUser: any = await c.env.DB.prepare('SELECT id, username, avatar_url, bio, role, created_at FROM users WHERE id = ?')
+    .bind(user.userId)
     .first();
 
   if (!fullUser) {
@@ -154,8 +182,8 @@ users.get('/submissions', authMiddleware, async (c) => {
     WHERE s.user_id = ?
   `;
   
-  const binds: any[] = [user.id];
-  const countBinds: any[] = [user.id];
+  const binds: any[] = [user.userId];
+  const countBinds: any[] = [user.userId];
   
   if (status) {
     countQuery += ' AND status = ?';
@@ -199,7 +227,7 @@ users.get('/solved', authMiddleware, async (c) => {
     JOIN submissions s ON p.id = s.problem_id
     WHERE s.user_id = ? AND s.status = 'accepted'
     ORDER BY p.id ASC
-  `).bind(user.id).all();
+  `).bind(user.userId).all();
   
   return c.json({
     success: true,
@@ -219,7 +247,7 @@ users.get('/contests', authMiddleware, async (c) => {
     JOIN contest_participants cp ON c.id = cp.contest_id
     WHERE cp.user_id = ?
     ORDER BY c.start_time DESC
-  `).bind(user.id).all();
+  `).bind(user.userId).all();
 
   return c.json({
     success: true,
@@ -231,7 +259,8 @@ users.get('/contests', authMiddleware, async (c) => {
 
 users.get('/:username', async (c) => {
   const username = c.req.param('username');
-  
+  const currentUser = c.get('user');
+
   const user = await c.env.DB.prepare(`
     SELECT id, username, avatar_url, bio, created_at
     FROM users WHERE username = ?
@@ -271,6 +300,23 @@ users.get('/:username', async (c) => {
     LIMIT 10
   `).bind((user as any).id).all();
 
+  // 粉丝/关注数
+  const followersCount = await c.env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM user_follows WHERE following_id = ?'
+  ).bind((user as any).id).first();
+  const followingCount = await c.env.DB.prepare(
+    'SELECT COUNT(*) as cnt FROM user_follows WHERE follower_id = ?'
+  ).bind((user as any).id).first();
+
+  // 是否已关注
+  let isFollowing = false;
+  if (currentUser) {
+    const followRow = await c.env.DB.prepare(
+      'SELECT 1 FROM user_follows WHERE follower_id = ? AND following_id = ?'
+    ).bind(currentUser.userId, (user as any).id).first();
+    isFollowing = !!followRow;
+  }
+
   return c.json({
     success: true,
     data: {
@@ -280,6 +326,9 @@ users.get('/:username', async (c) => {
         avatar_url: (user as any).avatar_url,
         bio: (user as any).bio || '',
         created_at: (user as any).created_at,
+        followers_count: (followersCount as any)?.cnt || 0,
+        following_count: (followingCount as any)?.cnt || 0,
+        is_following: isFollowing,
       },
       stats: {
         solved_count: (statsResult as any)?.solved_count || 0,
@@ -288,6 +337,128 @@ users.get('/:username', async (c) => {
       },
       solved_problems: solvedProblems.results,
       recent_submissions: recentSubmissions.results,
+    },
+  });
+});
+
+// POST /users/:username/follow — 关注
+users.post('/:username/follow', authMiddleware, async (c) => {
+  const currentUser = c.get('user');
+  const username = c.req.param('username');
+
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (!target) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+  const targetId = (target as any).id;
+  if (targetId === currentUser.userId) {
+    return c.json({ success: false, error: { message: 'Cannot follow yourself', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO user_follows (follower_id, following_id) VALUES (?, ?)'
+    ).bind(currentUser.userId, targetId).run();
+
+    // 通知被关注者
+    const { sendNotification, NotificationType } = await import('../utils/notify');
+    await sendNotification(
+      c.env.DB,
+      targetId,
+      NotificationType.FOLLOW,
+      '你有新的粉丝',
+      `${currentUser.username} 关注了你`,
+      `/users/${currentUser.username}`
+    );
+
+    return c.json({ success: true, data: { following: true, message: 'Followed' } }, 201);
+  } catch (e: any) {
+    if (String(e).includes('UNIQUE')) {
+      return c.json({ success: false, error: { message: 'Already following', code: 'CONFLICT' } }, 409);
+    }
+    throw e;
+  }
+});
+
+// DELETE /users/:username/follow — 取关
+users.delete('/:username/follow', authMiddleware, async (c) => {
+  const currentUser = c.get('user');
+  const username = c.req.param('username');
+
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (!target) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  await c.env.DB.prepare(
+    'DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?'
+  ).bind(currentUser.userId, (target as any).id).run();
+
+  return c.json({ success: true, data: { following: false, message: 'Unfollowed' } });
+});
+
+// GET /users/:username/followers — 粉丝列表
+users.get('/:username/followers', async (c) => {
+  const username = c.req.param('username');
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const offset = (page - 1) * pageSize;
+
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (!target) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM user_follows WHERE following_id = ?'
+  ).bind((target as any).id).first();
+  const total = (countResult as any)?.total || 0;
+
+  const results = await c.env.DB.prepare(
+    `SELECT u.id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
+     FROM user_follows uf JOIN users u ON uf.follower_id = u.id
+     WHERE uf.following_id = ?
+     ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`
+  ).bind((target as any).id, pageSize, offset).all();
+
+  return c.json({
+    success: true,
+    data: {
+      users: results.results,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    },
+  });
+});
+
+// GET /users/:username/following — 关注列表
+users.get('/:username/following', async (c) => {
+  const username = c.req.param('username');
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const offset = (page - 1) * pageSize;
+
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (!target) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM user_follows WHERE follower_id = ?'
+  ).bind((target as any).id).first();
+  const total = (countResult as any)?.total || 0;
+
+  const results = await c.env.DB.prepare(
+    `SELECT u.id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
+     FROM user_follows uf JOIN users u ON uf.following_id = u.id
+     WHERE uf.follower_id = ?
+     ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`
+  ).bind((target as any).id, pageSize, offset).all();
+
+  return c.json({
+    success: true,
+    data: {
+      users: results.results,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     },
   });
 });
@@ -350,6 +521,41 @@ users.put('/change-password', authMiddleware, async (c) => {
   const hash = bcrypt.hashSync(newPassword, 10);
   await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.userId).run();
   return c.json({ success: true, data: { message: 'Password changed successfully' } });
+});
+
+// GET /users/heatmap - Current user's submission heatmap (last 365 days)
+users.get('/heatmap', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const results = await c.env.DB.prepare(`
+    SELECT date(created_at) as date, COUNT(*) as count
+    FROM submissions
+    WHERE user_id = ? AND created_at >= date('now', '-365 days')
+    GROUP BY date(created_at)
+    ORDER BY date ASC
+  `).bind(user.userId).all();
+
+  const heatmap: Record<string, number> = {};
+  for (const row of results.results as any[]) {
+    heatmap[row.date] = row.count;
+  }
+
+  return c.json({ success: true, data: { heatmap } });
+});
+
+// GET /users/language-stats - Current user's submission stats by language
+users.get('/language-stats', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const results = await c.env.DB.prepare(`
+    SELECT language,
+      COUNT(*) as total,
+      SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted
+    FROM submissions
+    WHERE user_id = ?
+    GROUP BY language
+    ORDER BY total DESC
+  `).bind(user.userId).all();
+
+  return c.json({ success: true, data: { languages: results.results } });
 });
 
 export default users;

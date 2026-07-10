@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -20,13 +20,33 @@ export default function Submissions() {
   const [userIdFilter, setUserIdFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  const [debouncedUserId, setDebouncedUserId] = useState('');
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useDocumentTitle(t('submissions.title'));
 
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+
+  // Debounce user search
+  useEffect(() => {
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => { setDebouncedUserId(userIdFilter); }, 400);
+    return () => { if (searchTimerRef.current) clearTimeout(searchTimerRef.current); };
+  }, [userIdFilter]);
 
   useEffect(() => {
     if (user) fetchSubmissions();
-  }, [user, page, statusFilter, languageFilter, userIdFilter]);
+  }, [user, page, statusFilter, languageFilter, debouncedUserId]);
+
+  // Auto-refresh when there are pending/running submissions
+  useEffect(() => {
+    if (!user || loading) return;
+    const hasPending = submissions.some(s => s.status === 'pending' || s.status === 'running');
+    if (!hasPending) return;
+    const timer = setInterval(() => {
+      fetchSubmissions();
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [user, submissions, loading]);
 
   const fetchSubmissions = async () => {
     setLoading(true);
@@ -37,7 +57,7 @@ export default function Submissions() {
         pageSize: 20,
         status: statusFilter || undefined,
         language: languageFilter || undefined,
-        user_id: isAdmin && userIdFilter ? userIdFilter : undefined,
+        user_id: isAdmin && debouncedUserId ? debouncedUserId : undefined,
       });
       setSubmissions(data.submissions);
       setPagination(data.pagination);
@@ -74,6 +94,8 @@ export default function Submissions() {
               <input
                 type="text"
                 placeholder={t('submissions.searchUser')}
+                name="user_search"
+                autoComplete="off"
                 value={userIdFilter}
                 onChange={(e) => { setUserIdFilter(e.target.value); setPage(1); }}
               />
@@ -88,8 +110,10 @@ export default function Submissions() {
             <option value="accepted">{t('status.accepted')}</option>
             <option value="wrong_answer">{t('status.wrong_answer')}</option>
             <option value="time_limit_exceeded">{t('status.time_limit_exceeded')}</option>
+            <option value="memory_limit_exceeded">{t('status.memory_limit_exceeded')}</option>
             <option value="runtime_error">{t('status.runtime_error')}</option>
             <option value="compile_error">{t('status.compile_error')}</option>
+            <option value="system_error">{t('status.system_error')}</option>
             <option value="pending">{t('status.pending')}</option>
             <option value="running">{t('status.running')}</option>
           </select>
@@ -142,7 +166,7 @@ export default function Submissions() {
               <span className="col-score">{sub.score || '-'}</span>
               <span className="col-time">{sub.time_used ? `${sub.time_used}ms` : '-'}</span>
               <span className="col-memory">{sub.memory_used ? `${sub.memory_used}KB` : '-'}</span>
-              <span className="col-date">{new Date(sub.created_at).toLocaleString()}</span>
+              <span className="col-date">{new Intl.DateTimeFormat(undefined, { dateStyle: 'short', timeStyle: 'short' }).format(new Date(sub.created_at))}</span>
             </Link>
           ))}
         </div>

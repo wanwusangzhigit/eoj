@@ -2,8 +2,11 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { useToastStore } from '../store/toast';
 import LoadingSpinner from '../components/LoadingSpinner';
-import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle } from 'lucide-react';
+import RatingBadge from '../components/RatingBadge';
+import { getRatingColor } from '../utils/rating';
+import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import './ContestDetail.css';
@@ -32,15 +35,19 @@ function formatCountdown(ms: number): string {
 export default function ContestDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [contest, setContest] = useState<any>(null);
   const [problems, setProblems] = useState<any[]>([]);
   const [rankings, setRankings] = useState<any[]>([]);
   const [rankingProblems, setRankingProblems] = useState<any[]>([]);
+  const [rankingsMeta, setRankingsMeta] = useState<any>({});
   const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<'problems' | 'rankings' | 'review'>('problems');
   const [registering, setRegistering] = useState(false);
+  const [virtualStarting, setVirtualStarting] = useState(false);
+  const [ratingChanges, setRatingChanges] = useState<any[]>([]);
   const [countdown, setCountdown] = useState<string>('');
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
   const [myProblemStatus, setMyProblemStatus] = useState<Record<string, { status: string; score: number; best_score: number }>>({});
@@ -115,6 +122,7 @@ export default function ContestDetail() {
     } else if (activeTab === 'review') {
       fetchProblems();
       fetchRankings();
+      fetchRatingChanges();
     }
   }, [activeTab, id, contest]);
 
@@ -150,6 +158,11 @@ export default function ContestDetail() {
       const data = await api.getContestRankings(Number(id));
       setRankings(data.rankings);
       setRankingProblems(data.problems || []);
+      setRankingsMeta({
+        scoring_type: data.scoring_type,
+        is_rated: data.is_rated,
+        rating_finalized: data.rating_finalized,
+      });
     } catch (e: any) {
       setLoadError(e.message || t('common.error'));
     }
@@ -165,6 +178,44 @@ export default function ContestDetail() {
       setLoadError(e.message || t('common.error'));
     } finally {
       setRegistering(false);
+    }
+  };
+
+  const handleVirtualRegister = async () => {
+    if (!user || !id || virtualStarting) return;
+    setVirtualStarting(true);
+    try {
+      await api.startVirtualParticipation(Number(id));
+      addToast('success', t('contests.virtualStarted'));
+      setRegistered(true);
+      // Refresh problems so user can start submitting
+      await fetchContest();
+    } catch (e: any) {
+      addToast('error', e.message || t('common.error'));
+    } finally {
+      setVirtualStarting(false);
+    }
+  };
+
+  const handleFinalizeRatings = async () => {
+    if (!user || !id) return;
+    if (!confirm(t('contests.finalizeConfirm'))) return;
+    try {
+      const result = await api.finalizeContestRatings(Number(id));
+      addToast('success', `${t('contests.finalizeDone')} (${result.changes_count} users)`);
+      await fetchRatingChanges();
+      await fetchContest();
+    } catch (e: any) {
+      addToast('error', e.message || t('common.error'));
+    }
+  };
+
+  const fetchRatingChanges = async () => {
+    try {
+      const data = await api.getContestRatingChanges(Number(id));
+      setRatingChanges(data.changes || []);
+    } catch {
+      // contest may not be finalized yet — ignore
     }
   };
 
@@ -298,9 +349,17 @@ export default function ContestDetail() {
               <Trophy size={24} className="contest-icon" />
               <h1 className="contest-detail-title">{contest.title}</h1>
             </div>
-            <span className={STATUS_BADGE_CLASS[status] || 'badge'}>
-              {getStatusLabel(status)}
-            </span>
+            <div className="contest-badges">
+              {contest.scoring_type && (
+                <span className="badge badge-info">{contest.scoring_type === 'ioi' ? t('contests.ioiType') : t('contests.acmType')}</span>
+              )}
+              {contest.is_rated && (
+                <span className="badge badge-success">{t('contests.ratedContest')}</span>
+              )}
+              <span className={STATUS_BADGE_CLASS[status] || 'badge'}>
+                {getStatusLabel(status)}
+              </span>
+            </div>
           </div>
 
           {contest.description && (
@@ -330,7 +389,7 @@ export default function ContestDetail() {
 
           {user && (
             <div className="contest-actions">
-              {user.role === 'admin' && (
+              {(user.role === 'admin' || user.role === 'super_admin') && (
                 <Link to={`/contests/${id}/edit`} className="btn btn-secondary btn-sm">
                   <Edit3 size={14} />
                   {t('contests.editContest')}
@@ -351,6 +410,28 @@ export default function ContestDetail() {
                   {t('contests.register')}
                 </button>
               ))}
+              {status === 'ended' && contest.allow_virtual && !registered && (
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={handleVirtualRegister}
+                  disabled={virtualStarting}
+                  title={t('contests.allowVirtual')}
+                >
+                  <Play size={14} />
+                  {t('contests.virtualParticipation')}
+                </button>
+              )}
+              {(user.role === 'admin' || user.role === 'super_admin') &&
+                contest.is_rated && status === 'ended' && !rankingsMeta.rating_finalized && (
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleFinalizeRatings}
+                  title={t('contests.finalizeRating')}
+                >
+                  <Sparkles size={14} />
+                  {t('contests.finalizeRating')}
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -441,7 +522,9 @@ export default function ContestDetail() {
                   <span className="col-rank">#</span>
                   <span className="col-user">{t('contests.user')}</span>
                   <span className="col-score">{t('contests.totalScore')}</span>
-                  <span className="col-penalty">{t('contests.penalty')}</span>
+                  {rankingsMeta.scoring_type !== 'ioi' && (
+                    <span className="col-penalty">{t('contests.penalty')}</span>
+                  )}
                   {rankingProblems.map((cp: any) => (
                     <span key={cp.label} className="col-problem">{cp.label}</span>
                   ))}
@@ -452,10 +535,15 @@ export default function ContestDetail() {
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                     </span>
                     <span className="col-user">
-                      <Link to={`/users/${entry.username}`} className="user-link">{entry.username}</Link>
+                      <Link to={`/users/${entry.username}`} className="user-link">
+                        {entry.username}
+                        {entry.is_virtual && <span className="virtual-flag" title="Virtual">V</span>}
+                      </Link>
                     </span>
                     <span className="col-score">{entry.total_score ?? 0}</span>
-                    <span className="col-penalty">{formatPenalty(entry.total_penalty ?? 0)}</span>
+                    {rankingsMeta.scoring_type !== 'ioi' && (
+                      <span className="col-penalty">{formatPenalty(entry.total_penalty ?? 0)}</span>
+                    )}
                     {rankingProblems.map((cp: any) => {
                       const result = entry.problems?.[cp.label];
                       return (
@@ -509,7 +597,7 @@ export default function ContestDetail() {
             {user && (
               <div className="review-section">
                 <h3>{t('contests.mySubmissions')}</h3>
-                <Link to={`/submissions?user_id=${user.id}`} className="btn btn-primary btn-sm">
+                <Link to={`/submissions`} className="btn btn-primary btn-sm">
                   {t('contests.viewMySubmissions')}
                 </Link>
               </div>
@@ -554,6 +642,56 @@ export default function ContestDetail() {
                 </div>
               )}
             </div>
+
+            {/* Review: Rating Changes */}
+            {rankingsMeta.is_rated && (
+              <div className="review-section">
+                <h3>
+                  {t('contests.ratingChanges')}
+                  {rankingsMeta.rating_finalized && (
+                    <span className="badge badge-success" style={{ marginLeft: 8 }}>
+                      {t('contests.ratingFinalized')}
+                    </span>
+                  )}
+                </h3>
+                {ratingChanges.length === 0 ? (
+                  <div className="empty-tab">{t('contests.noRatingChanges')}</div>
+                ) : (
+                  <div className="rating-changes-table">
+                    <div className="rating-changes-header">
+                      <span className="rc-rank">#</span>
+                      <span className="rc-user">{t('contests.user')}</span>
+                      <span className="rc-old">{t('contests.oldRating')}</span>
+                      <span className="rc-arrow">→</span>
+                      <span className="rc-new">{t('contests.newRating')}</span>
+                      <span className="rc-delta">{t('contests.delta')}</span>
+                    </div>
+                    {ratingChanges.map((ch: any, idx: number) => {
+                      const delta = (ch.new_rating ?? 0) - (ch.old_rating ?? 0);
+                      const oldColor = getRatingColor(ch.old_rating ?? 0);
+                      const newColor = getRatingColor(ch.new_rating ?? 0);
+                      return (
+                        <div key={ch.user_id ?? idx} className="rating-change-row">
+                          <span className="rc-rank">{ch.rank ?? idx + 1}</span>
+                          <span className="rc-user">
+                            <Link to={`/users/${ch.username}`} className="user-link">{ch.username}</Link>
+                          </span>
+                          <span className="rc-old" style={{ color: oldColor }}>{ch.old_rating ?? 0}</span>
+                          <span className="rc-arrow">→</span>
+                          <span className="rc-new" style={{ color: newColor }}>
+                            <RatingBadge rating={ch.new_rating ?? 0} size="sm" />
+                          </span>
+                          <span className={`rc-delta ${delta >= 0 ? 'positive' : 'negative'}`}>
+                            {delta >= 0 ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                            {delta >= 0 ? '+' : ''}{delta}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

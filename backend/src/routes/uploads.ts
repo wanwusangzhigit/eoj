@@ -25,7 +25,7 @@ uploads.post('/image', authMiddleware, async (c) => {
   const user = c.get('user');
 
   // Check if image upload is enabled (upload_admin and super admin can bypass)
-  const hasUploadAdmin = user.role === 'admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
+  const hasUploadAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
   let imageUploadEnabled = true;
   try {
     const row: any = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'image_upload_enabled'").first();
@@ -111,7 +111,7 @@ uploads.post('/file', authMiddleware, async (c) => {
   const user = c.get('user');
 
   // Check if file upload is enabled (upload_admin and super admin can bypass)
-  const hasUploadAdmin = user.role === 'admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
+  const hasUploadAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
   let uploadEnabled = true;
   try {
     const row: any = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'upload_enabled'").first();
@@ -195,7 +195,7 @@ uploads.get('/', authMiddleware, async (c) => {
   const offset = (page - 1) * pageSize;
 
   // Check if user has upload_admin permission
-  const hasUploadAdmin = user.role === 'admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
+  const hasUploadAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
 
   let countQuery = 'SELECT COUNT(*) as total FROM uploads u';
   let dataQuery = 'SELECT u.*, us.username FROM uploads u JOIN users us ON u.user_id = us.id';
@@ -290,7 +290,7 @@ uploads.delete('/:id', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'File not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const hasUploadAdmin = user.role === 'admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
+  const hasUploadAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1 || (user.permissions || []).includes('upload_admin');
   if (upload.user_id !== user.userId && !hasUploadAdmin) {
     return c.json({ success: false, error: { message: 'Forbidden: cannot delete others\' files', code: 'FORBIDDEN' } }, 403);
   }

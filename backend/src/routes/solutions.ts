@@ -1,8 +1,22 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import { sendNotification, NotificationType } from '../utils/notify';
 
 const solutions = new Hono<AppType>();
+
+// Helper: get current user from optional auth (用于审核状态过滤)
+async function getCurrentUser(c: any): Promise<{ userId: number; role: string } | null> {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
+  try {
+    const { verifyJWT } = await import('../utils/jwt');
+    const payload = await verifyJWT(authHeader.slice(7), c.env.JWT_SECRET);
+    return payload as any;
+  } catch {
+    return null;
+  }
+}
 
 // List solutions for a problem
 solutions.get('/', async (c) => {
@@ -15,22 +29,36 @@ solutions.get('/', async (c) => {
   const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
   const sort = c.req.query('sort') || 'newest';
   const offset = (page - 1) * pageSize;
+  const currentUser = await getCurrentUser(c);
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.userId === 1;
+
+  // 普通用户只能看 approved + 自己的 pending/rejected；管理员看全部
+  let whereClause = 's.problem_id = ?';
+  const binds: any[] = [problemId];
+  if (!isAdmin) {
+    if (currentUser) {
+      whereClause += " AND (s.review_status = 'approved' OR s.user_id = ?)";
+      binds.push(currentUser.userId);
+    } else {
+      whereClause += " AND s.review_status = 'approved'";
+    }
+  }
 
   const countResult = await c.env.DB.prepare(
-    'SELECT COUNT(*) as total FROM solutions WHERE problem_id = ?'
-  ).bind(problemId).first();
+    `SELECT COUNT(*) as total FROM solutions s WHERE ${whereClause}`
+  ).bind(...binds).first();
   const total = (countResult as any)?.total || 0;
 
   const orderBy = sort === 'popular' ? 's.vote_count DESC, s.created_at DESC' : 's.created_at DESC';
 
   const results = await c.env.DB.prepare(
-    `SELECT s.id, s.problem_id, s.user_id, s.title, s.language, s.vote_count, s.view_count, s.created_at, s.updated_at, u.username
+    `SELECT s.id, s.problem_id, s.user_id, s.title, s.language, s.vote_count, s.view_count, s.review_status, s.created_at, s.updated_at, u.username
      FROM solutions s
      JOIN users u ON s.user_id = u.id
-     WHERE s.problem_id = ?
+     WHERE ${whereClause}
      ORDER BY ${orderBy}
      LIMIT ? OFFSET ?`
-  ).bind(problemId, pageSize, offset).all();
+  ).bind(...binds, pageSize, offset).all();
 
   return c.json({
     success: true,
@@ -125,10 +153,98 @@ solutions.post('/', authMiddleware, async (c) => {
   }
 
   const result = await c.env.DB.prepare(
-    'INSERT INTO solutions (problem_id, user_id, title, content, language) VALUES (?, ?, ?, ?, ?)'
+    "INSERT INTO solutions (problem_id, user_id, title, content, language, review_status) VALUES (?, ?, ?, ?, ?, 'pending')"
   ).bind(problem_id, user.userId, title, content, language || '').run();
 
-  return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Solution created' } }, 201);
+  return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Solution created, awaiting review' } }, 201);
+});
+
+// === 题解审核管理接口（admin） ===
+
+// GET /solutions/admin/review — 待审核列表
+solutions.get('/admin/review', authMiddleware, adminMiddleware, async (c) => {
+  const status = c.req.query('status') || 'pending';
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const offset = (page - 1) * pageSize;
+
+  const countResult = await c.env.DB.prepare(
+    'SELECT COUNT(*) as total FROM solutions WHERE review_status = ?'
+  ).bind(status).first();
+  const total = (countResult as any)?.total || 0;
+
+  const results = await c.env.DB.prepare(
+    `SELECT s.id, s.problem_id, s.user_id, s.title, s.language, s.review_status, s.reject_reason, s.created_at, s.reviewed_at,
+       u.username, p.title as problem_title, p.slug as problem_slug
+     FROM solutions s
+     JOIN users u ON s.user_id = u.id
+     JOIN problems p ON s.problem_id = p.id
+     WHERE s.review_status = ?
+     ORDER BY s.created_at DESC LIMIT ? OFFSET ?`
+  ).bind(status, pageSize, offset).all();
+
+  return c.json({
+    success: true,
+    data: {
+      solutions: results.results,
+      pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
+    },
+  });
+});
+
+// POST /solutions/admin/:id/approve — 通过审核
+solutions.post('/admin/:id/approve', authMiddleware, adminMiddleware, async (c) => {
+  const user = c.get('user');
+  const id = parseInt(c.req.param('id') || '0');
+
+  const solution = await c.env.DB.prepare('SELECT user_id, title FROM solutions WHERE id = ?').bind(id).first();
+  if (!solution) {
+    return c.json({ success: false, error: { message: 'Solution not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE solutions SET review_status = 'approved', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, reject_reason = '' WHERE id = ?`
+  ).bind(user.userId, id).run();
+
+  // 通知作者
+  await sendNotification(
+    c.env.DB,
+    (solution as any).user_id,
+    NotificationType.SOLUTION_REVIEW,
+    '题解审核通过',
+    `你的题解《${(solution as any).title}》已通过审核`,
+    `/solutions/${id}`
+  );
+
+  return c.json({ success: true, data: { message: 'Solution approved' } });
+});
+
+// POST /solutions/admin/:id/reject — 驳回
+solutions.post('/admin/:id/reject', authMiddleware, adminMiddleware, async (c) => {
+  const user = c.get('user');
+  const id = parseInt(c.req.param('id') || '0');
+  const body = await c.req.json();
+  const { reason } = body;
+
+  const solution = await c.env.DB.prepare('SELECT user_id, title FROM solutions WHERE id = ?').bind(id).first();
+  if (!solution) {
+    return c.json({ success: false, error: { message: 'Solution not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  await c.env.DB.prepare(
+    `UPDATE solutions SET review_status = 'rejected', reviewed_by = ?, reviewed_at = CURRENT_TIMESTAMP, reject_reason = ? WHERE id = ?`
+  ).bind(user.userId, reason || '', id).run();
+
+  await sendNotification(
+    c.env.DB,
+    (solution as any).user_id,
+    NotificationType.SOLUTION_REVIEW,
+    '题解审核未通过',
+    `你的题解《${(solution as any).title}》未通过审核：${reason || '无说明'}`,
+    `/solutions/${id}`
+  );
+
+  return c.json({ success: true, data: { message: 'Solution rejected' } });
 });
 
 // Update solution

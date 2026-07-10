@@ -5,12 +5,13 @@ import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
 import {
   Megaphone, X, Target, Swords, BookOpen, MessageSquare,
-  ChevronRight, Calendar, Quote, AlertCircle, RefreshCw
+  ChevronRight, Calendar, Quote, AlertCircle, RefreshCw, Sparkles
 } from 'lucide-react';
 import { DIFFICULTY_COLORS } from '../constants';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSiteConfig } from '../hooks/useSiteConfig';
+import AdSlot from '../components/AdSlot';
 import './Home.css';
 
 interface Hitokoto {
@@ -33,6 +34,7 @@ export default function Home() {
   const [recentContests, setRecentContests] = useState<any[]>([]);
   const [recentLists, setRecentLists] = useState<any[]>([]);
   const [recentDiscussions, setRecentDiscussions] = useState<any[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState('');
   const [fetchError, setFetchError] = useState(false);
   useDocumentTitle(t('home.title'));
@@ -48,7 +50,9 @@ export default function Home() {
     const ann = getAnnouncement();
     if (ann) setAnnouncement(ann);
     fetchAll();
-  }, []);
+    fetchHitokoto();
+    if (user) fetchRecommendations();
+  }, [user]);
 
   const fetchAll = async () => {
     try {
@@ -59,20 +63,22 @@ export default function Home() {
         api.getProblemLists({ page: 1, pageSize: 5 }),
         api.getDiscussions({ page: 1, pageSize: 5 }),
       ]);
-      let hasAnyFailure = false;
       if (problemsData.status === 'fulfilled') {
         setRecentProblems(problemsData.value.problems);
-      } else { hasAnyFailure = true; }
+      }
       if (contestsData.status === 'fulfilled') {
         setRecentContests(contestsData.value.contests);
-      } else { hasAnyFailure = true; }
+      }
       if (listsData.status === 'fulfilled') {
         setRecentLists(listsData.value.lists);
-      } else { hasAnyFailure = true; }
+      }
       if (discussionsData.status === 'fulfilled') {
         setRecentDiscussions(discussionsData.value.discussions);
-      } else { hasAnyFailure = true; }
-      if (hasAnyFailure && !recentProblems.length && !recentContests.length && !recentLists.length && !recentDiscussions.length) {
+      }
+      // 如果全部失败则显示错误
+      const allFailed = problemsData.status === 'rejected' && contestsData.status === 'rejected'
+        && listsData.status === 'rejected' && discussionsData.status === 'rejected';
+      if (allFailed) {
         setFetchError(true);
       }
     } catch (e) {
@@ -80,10 +86,6 @@ export default function Home() {
       setFetchError(true);
     }
   };
-
-  useEffect(() => {
-    fetchHitokoto();
-  }, []);
 
   const fetchHitokoto = async () => {
     try {
@@ -93,6 +95,15 @@ export default function Home() {
       setHitokoto(data);
     } catch {
       setHitokotoError(true);
+    }
+  };
+
+  const fetchRecommendations = async () => {
+    try {
+      const data = await api.getRecommendedProblems(6);
+      setRecommendations(data.recommendations || []);
+    } catch (e) {
+      // ignore — recommendations are optional
     }
   };
 
@@ -162,18 +173,21 @@ export default function Home() {
         </div>
       )}
 
+      {/* Ads */}
+      <AdSlot position="home_top" />
+
       {/* Hitokoto */}
       {hitokoto ? (
-        <div className="home-hitokoto" onClick={fetchHitokoto} title={t('home.clickToRefresh')}>
-          <Quote size={16} className="hitokoto-icon" />
+        <button className="home-hitokoto" onClick={fetchHitokoto} title={t('home.clickToRefresh')}>
+          <Quote size={16} className="hitokoto-icon" aria-hidden="true" />
           <div className="hitokoto-text">{hitokoto.hitokoto}</div>
           <div className="hitokoto-from">—— {hitokoto.from || hitokoto.from_who || t('home.unknown')}</div>
-        </div>
+        </button>
       ) : hitokotoError ? (
-        <div className="home-hitokoto hitokoto-error" onClick={fetchHitokoto} title={t('home.clickToRefresh')}>
-          <Quote size={16} className="hitokoto-icon" />
+        <button className="home-hitokoto hitokoto-error" onClick={fetchHitokoto} title={t('home.clickToRefresh')}>
+          <Quote size={16} className="hitokoto-icon" aria-hidden="true" />
           <div className="hitokoto-text">{t('home.clickToRefresh')}</div>
-        </div>
+        </button>
       ) : null}
 
       {/* Content Grid */}
@@ -186,6 +200,53 @@ export default function Home() {
           </button>
         </div>
       )}
+
+      {/* Personalized Recommendations (logged-in users only) */}
+      {user && (
+        <div className="home-recommend-section">
+          <div className="home-recommend-header">
+            <div className="recommend-title-block">
+              <Sparkles size={18} className="recommend-icon" />
+              <div>
+                <h2>{t('home.recommendProblems')}</h2>
+                <span className="recommend-subtitle">{t('home.recommendSubtitle')}</span>
+              </div>
+            </div>
+            <button className="btn btn-secondary btn-sm" onClick={fetchRecommendations}>
+              <RefreshCw size={14} /> {t('home.refreshRecommend')}
+            </button>
+          </div>
+          {recommendations.length === 0 ? (
+            <div className="home-empty">{t('home.noRecommendations')}</div>
+          ) : (
+            <div className="recommend-cards">
+              {recommendations.map((p: any) => (
+                <Link key={p.id} to={`/problems/${p.slug || p.id}`} className="recommend-card">
+                  <div className="recommend-card-header">
+                    <span className="difficulty-dot" style={{ color: DIFFICULTY_COLORS[p.difficulty] || '#8b8fa3' }}>●</span>
+                    <span className="recommend-card-difficulty">{p.difficulty}</span>
+                    {p.rating && (
+                      <span className="recommend-card-rating">{p.rating}</span>
+                    )}
+                  </div>
+                  <div className="recommend-card-title">{p.title}</div>
+                  {p.reason && (
+                    <div className="recommend-card-reason">{p.reason}</div>
+                  )}
+                  {p.tags && p.tags.length > 0 && (
+                    <div className="recommend-card-tags">
+                      {p.tags.slice(0, 3).map((tag: string, i: number) => (
+                        <span key={i} className="recommend-tag">#{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="home-content-grid">
         {/* Recent Problems */}
         <div className="home-card">
