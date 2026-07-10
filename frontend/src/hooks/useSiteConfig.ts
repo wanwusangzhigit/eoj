@@ -24,6 +24,9 @@ const defaults: SiteConfig = {
   home: {
     title: '',
   },
+  contact: {
+    email: '',
+  },
 };
 
 function deepMerge(target: any, source: any): any {
