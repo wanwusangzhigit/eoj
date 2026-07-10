@@ -99,7 +99,7 @@ teams.post('/', authMiddleware, async (c) => {
 // PUT /teams/:id — 编辑（owner 或 admin）
 teams.put('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const team = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
 
   if (!team) {
@@ -125,7 +125,7 @@ teams.put('/:id', authMiddleware, async (c) => {
 // DELETE /teams/:id — 删除
 teams.delete('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const team = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
 
   if (!team) {
@@ -143,7 +143,7 @@ teams.delete('/:id', authMiddleware, async (c) => {
 // POST /teams/:id/join — 加入公开团队
 teams.post('/:id/join', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const team = await c.env.DB.prepare('SELECT is_public FROM teams WHERE id = ?').bind(id).first();
   if (!team) {
@@ -169,7 +169,7 @@ teams.post('/:id/join', authMiddleware, async (c) => {
 // POST /teams/:id/leave — 离开
 teams.post('/:id/leave', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
 
   const team = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
   if (!team) {
@@ -186,8 +186,8 @@ teams.post('/:id/leave', authMiddleware, async (c) => {
 // DELETE /teams/:id/members/:userId — 移除成员（owner 或 admin）
 teams.delete('/:id/members/:userId', authMiddleware, async (c) => {
   const user = c.get('user');
-  const id = parseInt(c.req.param('id'));
-  const targetUserId = parseInt(c.req.param('userId'));
+  const id = parseInt(c.req.param('id') || '0');
+  const targetUserId = parseInt(c.req.param('userId') || '0');
 
   const team = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
   if (!team) {
@@ -206,7 +206,7 @@ teams.delete('/:id/members/:userId', authMiddleware, async (c) => {
 
 // GET /teams/:id/rankings — 团队内排行榜
 teams.get('/:id/rankings', async (c) => {
-  const id = parseInt(c.req.param('id'));
+  const id = parseInt(c.req.param('id') || '0');
   const rankings = await c.env.DB.prepare(
     `SELECT tm.user_id, u.username, u.avatar_url,
        COUNT(DISTINCT s.problem_id) as solved_count,
