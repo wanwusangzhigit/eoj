@@ -49,7 +49,12 @@ solutions.get('/', async (c) => {
   ).bind(...binds).first();
   const total = (countResult as any)?.total || 0;
 
-  const orderBy = sort === 'popular' ? 's.vote_count DESC, s.created_at DESC' : 's.created_at DESC';
+  const sortClauses: Record<string, string> = {
+    newest: 's.created_at DESC',
+    popular: 's.vote_count DESC, s.created_at DESC',
+    oldest: 's.created_at ASC',
+  };
+  const orderBy = sortClauses[sort] || sortClauses.newest;
 
   const results = await c.env.DB.prepare(
     `SELECT s.id, s.problem_id, s.user_id, s.title, s.language, s.vote_count, s.view_count, s.review_status, s.created_at, s.updated_at, u.username

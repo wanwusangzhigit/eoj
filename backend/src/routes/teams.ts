@@ -92,7 +92,7 @@ teams.post('/', authMiddleware, async (c) => {
     if (String(e).includes('UNIQUE')) {
       return c.json({ success: false, error: { message: 'slug already exists', code: 'CONFLICT' } }, 409);
     }
-    throw e;
+    return c.json({ success: false, error: { message: 'Failed to create team', code: 'INTERNAL_ERROR' } }, 500);
   }
 });
 
@@ -162,7 +162,7 @@ teams.post('/:id/join', authMiddleware, async (c) => {
     if (String(e).includes('UNIQUE')) {
       return c.json({ success: false, error: { message: 'Already a member', code: 'CONFLICT' } }, 409);
     }
-    throw e;
+    return c.json({ success: false, error: { message: 'Failed to join team', code: 'INTERNAL_ERROR' } }, 500);
   }
 });
 

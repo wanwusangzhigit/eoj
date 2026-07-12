@@ -29,6 +29,23 @@ import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 
 const app = new Hono<AppType>();
 
+// Validate required environment variables
+const REQUIRED_ENV_VARS = ['JWT_SECRET', 'CALLBACK_SECRET', 'GITHUB_TOKEN', 'JUDGE_REPO', 'FRONTEND_URL'];
+let envValidated = false;
+
+app.use('/api/*', async (c, next) => {
+  if (!envValidated) {
+    for (const key of REQUIRED_ENV_VARS) {
+      if (!(c.env as any)[key]) {
+        console.error(`Missing required env var: ${key}`);
+        return c.json({ success: false, error: { message: `Server config error: ${key} not set`, code: 'CONFIG_ERROR' } }, 500);
+      }
+    }
+    envValidated = true;
+  }
+  await next();
+});
+
 app.use('/api/*', async (c, next) => {
   const corsMiddleware = cors({
     origin: [c.env.FRONTEND_URL || 'http://localhost:5173'],

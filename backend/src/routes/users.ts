@@ -376,7 +376,7 @@ users.post('/:username/follow', authMiddleware, async (c) => {
     if (String(e).includes('UNIQUE')) {
       return c.json({ success: false, error: { message: 'Already following', code: 'CONFLICT' } }, 409);
     }
-    throw e;
+    return c.json({ success: false, error: { message: 'Failed to follow user', code: 'INTERNAL_ERROR' } }, 500);
   }
 });
 

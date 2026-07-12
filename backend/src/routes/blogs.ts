@@ -27,7 +27,13 @@ blogs.get('/', async (c) => {
     countBinds.push(`%${tag}%`);
   }
 
-  const orderBy = sort === 'hot' ? 'b.like_count DESC, b.created_at DESC' : 'b.created_at DESC';
+  const sortClauses: Record<string, string> = {
+    latest: 'b.created_at DESC',
+    hot: 'b.like_count DESC, b.created_at DESC',
+    oldest: 'b.created_at ASC',
+    most_viewed: 'b.view_count DESC',
+  };
+  const orderBy = sortClauses[sort] || sortClauses.latest;
   query += ` ORDER BY ${orderBy} LIMIT ? OFFSET ?`;
 
   const countResult = await c.env.DB.prepare(countQuery).bind(...countBinds).first();

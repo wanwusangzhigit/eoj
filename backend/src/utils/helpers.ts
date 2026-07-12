@@ -25,3 +25,17 @@ export function paginate(page: number, pageSize: number, total: number) {
     totalPages,
   };
 }
+
+/**
+ * Parse page/pageSize from query params with sensible defaults and bounds.
+ */
+export function parsePagination(
+  query: { page?: string; pageSize?: string },
+  defaultPageSize = 20,
+  maxPageSize = 50,
+): { page: number; pageSize: number; offset: number } {
+  const page = Math.max(1, parseInt(query.page || '1'));
+  const pageSize = Math.min(maxPageSize, Math.max(1, parseInt(query.pageSize || String(defaultPageSize))));
+  const offset = (page - 1) * pageSize;
+  return { page, pageSize, offset };
+}

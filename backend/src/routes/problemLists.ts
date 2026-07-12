@@ -32,15 +32,23 @@ problemLists.get('/', async (c) => {
   const total = (countResult as any)?.total || 0;
   const results = await c.env.DB.prepare(query).bind(...binds, pageSize, offset).all();
 
-  // Add problem count for each list
-  const listsWithCount = await Promise.all(
-    results.results.map(async (list: any) => {
-      const count = await c.env.DB.prepare(
-        'SELECT COUNT(*) as cnt FROM problem_list_items WHERE list_id = ?'
-      ).bind(list.id).first();
-      return { ...list, problem_count: (count as any)?.cnt || 0 };
-    })
-  );
+  // Add problem count for each list (batch query)
+  const lists = results.results as any[];
+  const listIds = lists.map((l: any) => l.id);
+  const problemCountMap = new Map<number, number>();
+  if (listIds.length > 0) {
+    const placeholders = listIds.map(() => '?').join(',');
+    const countRows = await c.env.DB.prepare(
+      `SELECT list_id, COUNT(*) as cnt FROM problem_list_items WHERE list_id IN (${placeholders}) GROUP BY list_id`
+    ).bind(...listIds).all();
+    for (const row of countRows.results as any[]) {
+      problemCountMap.set(row.list_id, row.cnt);
+    }
+  }
+  const listsWithCount = lists.map((list: any) => ({
+    ...list,
+    problem_count: problemCountMap.get(list.id) || 0,
+  }));
 
   return c.json({
     success: true,
