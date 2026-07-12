@@ -6,7 +6,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '../../constants';
 import { t } from '../../i18n';
 import {
-  Search, Trash2, Edit3, X, ChevronLeft, ChevronRight, FileText, Save,
+  Search, Trash2, Edit3, X, ChevronLeft, ChevronRight, FileText, Save, Download, Upload,
 } from 'lucide-react';
 import '../Admin.css';
 
@@ -24,6 +24,7 @@ export default function AdminProblems() {
   const [problemPage, setProblemPage] = useState(1);
   const [editingProblem, setEditingProblem] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAdminProblems();
@@ -98,6 +99,43 @@ export default function AdminProblems() {
     setEditForm({});
   };
 
+  const handleExportProblems = async () => {
+    try {
+      const data = await api.exportProblems();
+      const blob = new Blob([JSON.stringify(data.problems, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `eoj-problems-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      useToastStore().addToast('success', t('admin.problemsExported'));
+    } catch (e: any) {
+      useToastStore().addToast('error', e.message || t('common.error'));
+    }
+  };
+
+  const handleImportProblems = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const payload = JSON.parse(text);
+      const result = await api.importProblems(Array.isArray(payload) ? payload : payload.problems || []);
+      useToastStore().addToast('success', t('admin.problemsImported').replace('{0}', String(result.imported || 0)));
+      refresh();
+    } catch (e: any) {
+      useToastStore().addToast('error', e.message || t('common.error'));
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   return (
     <div className="admin-form">
       <div className="admin-search">
@@ -111,6 +149,16 @@ export default function AdminProblems() {
             setProblemPage(1);
           }}
         />
+      </div>
+
+      <div className="admin-actions" style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <button className="btn btn-secondary btn-sm" onClick={handleExportProblems}>
+          <Download size={14} /> {t('admin.exportProblems')}
+        </button>
+        <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()}>
+          <Upload size={14} /> {t('admin.importProblems')}
+        </button>
+        <input ref={fileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={handleImportProblems} />
       </div>
 
       <div className="problem-management-table">

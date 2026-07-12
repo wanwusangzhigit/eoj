@@ -6,6 +6,7 @@ import { t } from './i18n';
 import { useAuthStore } from './store/auth';
 import './styles/global.css';
 import './styles/components.css';
+import 'katex/dist/katex.min.css';
 
 const ProblemList = lazy(() => import('./pages/ProblemList'));
 const Home = lazy(() => import('./pages/Home'));
