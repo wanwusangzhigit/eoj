@@ -105,7 +105,7 @@ problems.get('/recommend', authMiddleware, async (c) => {
 
   // 2. Get the user's tag profile (count of solved problems per tag)
   const tagRows = await c.env.DB.prepare(
-    `SELECT json_extract(value, '$') as tag, COUNT(DISTINCT s.problem_id) as cnt
+    `SELECT value as tag, COUNT(DISTINCT s.problem_id) as cnt
      FROM submissions s, problems p, json_each(p.tags)
      WHERE s.user_id = ? AND s.status = 'accepted' AND s.problem_id = p.id
      GROUP BY tag ORDER BY cnt DESC LIMIT 5`

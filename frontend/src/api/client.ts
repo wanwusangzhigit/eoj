@@ -133,7 +133,7 @@ class ApiClient {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
-    return this.request<{ rankings: any[]; pagination: any }>(`/rating/leaderboard?${query.toString()}`);
+    return this.request<{ rankings: any[]; pagination: any }>(`/ratings/leaderboard?${query.toString()}`);
   }
 
   // User rating info
