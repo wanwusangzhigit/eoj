@@ -24,6 +24,10 @@ export default function AdminProblems() {
   const [problemPage, setProblemPage] = useState(1);
   const [editingProblem, setEditingProblem] = useState<any>(null);
   const [editForm, setEditForm] = useState<any>({});
+  const [actionLog, setActionLog] = useState<string[]>([]);
+  const [actionStatus, setActionStatus] = useState<string>('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -99,9 +103,26 @@ export default function AdminProblems() {
     setEditForm({});
   };
 
+  const appendActionLog = (message: string) => {
+    setActionLog((prev) => [...prev, message]);
+  };
+
+  const resetActionLog = () => {
+    setActionLog([]);
+    setActionStatus('');
+  };
+
   const handleExportProblems = async () => {
+    resetActionLog();
+    setIsExporting(true);
+    setActionStatus(t('admin.exportingProblems'));
+    appendActionLog(t('admin.exportLogStart'));
+
     try {
       const data = await api.exportProblems();
+      appendActionLog(t('admin.exportLogCount').replace('{0}', String(data.problems?.length ?? 0)));
+      appendActionLog(t('admin.exportLogPreparingDownload'));
+
       const blob = new Blob([JSON.stringify(data.problems, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -111,9 +132,16 @@ export default function AdminProblems() {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      appendActionLog(t('admin.exportLogFinished'));
+      setActionStatus(t('admin.exportComplete'));
       useToastStore().addToast('success', t('admin.problemsExported'));
     } catch (e: any) {
+      appendActionLog(`${t('common.error')}: ${e.message || t('common.error')}`);
+      setActionStatus(t('admin.exportFailed'));
       useToastStore().addToast('error', e.message || t('common.error'));
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -121,15 +149,30 @@ export default function AdminProblems() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    resetActionLog();
+    setIsImporting(true);
+    setActionStatus(t('admin.importingProblems'));
+    appendActionLog(t('admin.importLogReadFile'));
+
     try {
       const text = await file.text();
+      appendActionLog(t('admin.importLogParseJson'));
       const payload = JSON.parse(text);
-      const result = await api.importProblems(Array.isArray(payload) ? payload : payload.problems || []);
+      const problems = Array.isArray(payload) ? payload : payload.problems || [];
+      appendActionLog(t('admin.importLogCount').replace('{0}', String(problems.length)));
+      appendActionLog(t('admin.importLogUploading'));
+
+      const result = await api.importProblems(problems);
+      appendActionLog(t('admin.importLogFinished').replace('{0}', String(result.imported || 0)));
+      setActionStatus(t('admin.importComplete'));
       useToastStore().addToast('success', t('admin.problemsImported').replace('{0}', String(result.imported || 0)));
       refresh();
     } catch (e: any) {
+      appendActionLog(`${t('common.error')}: ${e.message || t('common.error')}`);
+      setActionStatus(t('admin.importFailed'));
       useToastStore().addToast('error', e.message || t('common.error'));
     } finally {
+      setIsImporting(false);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -152,14 +195,40 @@ export default function AdminProblems() {
       </div>
 
       <div className="admin-actions" style={{ display: 'flex', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-        <button className="btn btn-secondary btn-sm" onClick={handleExportProblems}>
+        <button className="btn btn-secondary btn-sm" onClick={handleExportProblems} disabled={isExporting || isImporting}>
           <Download size={14} /> {t('admin.exportProblems')}
         </button>
-        <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()}>
+        <button className="btn btn-primary btn-sm" onClick={() => fileInputRef.current?.click()} disabled={isExporting || isImporting}>
           <Upload size={14} /> {t('admin.importProblems')}
         </button>
         <input ref={fileInputRef} type="file" accept="application/json" style={{ display: 'none' }} onChange={handleImportProblems} />
       </div>
+
+      {(actionLog.length > 0 || isExporting || isImporting) && (
+        <div style={{
+          border: '1px solid #e0e0e0',
+          borderRadius: 8,
+          padding: 12,
+          marginBottom: 16,
+          backgroundColor: '#fafafa',
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+            <div style={{ fontWeight: 600 }}>{actionStatus || t('admin.noActionLogs')}</div>
+            {(isExporting || isImporting) && (
+              <span style={{ fontStyle: 'italic', color: '#666' }}>{t('admin.processing')}</span>
+            )}
+          </div>
+          <div style={{ maxHeight: 180, overflowY: 'auto', fontSize: 13, lineHeight: 1.6 }}>
+            {actionLog.length === 0 ? (
+              <div style={{ color: '#777' }}>{t('admin.noActionLogs')}</div>
+            ) : (
+              actionLog.map((line, index) => (
+                <div key={index}>{line}</div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="problem-management-table">
         <div className="pm-table-header">
