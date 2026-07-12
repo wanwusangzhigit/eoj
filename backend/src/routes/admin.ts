@@ -1,7 +1,8 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, superAdminMiddleware, problemAdminMiddleware, contestAdminMiddleware, ticketAdminMiddleware, listAdminMiddleware } from '../middleware/auth';
-import { fetchTestcases } from '../utils/github-testcases';
+import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
+import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
 
 const admin = new Hono<AppType>();
 
@@ -91,6 +92,119 @@ admin.get('/problems', authMiddleware, problemAdminMiddleware, async (c) => {
       pagination: { page, pageSize, total, totalPages: Math.ceil(total / pageSize) },
     },
   });
+});
+
+// GET /problems/export - Export full problem library as JSON
+admin.get('/problems/export', authMiddleware, problemAdminMiddleware, async (c) => {
+  const results = await c.env.DB.prepare('SELECT * FROM problems ORDER BY id ASC').all();
+  const problems = await Promise.all((results.results as any[]).map(async (problem: any) => {
+    let tags: string[] = [];
+    try {
+      tags = typeof problem.tags === 'string' ? JSON.parse(problem.tags || '[]') : (Array.isArray(problem.tags) ? problem.tags : []);
+    } catch {
+      tags = [];
+    }
+
+    const testcases = await fetchTestcases(c.env, problem.slug).catch(() => []);
+    const spjCode = problem.judge_type === 'spj' && problem.spj_language
+      ? await fetchSpjCode(c.env, problem.slug, problem.spj_language).catch(() => '')
+      : null;
+
+    return {
+      ...problem,
+      tags,
+      testcases,
+      spj_code: spjCode,
+      spj_language: problem.spj_language,
+    };
+  }));
+
+  return c.json({ success: true, data: { problems } });
+});
+
+// POST /problems/import - Import a problem library from JSON
+admin.post('/problems/import', authMiddleware, problemAdminMiddleware, async (c) => {
+  const body = await c.req.json();
+  const payload = Array.isArray(body) ? body : body?.problems;
+
+  if (!Array.isArray(payload)) {
+    return c.json({ success: false, error: { message: 'Expected an array of problems', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  let imported = 0;
+  for (const item of payload) {
+    const title = item?.title;
+    const slug = item?.slug || (typeof title === 'string' ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : 'problem');
+    if (!title || !slug) continue;
+
+    const tags = Array.isArray(item?.tags)
+      ? item.tags
+      : (typeof item?.tags === 'string' ? item.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : []);
+
+    const existing = await c.env.DB.prepare('SELECT id, slug, judge_type, spj_language FROM problems WHERE slug = ?').bind(slug).first();
+    const problemId = existing ? (existing as any).id : null;
+
+    if (problemId) {
+      await c.env.DB.prepare(`
+        UPDATE problems
+        SET title = ?, slug = ?, description = ?, input_format = ?, output_format = ?, time_limit = ?, memory_limit = ?, tags = ?, difficulty = ?, is_public = ?, judge_type = ?, spj_language = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?
+      `).bind(
+        item.title || title,
+        slug,
+        item.description || '',
+        item.input_format || null,
+        item.output_format || null,
+        item.time_limit || 1000,
+        item.memory_limit || 256,
+        JSON.stringify(tags),
+        item.difficulty || 'Easy',
+        item.is_public !== undefined ? (item.is_public ? 1 : 0) : 1,
+        item.judge_type || 'default',
+        item.judge_type === 'spj' ? (item.spj_language || null) : null,
+        problemId,
+      ).run();
+
+      await deleteTestcases(c.env, slug);
+      if ((existing as any)?.judge_type === 'spj' && (existing as any)?.spj_language) {
+        await deleteSpjCode(c.env, slug, (existing as any).spj_language);
+      }
+    } else {
+      const result = await c.env.DB.prepare(`
+        INSERT INTO problems (title, slug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, is_public, judge_type, spj_language)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        item.title || title,
+        slug,
+        item.description || '',
+        item.input_format || null,
+        item.output_format || null,
+        item.time_limit || 1000,
+        item.memory_limit || 256,
+        JSON.stringify(tags),
+        item.difficulty || 'Easy',
+        item.is_public !== undefined ? (item.is_public ? 1 : 0) : 1,
+        item.judge_type || 'default',
+        item.judge_type === 'spj' ? (item.spj_language || null) : null,
+      ).run();
+
+      if (result.meta.last_row_id) {
+        // keep reference for later use
+      }
+    }
+
+    if (Array.isArray(item?.testcases) && item.testcases.length > 0) {
+      await saveTestcases(c.env, slug, item.testcases);
+    }
+
+    if (item?.judge_type === 'spj' && item?.spj_language && item?.spj_code) {
+      await saveSpjCode(c.env, slug, item.spj_language, item.spj_code);
+    }
+
+    imported += 1;
+  }
+
+  return c.json({ success: true, data: { imported, message: `Imported ${imported} problems` } });
 });
 
 // GET /contests - List all contests (admin, including private)

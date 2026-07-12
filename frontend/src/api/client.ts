@@ -325,6 +325,17 @@ class ApiClient {
     return this.request<{ problems: any[]; pagination: any }>(`/admin/problems?${query.toString()}`);
   }
 
+  async exportProblems() {
+    return this.request<{ problems: any[] }>('/admin/problems/export');
+  }
+
+  async importProblems(payload: any[]) {
+    return this.request<{ imported: number; message: string }>('/admin/problems/import', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   async deleteProblem(id: number) {
     return this.request<{ message: string }>(`/problems/${id}`, {
       method: 'DELETE',
