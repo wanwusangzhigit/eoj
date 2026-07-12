@@ -39,7 +39,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         <div className="footer-inner">
           <div className="footer-text footer-text-multi">
             <span>
-              Build by <a href="https://github.com/wanwusangzhigit/eoj/" target="_blank" rel="noopener noreferrer">https://github.com/wanwusangzhigit/eoj/</a>
+              Build by <a href="https://github.com/wanwusangzhigit/eoj/" target="_blank" rel="noopener noreferrer">EOJ</a>
             </span>
             {config.contact.email && (
               <span>

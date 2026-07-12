@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
+import { renderMarkdown } from '../utils/markdown';
 import './Blogs.css';
 
 export default function BlogDetail() {
@@ -127,10 +128,7 @@ export default function BlogDetail() {
             </div>
           )}
         </header>
-        <div className="article-content">
-          {/* Markdown content - simple rendering */}
-          <MarkdownRenderer content={blog.content} />
-        </div>
+        <div className="article-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(blog.content || '') }} />
         <footer className="article-footer">
           <div className="article-actions">
             <button className={`action-btn ${liked ? 'liked' : ''}`} onClick={handleLike} disabled={!user}>
@@ -190,7 +188,7 @@ export default function BlogDetail() {
                     <Link to={`/users/${c.username}`} className="comment-author">{c.username}</Link>
                     <span className="comment-time">{new Date(c.created_at).toLocaleString()}</span>
                   </div>
-                  <div className="comment-text">{c.content}</div>
+                  <div className="comment-text" dangerouslySetInnerHTML={{ __html: renderMarkdown(c.content || '') }} />
                 </div>
               </div>
             ))
@@ -199,21 +197,4 @@ export default function BlogDetail() {
       </section>
     </div>
   );
-}
-
-// 简单的 Markdown 渲染器（复用项目已有能力可替换）
-function MarkdownRenderer({ content }: { content: string }) {
-  // 简单处理：代码块、粗体、斜体、链接、标题
-  let html = content
-    .replace(/```(\w+)?\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-    .replace(/\n/g, '<br />');
-
-  return <div dangerouslySetInnerHTML={{ __html: html }} />;
 }

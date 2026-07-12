@@ -451,6 +451,10 @@ const zh = {
     tagPlaceholder: '输入标签后按回车',
     // Problem management
     searchProblems: '搜索题目...',
+    exportProblems: '导出题库',
+    importProblems: '导入题库',
+    problemsExported: '题库已导出',
+    problemsImported: '已导入 {0} 道题目',
     noProblems: '暂无题目',
     // Testcase
     selectProblem: '选择题目',
