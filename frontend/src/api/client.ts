@@ -112,7 +112,7 @@ class ApiClient {
 
   // Tags tree with problem counts
   async getTagsTree() {
-    return this.request<{ tree: any[] }>('/tags/tree');
+    return this.request<{ categories: any[] }>('/tags/problems/tags-tree');
   }
 
   // Problem-specific tags

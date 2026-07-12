@@ -48,35 +48,56 @@ training.get('/', async (c) => {
   const total = (countResult as any)?.total || 0;
   const results = await c.env.DB.prepare(query).bind(...binds, pageSize, offset).all();
 
-  // 附带章节/题目数和当前用户进度
+  // 附带章节/题目数和当前用户进度（批量查询消除 N+1）
   const user = c.get('user');
-  const plansWithExtra = await Promise.all(
-    results.results.map(async (plan: any) => {
-      const chapterCount = await c.env.DB.prepare(
-        'SELECT COUNT(*) as cnt FROM training_chapters WHERE plan_id = ?'
-      ).bind(plan.id).first();
+  const plans = results.results as any[];
+  const planIds = plans.map((p: any) => p.id);
 
-      const problemCount = await c.env.DB.prepare(
-        `SELECT COUNT(*) as cnt FROM training_chapter_problems tcp
-         JOIN training_chapters tc ON tcp.chapter_id = tc.id
-         WHERE tc.plan_id = ?`
-      ).bind(plan.id).first();
+  // 批量查询章节数
+  const chapterCountMap = new Map<number, number>();
+  if (planIds.length > 0) {
+    const placeholders = planIds.map(() => '?').join(',');
+    const chapterRows = await c.env.DB.prepare(
+      `SELECT plan_id, COUNT(*) as cnt FROM training_chapters WHERE plan_id IN (${placeholders}) GROUP BY plan_id`
+    ).bind(...planIds).all();
+    for (const row of chapterRows.results as any[]) {
+      chapterCountMap.set(row.plan_id, row.cnt);
+    }
+  }
 
-      let progress = null;
-      if (user) {
-        progress = await c.env.DB.prepare(
-          'SELECT completed, total FROM training_progress WHERE user_id = ? AND plan_id = ?'
-        ).bind(user.userId, plan.id).first();
-      }
+  // 批量查询题目数
+  const problemCountMap = new Map<number, number>();
+  if (planIds.length > 0) {
+    const placeholders = planIds.map(() => '?').join(',');
+    const problemRows = await c.env.DB.prepare(
+      `SELECT tc.plan_id, COUNT(*) as cnt FROM training_chapter_problems tcp
+       JOIN training_chapters tc ON tcp.chapter_id = tc.id
+       WHERE tc.plan_id IN (${placeholders})
+       GROUP BY tc.plan_id`
+    ).bind(...planIds).all();
+    for (const row of problemRows.results as any[]) {
+      problemCountMap.set(row.plan_id, row.cnt);
+    }
+  }
 
-      return {
-        ...plan,
-        chapter_count: (chapterCount as any)?.cnt || 0,
-        problem_count: (problemCount as any)?.cnt || 0,
-        progress: progress || null,
-      };
-    })
-  );
+  // 批量查询用户进度
+  const progressMap = new Map<number, any>();
+  if (user && planIds.length > 0) {
+    const placeholders = planIds.map(() => '?').join(',');
+    const progressRows = await c.env.DB.prepare(
+      `SELECT plan_id, completed, total FROM training_progress WHERE user_id = ? AND plan_id IN (${placeholders})`
+    ).bind(user.userId, ...planIds).all();
+    for (const row of progressRows.results as any[]) {
+      progressMap.set(row.plan_id, row);
+    }
+  }
+
+  const plansWithExtra = plans.map((plan: any) => ({
+    ...plan,
+    chapter_count: chapterCountMap.get(plan.id) || 0,
+    problem_count: problemCountMap.get(plan.id) || 0,
+    progress: progressMap.get(plan.id) || null,
+  }));
 
   return c.json({
     success: true,
@@ -353,7 +374,7 @@ training.post('/chapters/:id/problems', authMiddleware, adminMiddleware, async (
     if (String(e).includes('UNIQUE')) {
       return c.json({ success: false, error: { message: 'Problem already in this chapter', code: 'CONFLICT' } }, 409);
     }
-    throw e;
+    return c.json({ success: false, error: { message: 'Failed to add problem', code: 'INTERNAL_ERROR' } }, 500);
   }
 });
 

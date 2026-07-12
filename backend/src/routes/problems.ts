@@ -13,10 +13,19 @@ const problems = new Hono<AppType>();
 // GET /problems/tags - All unique tags from public problems
 problems.get('/tags', async (c) => {
   const results = await c.env.DB.prepare(
-    "SELECT DISTINCT json_extract(value, '$') as tag FROM problems, json_each(tags) WHERE is_public = 1"
+    "SELECT tags FROM problems WHERE is_public = 1 AND tags IS NOT NULL AND tags != '[]'"
   ).all();
 
-  const tags = (results.results as any[]).map((r) => r.tag).filter(Boolean).sort();
+  const tagSet = new Set<string>();
+  for (const row of results.results as any[]) {
+    try {
+      const parsed = JSON.parse(row.tags || '[]');
+      if (Array.isArray(parsed)) {
+        parsed.forEach((t: string) => t && tagSet.add(t));
+      }
+    } catch { /* skip invalid JSON */ }
+  }
+  const tags = Array.from(tagSet).sort();
   return c.json({ success: true, data: { tags } });
 });
 
@@ -105,12 +114,26 @@ problems.get('/recommend', authMiddleware, async (c) => {
 
   // 2. Get the user's tag profile (count of solved problems per tag)
   const tagRows = await c.env.DB.prepare(
-    `SELECT value as tag, COUNT(DISTINCT s.problem_id) as cnt
-     FROM submissions s, problems p, json_each(p.tags)
-     WHERE s.user_id = ? AND s.status = 'accepted' AND s.problem_id = p.id
-     GROUP BY tag ORDER BY cnt DESC LIMIT 5`
+    `SELECT p.tags FROM submissions s
+     JOIN problems p ON s.problem_id = p.id
+     WHERE s.user_id = ? AND s.status = 'accepted'
+     AND p.tags IS NOT NULL AND p.tags != '[]'`
   ).bind(user.userId).all();
-  const topTags = (tagRows.results as any[]).map((r) => r.tag).filter(Boolean);
+  const tagCount = new Map<string, number>();
+  for (const row of tagRows.results as any[]) {
+    try {
+      const parsed = JSON.parse(row.tags || '[]');
+      if (Array.isArray(parsed)) {
+        parsed.forEach((t: string) => {
+          if (t) tagCount.set(t, (tagCount.get(t) || 0) + 1);
+        });
+      }
+    } catch { /* skip invalid JSON */ }
+  }
+  const topTags = Array.from(tagCount.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([tag]) => tag);
 
   // 3. Get user's current rating (or 0 if unrated)
   const ratingRow = await c.env.DB.prepare(
