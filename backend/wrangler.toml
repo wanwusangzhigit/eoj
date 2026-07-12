@@ -1,0 +1,26 @@
+name = "oj-backend"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+account_id = "93767a366115cff85216a3fe7d6e62e5"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "oj-database"
+database_id = "0f57b162-ec0c-4853-ab19-2a7d6fcd48bf"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+[vars]
+GITHUB_CLIENT_ID = ""
+GITHUB_CLIENT_SECRET = ""
+GITHUB_TOKEN = ""
+CPOAUTH_CLIENT_ID = ""
+CPOAUTH_CLIENT_SECRET = ""
+CALLBACK_SECRET = ""
+JWT_SECRET = "your secret"
+JUDGE_REPO = "your-username/oj-judge"
+FRONTEND_URL = "https://your-frontend-url"
+REGISTRATION_OPEN = "true"
