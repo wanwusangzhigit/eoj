@@ -4,10 +4,11 @@ import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { rateLimitMiddleware } from '../middleware/rateLimit';
 import { getLanguageExt } from '../utils/helpers';
 import { validateSourceCode, validateLanguage } from '../utils/validator';
+import { captchaMiddleware } from '../middleware/captcha';
 
 const submissions = new Hono<AppType>();
 
-submissions.post('/', authMiddleware, rateLimitMiddleware, async (c) => {
+submissions.post('/', authMiddleware, captchaMiddleware('submit'), rateLimitMiddleware, async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const { problem_id, language, source_code } = body;

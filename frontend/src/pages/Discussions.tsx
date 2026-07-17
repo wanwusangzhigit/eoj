@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { MessageSquare, Eye, Plus, Pin, Clock, Tag, AlertCircle } from 'lucide-react';
 import ImageUploadButton from '../components/ImageUploadButton';
+import Captcha from '../components/Captcha';
+import type { CaptchaHandle } from '../components/Captcha';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
@@ -49,6 +51,9 @@ export default function Discussions() {
   const [formCategory, setFormCategory] = useState('general');
   const [formContent, setFormContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [captchaUuid, setCaptchaUuid] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const captchaRef = useRef<CaptchaHandle>(null);
   useDocumentTitle(t('discussions.title'));
 
   useEffect(() => {
@@ -89,6 +94,8 @@ export default function Discussions() {
         title: formTitle.trim(),
         category: formCategory,
         content: formContent.trim(),
+        captcha_uuid: captchaUuid,
+        captcha_answer: captchaAnswer,
       };
       if (problemId) {
         data.problem_id = Number(problemId);
@@ -101,6 +108,9 @@ export default function Discussions() {
       navigate(`/discussions/${result.id}`);
     } catch (e: any) {
       console.error('Failed to create discussion:', e);
+      if (e.message?.includes('CAPTCHA')) {
+        captchaRef.current?.refresh();
+      }
       useToastStore().addToast('error', e.message || t('common.error'));
     } finally {
       setSubmitting(false);
@@ -215,6 +225,12 @@ export default function Discussions() {
               <ImageUploadButton onInsert={(md) => setFormContent(prev => prev + (prev ? '\n' : '') + md)} />
             </div>
           </div>
+          <Captcha
+            ref={captchaRef}
+            onCaptchaReady={({ uuid }) => setCaptchaUuid(uuid)}
+            onCaptchaChange={(answer) => setCaptchaAnswer(answer)}
+            captchaAnswer={captchaAnswer}
+          />
           <div className="form-actions">
             <button
               className="btn btn-secondary btn-sm"

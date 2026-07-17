@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { ArrowLeft } from 'lucide-react';
+import Captcha from '../components/Captcha';
+import type { CaptchaHandle } from '../components/Captcha';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
@@ -15,6 +17,9 @@ export default function BlogEditor() {
   const [form, setForm] = useState({ title: '', content: '', tags: '', status: 'published' });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [captchaUuid, setCaptchaUuid] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const captchaRef = useRef<CaptchaHandle>(null);
   useDocumentTitle(blogId ? t('blogs.editBlog') : t('blogs.writeBlog'));
 
   useEffect(() => {
@@ -51,12 +56,15 @@ export default function BlogEditor() {
         addToast('success', t('blogs.blogUpdated'));
         navigate(`/blogs/${blogId}`);
       } else {
-        const result = await api.createBlog(form);
+        const result = await api.createBlog({ ...form, captcha_uuid: captchaUuid, captcha_answer: captchaAnswer });
         addToast('success', t('blogs.blogCreated'));
         navigate(`/blogs/${result.id}`);
       }
     } catch (e: any) {
       addToast('error', e.message || t('common.error'));
+      if (e.message?.includes('CAPTCHA')) {
+        captchaRef.current?.refresh();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -100,6 +108,14 @@ export default function BlogEditor() {
             placeholder={t('blogs.tagHint')}
           />
         </label>
+        {!blogId && (
+          <Captcha
+            ref={captchaRef}
+            onCaptchaReady={({ uuid }) => setCaptchaUuid(uuid)}
+            onCaptchaChange={(answer) => setCaptchaAnswer(answer)}
+            captchaAnswer={captchaAnswer}
+          />
+        )}
         <div className="editor-actions">
           <button
             type="button"

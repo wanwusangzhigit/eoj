@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { ThumbsUp, Eye, MessageSquare, Plus, ChevronRight, ArrowLeft, Clock, Code, AlertCircle } from 'lucide-react';
 import ImageUploadButton from '../components/ImageUploadButton';
+import Captcha from '../components/Captcha';
+import type { CaptchaHandle } from '../components/Captcha';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -56,6 +58,9 @@ export default function Solutions() {
   const [formContent, setFormContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [captchaUuid, setCaptchaUuid] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const captchaRef = useRef<CaptchaHandle>(null);
   useDocumentTitle(t('solutions.title'));
 
   useEffect(() => {
@@ -95,6 +100,8 @@ export default function Solutions() {
         title: formTitle.trim(),
         content: formContent.trim(),
         language: formLanguage || undefined,
+        captcha_uuid: captchaUuid,
+        captcha_answer: captchaAnswer,
       });
       setShowForm(false);
       setFormTitle('');
@@ -103,6 +110,9 @@ export default function Solutions() {
       fetchSolutions();
     } catch (e: any) {
       setFormError(e.message || t('common.error'));
+      if (e.message?.includes('CAPTCHA')) {
+        captchaRef.current?.refresh();
+      }
     } finally {
       setSubmitting(false);
     }
@@ -218,6 +228,13 @@ export default function Solutions() {
                 <ImageUploadButton onInsert={(md) => setFormContent(prev => prev + (prev ? '\n' : '') + md)} />
               </div>
             </div>
+
+            <Captcha
+              ref={captchaRef}
+              onCaptchaReady={({ uuid }) => setCaptchaUuid(uuid)}
+              onCaptchaChange={(answer) => setCaptchaAnswer(answer)}
+              captchaAnswer={captchaAnswer}
+            />
 
             <div className="form-actions">
               <button

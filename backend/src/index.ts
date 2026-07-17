@@ -24,6 +24,7 @@ import notifications from './routes/notifications';
 import messages from './routes/messages';
 import teams from './routes/teams';
 import blogs from './routes/blogs';
+import captcha from './routes/captcha';
 import { seedDatabase } from './seed';
 import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 
@@ -124,6 +125,7 @@ api.route('/notifications', notifications);
 api.route('/messages', messages);
 api.route('/teams', teams);
 api.route('/blogs', blogs);
+api.route('/captcha', captcha);
 
 app.route('/api/v1', api);
 

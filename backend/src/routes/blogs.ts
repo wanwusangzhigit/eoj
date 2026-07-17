@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { sendNotification, NotificationType } from '../utils/notify';
+import { captchaMiddleware } from '../middleware/captcha';
 
 const blogs = new Hono<AppType>();
 
@@ -67,7 +68,7 @@ blogs.get('/:id', async (c) => {
 });
 
 // POST /blogs — 创建博客
-blogs.post('/', authMiddleware, async (c) => {
+blogs.post('/', authMiddleware, captchaMiddleware('blog'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const { title, content, tags, status } = body;
