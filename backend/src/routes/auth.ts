@@ -5,6 +5,7 @@ import { signJWT } from '../utils/jwt';
 import { validateUsername, validateEmail } from '../utils/validator';
 import * as bcrypt from 'bcryptjs';
 import { createRateLimiter } from '../middleware/rateLimit';
+import { captchaMiddleware } from '../middleware/captcha';
 
 const auth = new Hono<AppType>();
 
@@ -287,7 +288,7 @@ auth.get('/github/callback', async (c) => {
 });
 
 // New: register with username/password
-auth.post('/register', createRateLimiter('register', 10, 300_000), async (c) => {
+auth.post('/register', captchaMiddleware('register'), createRateLimiter('register', 10, 300_000), async (c) => {
   const body: any = await c.req.json();
   const username = (body.username || '').trim();
   const password = body.password;
@@ -390,7 +391,7 @@ auth.post('/register', createRateLimiter('register', 10, 300_000), async (c) => 
 });
 
 // New: login with username/email + password
-auth.post('/login', createRateLimiter('login', 10, 300_000), async (c) => {
+auth.post('/login', captchaMiddleware('login'), createRateLimiter('login', 10, 300_000), async (c) => {
   const body: any = await c.req.json();
   const usernameOrEmail = (body.username || body.email || '').trim();
   const password = body.password;

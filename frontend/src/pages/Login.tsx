@@ -30,12 +30,35 @@ export default function Login() {
   const [emailRequired, setEmailRequired] = useState(false);
   const [emailSuffixes, setEmailSuffixes] = useState('');
   const [agreed, setAgreed] = useState(false);
+  const [captchaUuid, setCaptchaUuid] = useState('');
+  const [captchaSvg, setCaptchaSvg] = useState('');
+  const [captchaType, setCaptchaType] = useState<'text' | 'math'>('text');
+  const [captchaAnswerLen, setCaptchaAnswerLen] = useState(4);
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
 
   useEffect(() => {
     setRegistrationOpen(getRegistrationOpen());
     setEmailRequired(getEmailRequired());
     setEmailSuffixes(getEmailSuffixes());
   }, []);
+
+  // Fetch captcha on mount and when switching mode
+  useEffect(() => {
+    fetchCaptcha();
+  }, [mode]);
+
+  const fetchCaptcha = async () => {
+    try {
+      const data = await api.getCaptcha();
+      setCaptchaUuid(data.uuid);
+      setCaptchaSvg(data.svg);
+      setCaptchaType(data.type);
+      setCaptchaAnswerLen(data.answer_length);
+      setCaptchaAnswer('');
+    } catch {
+      // captcha unavailable, proceed without
+    }
+  };
 
   if (user) {
     navigate('/', { replace: true });
@@ -94,14 +117,17 @@ export default function Login() {
     try {
       setLoading(true);
       const data = mode === 'register'
-        ? await api.register(username.trim(), password, email.trim() || undefined)
-        : await api.login(username.trim(), password);
+        ? await api.register(username.trim(), password, email.trim() || undefined, captchaUuid, captchaAnswer)
+        : await api.login(username.trim(), password, captchaUuid, captchaAnswer);
 
       setToken(data.token);
       await fetchUser();
       navigate('/', { replace: true });
     } catch (err: any) {
       setError(err.message || t('login.authFailed'));
+      if (err.message?.includes('CAPTCHA')) {
+        fetchCaptcha();
+      }
     } finally {
       setLoading(false);
     }
@@ -219,6 +245,40 @@ export default function Login() {
                     <Link to="/terms" target="_blank" rel="noopener noreferrer">{t('terms.title')}</Link>
                   </span>
                 </label>
+              </div>
+            )}
+
+            {/* CAPTCHA */}
+            {captchaSvg && (
+              <div className="form-group captcha-group">
+                <label>{t('login.captcha')}</label>
+                <div className="captcha-container" style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>
+                  <div
+                    className="captcha-image"
+                    dangerouslySetInnerHTML={{ __html: captchaSvg }}
+                    style={{border:'1px solid var(--border)', borderRadius:'6px', cursor:'pointer', lineHeight:0}}
+                    onClick={fetchCaptcha}
+                    title={t('login.captchaRefresh')}
+                  />
+                  <input
+                    type="text"
+                    value={captchaAnswer}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (captchaType === 'math' ? /^\d*$/.test(val) : true) {
+                        setCaptchaAnswer(val);
+                      }
+                    }}
+                    placeholder={captchaType === 'math' ? t('login.captchaMathPlaceholder') : t('login.captchaPlaceholder')}
+                    required
+                    maxLength={captchaAnswerLen}
+                    style={{width: captchaType === 'math' ? '120px' : '80px', textAlign:'center', letterSpacing: captchaType === 'math' ? '2px' : '4px', fontWeight:'bold'}}
+                    inputMode={captchaType === 'math' ? 'numeric' : 'text'}
+                  />
+                  <button type="button" className="btn btn-sm" onClick={fetchCaptcha} style={{fontSize:'12px'}}>
+                    {t('login.captchaRefresh')}
+                  </button>
+                </div>
               </div>
             )}
 

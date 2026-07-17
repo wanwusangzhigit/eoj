@@ -28,6 +28,15 @@ export default function AdminSettings() {
   const [settingsAIAllowedModels, setSettingsAIAllowedModels] = useState('');
   const [settingsOAuthProtocol, setSettingsOAuthProtocol] = useState('');
   const [settingsOAuthCallbackUrl, setSettingsOAuthCallbackUrl] = useState('');
+  const [settingsCaptchaEnabled, setSettingsCaptchaEnabled] = useState(true);
+  const [settingsCaptchaStrength, setSettingsCaptchaStrength] = useState('medium');
+  const [settingsCaptchaType, setSettingsCaptchaType] = useState('text');
+  const [settingsCaptchaRegister, setSettingsCaptchaRegister] = useState(true);
+  const [settingsCaptchaLogin, setSettingsCaptchaLogin] = useState(true);
+  const [settingsCaptchaSubmit, setSettingsCaptchaSubmit] = useState(false);
+  const [settingsCaptchaBlog, setSettingsCaptchaBlog] = useState(false);
+  const [settingsCaptchaDiscussion, setSettingsCaptchaDiscussion] = useState(false);
+  const [settingsCaptchaSolution, setSettingsCaptchaSolution] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -60,6 +69,15 @@ export default function AdminSettings() {
       setSettingsAIAllowedModels(data.ai_allowed_models || '');
       setSettingsOAuthProtocol(data.oauth_protocol || '');
       setSettingsOAuthCallbackUrl(data.oauth_callback_url || '');
+      setSettingsCaptchaEnabled(data.captcha_enabled !== 'false');
+      setSettingsCaptchaStrength(data.captcha_strength || 'medium');
+      setSettingsCaptchaType(data.captcha_type || 'text');
+      setSettingsCaptchaRegister(data.captcha_register !== 'false');
+      setSettingsCaptchaLogin(data.captcha_login !== 'false');
+      setSettingsCaptchaSubmit(data.captcha_submit === 'true');
+      setSettingsCaptchaBlog(data.captcha_blog === 'true');
+      setSettingsCaptchaDiscussion(data.captcha_discussion === 'true');
+      setSettingsCaptchaSolution(data.captcha_solution === 'true');
       setSettingsLoaded(true);
     } catch (e) {
       console.error('Failed to fetch site settings:', e);
@@ -88,6 +106,15 @@ export default function AdminSettings() {
         ai_allowed_models: settingsAIAllowedModels,
         oauth_protocol: settingsOAuthProtocol,
         oauth_callback_url: settingsOAuthCallbackUrl,
+        captcha_enabled: String(settingsCaptchaEnabled),
+        captcha_strength: settingsCaptchaStrength,
+        captcha_type: settingsCaptchaType,
+        captcha_register: String(settingsCaptchaRegister),
+        captcha_login: String(settingsCaptchaLogin),
+        captcha_submit: String(settingsCaptchaSubmit),
+        captcha_blog: String(settingsCaptchaBlog),
+        captcha_discussion: String(settingsCaptchaDiscussion),
+        captcha_solution: String(settingsCaptchaSolution),
       });
       await fetchSettings(true);
       useToastStore().addToast('success', t('admin.settingsSaved'));
@@ -389,6 +416,79 @@ export default function AdminSettings() {
             {t('admin.oauthCallbackUrlHint')}
           </p>
         </div>
+      </div>
+
+      {/* CAPTCHA Settings */}
+      <div style={{marginTop: '24px', paddingTop: '24px', borderTop: '1px solid var(--border-color)'}}>
+        <h3 style={{marginBottom: '12px'}}>{t('admin.captchaSettings')}</h3>
+
+        <div className="form-group">
+          <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'}}>
+            <input
+              type="checkbox"
+              checked={settingsCaptchaEnabled}
+              onChange={(e) => setSettingsCaptchaEnabled(e.target.checked)}
+            />
+            {t('admin.captchaEnabled')}
+          </label>
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginTop:'4px'}}>
+            {t('admin.captchaEnabledHint')}
+          </p>
+        </div>
+
+        {settingsCaptchaEnabled && (
+          <>
+            <div className="form-group">
+              <label>{t('admin.captchaStrength')}</label>
+              <select
+                className="form-select"
+                value={settingsCaptchaStrength}
+                onChange={(e) => setSettingsCaptchaStrength(e.target.value)}
+              >
+                <option value="easy">{t('admin.captchaStrengthEasy')}</option>
+                <option value="medium">{t('admin.captchaStrengthMedium')}</option>
+                <option value="hard">{t('admin.captchaStrengthHard')}</option>
+              </select>
+              <p style={{fontSize:'13px',color:'var(--text-secondary)',marginTop:'4px'}}>
+                {t('admin.captchaStrengthHint')}
+                            </p>
+                            </div>
+
+                            <div className="form-group">
+                              <label>{t('admin.captchaType')}</label>
+                              <select
+                                className="form-select"
+                                value={settingsCaptchaType}
+                                onChange={(e) => setSettingsCaptchaType(e.target.value)}
+                              >
+                                <option value="text">{t('admin.captchaTypeText')}</option>
+                                <option value="math">{t('admin.captchaTypeMath')}</option>
+                              </select>
+                              <p style={{fontSize:'13px',color:'var(--text-secondary)',marginTop:'4px'}}>
+                                {t('admin.captchaTypeHint')}
+                              </p>
+                            </div>
+
+            <div style={{marginTop:'16px'}}>
+              <p style={{fontSize:'13px',fontWeight:'bold',marginBottom:'8px'}}>{t('admin.captchaFeatures')}</p>
+              {[
+                {key:'register', label:t('admin.captchaFeatureRegister'), val:settingsCaptchaRegister, set:setSettingsCaptchaRegister},
+                {key:'login', label:t('admin.captchaFeatureLogin'), val:settingsCaptchaLogin, set:setSettingsCaptchaLogin},
+                {key:'submit', label:t('admin.captchaFeatureSubmit'), val:settingsCaptchaSubmit, set:setSettingsCaptchaSubmit},
+                {key:'blog', label:t('admin.captchaFeatureBlog'), val:settingsCaptchaBlog, set:setSettingsCaptchaBlog},
+                {key:'discussion', label:t('admin.captchaFeatureDiscussion'), val:settingsCaptchaDiscussion, set:setSettingsCaptchaDiscussion},
+                {key:'solution', label:t('admin.captchaFeatureSolution'), val:settingsCaptchaSolution, set:setSettingsCaptchaSolution},
+              ].map(({key,label,val,set}) => (
+                <div className="form-group" key={key} style={{marginBottom:'8px'}}>
+                  <label style={{display:'flex',alignItems:'center',gap:'8px',cursor:'pointer'}}>
+                    <input type="checkbox" checked={val} onChange={(e) => set(e.target.checked)} />
+                    {label}
+                  </label>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </div>
 
       <div className="form-actions">

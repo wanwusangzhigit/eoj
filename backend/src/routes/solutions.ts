@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { sendNotification, NotificationType } from '../utils/notify';
+import { captchaMiddleware } from '../middleware/captcha';
 
 const solutions = new Hono<AppType>();
 
@@ -131,7 +132,7 @@ solutions.get('/:id', async (c) => {
 });
 
 // Create solution
-solutions.post('/', authMiddleware, async (c) => {
+solutions.post('/', authMiddleware, captchaMiddleware('solution'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const { problem_id, title, content, language } = body;

@@ -2,6 +2,8 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware } from '../middleware/auth';
 
+import { captchaMiddleware } from '../middleware/captcha';
+
 const discussions = new Hono<AppType>();
 
 // List discussions
@@ -90,7 +92,7 @@ discussions.get('/:id', async (c) => {
 });
 
 // Create discussion
-discussions.post('/', authMiddleware, async (c) => {
+discussions.post('/', authMiddleware, captchaMiddleware('discussion'), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const { problem_id, title, content, category } = body;

@@ -206,17 +206,21 @@ class ApiClient {
     return this.request<{ user: any }>('/auth/me');
   }
 
-  async register(username: string, password: string, email?: string) {
+  async getCaptcha() {
+    return this.request<{ uuid: string; svg: string; type: 'text' | 'math'; answer_length: number }>('/captcha/generate');
+  }
+
+  async register(username: string, password: string, email?: string, captcha_uuid?: string, captcha_answer?: string) {
     return this.request<{ token: string }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, email }),
+      body: JSON.stringify({ username, password, email, captcha_uuid, captcha_answer }),
     });
   }
 
-  async login(username: string, password: string) {
+  async login(username: string, password: string, captcha_uuid?: string, captcha_answer?: string) {
     return this.request<{ token: string }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, password, captcha_uuid, captcha_answer }),
     });
   }
 
@@ -586,7 +590,7 @@ class ApiClient {
     return this.request<{ solution: any; is_voted: boolean }>(`/solutions/${id}`);
   }
 
-  async createSolution(data: { problem_id: number; title: string; content: string; language?: string }) {
+  async createSolution(data: { problem_id: number; title: string; content: string; language?: string; captcha_uuid?: string; captcha_answer?: string }) {
     return this.request<{ id: number; message: string }>('/solutions', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -627,7 +631,7 @@ class ApiClient {
     return this.request<{ discussion: any; replies: any[] }>(`/discussions/${id}`);
   }
 
-  async createDiscussion(data: { problem_id?: number; title: string; content: string; category?: string }) {
+  async createDiscussion(data: { problem_id?: number; title: string; content: string; category?: string; captcha_uuid?: string; captcha_answer?: string }) {
     return this.request<{ id: number; message: string }>('/discussions', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -1102,7 +1106,7 @@ class ApiClient {
     return this.request<{ blog: any }>(`/blogs/${id}`);
   }
 
-  async createBlog(data: { title: string; content: string; tags?: string; status?: string }) {
+  async createBlog(data: { title: string; content: string; tags?: string; status?: string; captcha_uuid?: string; captcha_answer?: string }) {
     return this.request<{ id: number; message: string }>('/blogs', {
       method: 'POST',
       body: JSON.stringify(data),
