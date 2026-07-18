@@ -17,17 +17,11 @@ jobs:
       - name: Extract submission info
         id: info
         run: |
-          # Get the list of changed files in the latest commit
-          # Use git diff against the parent commit to find submission files
-          FILES=$(git diff --name-only HEAD~1 HEAD 2>/dev/null | grep 'submissions/' | head -1)
-          # Fallback: if diff fails (e.g. first commit), try diff-tree
+          FILES=$(git diff --name-only HEAD^ HEAD 2>/dev/null | grep 'submissions/' | head -1)
           if [ -z "$FILES" ]; then
-            FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | grep 'submissions/' | head -1)
+            FILES=$(find submissions/ -maxdepth 1 -type f ! -name '.gitkeep' | head -1)
           fi
-          # Fallback: list files in submissions/ directory
-          if [ -z "$FILES" ]; then
-            FILES=$(find submissions/ -type f ! -name '.gitkeep' | head -1)
-          fi
+
           echo "file=$FILES" >> $GITHUB_OUTPUT
           FILENAME=$(basename "$FILES")
           SUBMISSION_ID=$(echo "$FILENAME" | sed 's/\.[^.]*$//')
@@ -57,7 +51,7 @@ jobs:
             echo "ERROR: No submission ID found"
             exit 1
           fi
-          RESPONSE=$(curl -s -H "Authorization: Bearer $CALLBACK_SECRET" \
+          RESPONSE=$(curl -s --max-time 10 --retry 3 -H "Authorization: Bearer $CALLBACK_SECRET" \
             "${WORKER_API}/api/v1/internal/judge-data?submission_id=${SUBMISSION_ID}")
           echo "$RESPONSE" > judge_data.json
           echo "Fetched judge data for submission $SUBMISSION_ID"
@@ -74,43 +68,40 @@ jobs:
           LANGUAGE="${{ steps.info.outputs.language }}"
           SPJ_LANGUAGE="${{ steps.spj_info.outputs.spj_language }}"
 
-          # Function to install a language runtime
           install_language() {
             local lang="$1"
             case "$lang" in
               python)
-                # Python3 is pre-installed on ubuntu-latest
                 python3 --version
                 ;;
               cpp)
-                sudo apt-get update && sudo apt-get install -y g++
+                sudo apt-get update -o Acquire::LockTimeout=30 -o APT::Install-Suggests=0
+                sudo apt-get install -y g++
                 ;;
               java)
-                sudo apt-get update && sudo apt-get install -y default-jdk
+                sudo apt-get update -o Acquire::LockTimeout=30
+                sudo apt-get install -y default-jdk
                 ;;
               javascript)
-                # Node.js is pre-installed on ubuntu-latest
                 node --version
                 ;;
               c)
-                sudo apt-get update && sudo apt-get install -y gcc
+                sudo apt-get update -o Acquire::LockTimeout=30
+                sudo apt-get install -y gcc
                 ;;
               go)
-                sudo apt-get update && sudo apt-get install -y golang-go
+                sudo apt-get update -o Acquire::LockTimeout=30
+                sudo apt-get install -y golang-go
                 ;;
               rust)
-                curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+                curl --connect-timeout 10 --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
                 source "$HOME/.cargo/env"
                 ;;
             esac
           }
 
-          # Install submission language runtime
           install_language "$LANGUAGE"
-
-          # Install SPJ language runtime if different from submission language
           if [ -n "$SPJ_LANGUAGE" ] && [ "$SPJ_LANGUAGE" != "$LANGUAGE" ]; then
-            echo "Also installing SPJ language runtime: $SPJ_LANGUAGE"
             install_language "$SPJ_LANGUAGE"
           fi
 
@@ -118,6 +109,7 @@ jobs:
         id: judge
         run: |
           chmod +x scripts/judge.sh
+          ulimit -t 5
           bash scripts/judge.sh
         env:
           SUBMISSION_ID: ${{ steps.info.outputs.submission_id }}
@@ -131,21 +123,38 @@ jobs:
           WORKER_API: ${{ secrets.WORKER_API }}
           SUBMISSION_ID: ${{ steps.info.outputs.submission_id }}
         run: |
+          set -o errexit
+          if [ -z "$SUBMISSION_ID" ]; then
+            echo "ERROR submission_id empty, skip callback"
+            exit 0
+          fi
+          CALL_URL="${WORKER_API}/api/v1/internal/callback"
           if [ -f result.json ]; then
-            curl -s -X POST "${WORKER_API}/api/v1/internal/callback" \
+            echo "Send normal callback, file content:"
+            cat result.json
+            RESP=$(curl -X POST "$CALL_URL" \
+              --max-time 10 --retry 2 \
               -H "Authorization: Bearer $CALLBACK_SECRET" \
               -H "Content-Type: application/json" \
-              -d @result.json
-            echo "Callback sent successfully"
-          else
-            if [ -n "$SUBMISSION_ID" ]; then
-              echo "{\"submission_id\": \"$SUBMISSION_ID\", \"status\": \"system_error\", \"details\": [{\"status\": \"system_error\", \"message\": \"Judge failed to produce result\"}]}" > fallback_result.json
-              curl -s -X POST "${WORKER_API}/api/v1/internal/callback" \
+              -d @result.json -w $'\nHTTP_CODE=%{http_code}' 2>&1)
+            echo "$RESP"
+            if echo "$RESP" | grep -q "HTTP_CODE=200"; then
+              echo "Callback success"
+            else
+              echo "Callback request failed, trigger fallback"
+              echo "{\"submission_id\":\"$SUBMISSION_ID\",\"status\":\"system_error\",\"details\":[{\"message\":\"Judge callback request failed\"}]}" > fallback_result.json
+              curl -X POST "$CALL_URL" \
+                --max-time 10 --retry 2 \
                 -H "Authorization: Bearer $CALLBACK_SECRET" \
                 -H "Content-Type: application/json" \
                 -d @fallback_result.json
-              echo "Fallback callback sent"
-            else
-              echo "ERROR: No submission ID available for callback"
             fi
+          else
+            echo "No result.json, send system error fallback"
+            echo "{\"submission_id\": \"$SUBMISSION_ID\", \"status\": \"system_error\", \"details\": [{\"status\": \"system_error\", \"message\": \"Judge failed to produce result\"}]}" > fallback_result.json
+            curl -X POST "$CALL_URL" \
+              --max-time 10 --retry 2 \
+              -H "Authorization: Bearer $CALLBACK_SECRET" \
+              -H "Content-Type: application/json" \
+              -d @fallback_result.json
           fi
