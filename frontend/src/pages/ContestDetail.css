@@ -83,7 +83,7 @@
 }
 
 .nav-problem-btn.active {
-  background: var(--accent-light, rgba(108, 140, 255, 0.12));
+  background: var(--accent-light);
   color: var(--accent);
 }
 
@@ -226,7 +226,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }
@@ -283,7 +283,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -329,7 +328,7 @@
   width: 32px;
   height: 32px;
   border-radius: var(--radius);
-  background: var(--accent-light, rgba(108, 140, 255, 0.12));
+  background: var(--accent-light);
   color: var(--accent);
   font-weight: 700;
   font-size: 14px;
@@ -501,7 +500,7 @@
 }
 
 .cell-attempted {
-  background: rgba(108, 140, 255, 0.08);
+  background: var(--accent-light);
   color: var(--accent);
 }
 
@@ -575,7 +574,7 @@
   width: 28px;
   height: 28px;
   border-radius: var(--radius);
-  background: var(--accent-light, rgba(108, 140, 255, 0.12));
+  background: var(--accent-light);
   color: var(--accent);
   font-weight: 700;
   font-size: 13px;
@@ -754,7 +753,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 

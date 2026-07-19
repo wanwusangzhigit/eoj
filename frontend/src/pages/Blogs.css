@@ -1,4 +1,4 @@
-﻿.blogs-page {
+.blogs-page {
   max-width: 800px;
   margin: 0 auto;
   padding: 24px;
@@ -27,8 +27,8 @@
 .sort-tabs {
   display: flex;
   gap: 4px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2px;
 }
@@ -37,7 +37,7 @@
   padding: 4px 12px;
   background: transparent;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 6px;
   font-size: 13px;
@@ -59,8 +59,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
@@ -69,7 +69,6 @@
 
 .blog-card:hover {
   border-color: var(--accent);
-  transform: translateY(-1px);
 }
 
 .blog-card-header {
@@ -111,7 +110,7 @@
 }
 
 .blog-date {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .blog-title {
@@ -138,7 +137,7 @@
   display: flex;
   gap: 16px;
   font-size: 12px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .blog-stats span {
@@ -158,22 +157,22 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 13px;
   margin-bottom: 16px;
 }
 
 .blog-article {
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .article-header {
   padding: 24px;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border);
 }
 
 .article-header h1 {
@@ -186,7 +185,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .article-author {
@@ -196,7 +195,7 @@
 }
 
 .meta-sep {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .draft-badge {
@@ -236,7 +235,7 @@
 
 .article-footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--border);
 }
 
 .article-actions {
@@ -251,7 +250,7 @@
   gap: 6px;
   background: transparent;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 14px;
   padding: 4px 8px;
@@ -276,8 +275,8 @@
 /* Comments */
 .comments-section {
   margin-top: 24px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
 }
@@ -296,8 +295,8 @@
 
 .comment-form textarea {
   padding: 10px 12px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: inherit;
   outline: none;
@@ -340,7 +339,7 @@
 
 .comment-time {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .comment-text {
@@ -351,7 +350,7 @@
 .empty-text {
   text-align: center;
   padding: 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -383,8 +382,8 @@
 .blog-editor-form input,
 .blog-editor-form textarea {
   padding: 10px 12px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: inherit;
   outline: none;
@@ -405,7 +404,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .empty-state p {

@@ -417,3 +417,45 @@
   border-radius: 3px;
   transition: width var(--transition);
 }
+
+/* ── Luogu-style page title with left accent bar ── */
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  position: relative;
+  padding-left: 12px;
+}
+
+.page-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 18px;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* ── Luogu-style section/card header with left accent bar ── */
+.section-title {
+  position: relative;
+  padding-left: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 14px;
+  background: var(--accent);
+  border-radius: 2px;
+}

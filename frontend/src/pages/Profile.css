@@ -81,7 +81,7 @@
   border-radius: var(--radius-lg);
   width: 90%;
   max-width: 440px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .modal-header {
@@ -186,7 +186,7 @@
 
 .badge {
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }
@@ -300,7 +300,6 @@
 
 .problem-card:hover {
   border-color: var(--accent);
-  transform: translateY(-2px);
 }
 
 .problem-card.solved {

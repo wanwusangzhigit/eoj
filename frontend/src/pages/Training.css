@@ -1,4 +1,4 @@
-﻿.training-page {
+.training-page {
   max-width: 1200px;
   margin: 0 auto;
   padding: 24px;
@@ -28,8 +28,8 @@
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   min-width: 280px;
 }
@@ -51,8 +51,8 @@
 .training-card {
   display: flex;
   flex-direction: column;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   text-decoration: none;
@@ -61,8 +61,6 @@
 }
 
 .training-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   border-color: var(--accent);
 }
 
@@ -102,18 +100,18 @@
 }
 
 .official-badge {
-  background: linear-gradient(135deg, #ffc800, #ff7c00);
+  background: var(--warning);
   color: #fff;
   font-size: 11px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-weight: 600;
 }
 
 .training-card-desc {
   margin: 0;
   font-size: 13px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -127,7 +125,7 @@
   gap: 12px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .difficulty-tag {
@@ -153,20 +151,20 @@
 
 .progress-bar {
   height: 6px;
-  background: var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--border);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .progress-bar-inner {
   height: 100%;
-  background: linear-gradient(90deg, #52c41a, #3498db);
+  background: var(--accent);
   transition: width 0.4s;
 }
 
 .progress-text {
   font-size: 11px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 /* Detail page */
@@ -182,8 +180,8 @@
   gap: 12px;
   margin-bottom: 24px;
   padding: 24px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 
@@ -198,7 +196,7 @@
   gap: 16px;
   flex-wrap: wrap;
   font-size: 13px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .training-detail-header .progress-section {
@@ -215,8 +213,8 @@
 }
 
 .chapter-item {
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -282,13 +280,13 @@
 
 .chapter-problem-row .problem-meta {
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .empty-chapter {
   padding: 16px;
   text-align: center;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
