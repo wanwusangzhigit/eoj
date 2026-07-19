@@ -39,9 +39,12 @@
   --diff-noi: #0E1D69;
   --header-gradient: linear-gradient(90deg, #5BA5C5, #CF94C5);
   --radius: 3px;
+  --radius-md: 3px;
   --radius-lg: 4px;
   --radius-xl: 6px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-accent: none;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.04);
@@ -82,6 +85,8 @@
   --bronze: #A0785A;
   --bronze-bg: rgba(160, 120, 90, 0.15);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 2px 8px rgba(0, 0, 0, 0.4);
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
