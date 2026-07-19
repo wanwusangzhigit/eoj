@@ -146,8 +146,8 @@
 .difficulty-badge[data-difficulty="普及"]     { color: var(--diff-mid); border-color: var(--diff-mid); background: color-mix(in srgb, var(--diff-mid) 12%, transparent); }
 .difficulty-badge[data-difficulty="提高"]     { color: var(--diff-hard); border-color: var(--diff-hard); background: color-mix(in srgb, var(--diff-hard) 12%, transparent); }
 .difficulty-badge[data-difficulty="提高+"]    { color: var(--diff-hard-plus); border-color: var(--diff-hard-plus); background: color-mix(in srgb, var(--diff-hard-plus) 12%, transparent); }
-.difficulty-badge[data-difficulty="省�?"]    { color: var(--diff-province); border-color: var(--diff-province); background: color-mix(in srgb, var(--diff-province) 12%, transparent); }
-.difficulty-badge[data-difficulty="省�?]     { color: var(--diff-province-plus); border-color: var(--diff-province-plus); background: color-mix(in srgb, var(--diff-province-plus) 12%, transparent); }
+.difficulty-badge[data-difficulty="省选-"]    { color: var(--diff-province); border-color: var(--diff-province); background: color-mix(in srgb, var(--diff-province) 12%, transparent); }
+.difficulty-badge[data-difficulty="省选"]     { color: var(--diff-province-plus); border-color: var(--diff-province-plus); background: color-mix(in srgb, var(--diff-province-plus) 12%, transparent); }
 .difficulty-badge[data-difficulty="NOI"]      { color: var(--diff-noi); border-color: var(--diff-noi); background: color-mix(in srgb, var(--diff-noi) 12%, transparent); }
 .difficulty-badge[data-difficulty="NOI+"]     { color: var(--diff-noi); border-color: var(--diff-noi); background: color-mix(in srgb, var(--diff-noi) 12%, transparent); }
 .difficulty-badge[data-difficulty="CTSC"]     { color: var(--diff-noi); border-color: var(--diff-noi); background: color-mix(in srgb, var(--diff-noi) 12%, transparent); }
