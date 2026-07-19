@@ -2,6 +2,8 @@
 
 这是一个基于 Cloudflare Workers 的在线判题系统，覆盖题目管理、用户认证、提交评测、竞赛、讨论、题单、后台管理与可选广告位配置。
 
+> **UI 变体**：本仓库提供两套前端视觉风格——`main` 分支为默认风格，[`luogu-style`](https://github.com/wanwusangzhigit/eoj/tree/luogu-style) 分支为洛谷风格完整复刻（50px 蓝粉渐变顶栏 + 240px 左侧边栏双栏布局、9 级难度色板、3-4px 小圆角扁平设计、浅色默认支持暗色切换，覆盖 20+ 页面）。详见该分支 README 的「Luogu 风格 UI 特性」章节。
+
 
 ## 技术栈
 
