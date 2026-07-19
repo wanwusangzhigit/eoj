@@ -1,4 +1,4 @@
-﻿.messages-page {
+.messages-page {
   height: calc(100vh - 60px);
   padding: 16px;
 }
@@ -10,8 +10,8 @@
   display: grid;
   grid-template-columns: 320px 1fr;
   gap: 12px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -29,7 +29,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 16px;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border);
   font-weight: 600;
 }
 
@@ -99,7 +99,7 @@
 
 .conv-preview {
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -139,8 +139,8 @@
 .message-bubble {
   max-width: 70%;
   padding: 10px 14px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 
@@ -156,7 +156,7 @@
 
 .message-time {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   margin-top: 4px;
   text-align: right;
 }
@@ -165,14 +165,14 @@
   display: flex;
   gap: 8px;
   padding: 12px 16px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--border);
 }
 
 .message-input-form input {
   flex: 1;
   padding: 10px 14px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.06));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: inherit;
   outline: none;
@@ -189,7 +189,7 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -223,7 +223,7 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.15s;
@@ -239,7 +239,7 @@
   align-self: center;
   padding: 8px 18px;
   background: var(--bg-tertiary, rgba(255,255,255,0.04));
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   border: 1px solid var(--border);
   border-radius: 16px;
   font-size: 12px;
@@ -278,7 +278,7 @@
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
 }
 
 .msg-modal-header {
@@ -316,7 +316,7 @@
 }
 
 .msg-search-icon {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -341,7 +341,7 @@
 .msg-search-empty {
   padding: 24px 8px;
   text-align: center;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -397,7 +397,6 @@
   border-radius: 8px;
   background: var(--accent);
   color: #fff;
-  text-transform: uppercase;
 }
 
 @media (max-width: 768px) {

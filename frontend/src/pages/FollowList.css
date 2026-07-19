@@ -1,4 +1,4 @@
-﻿.follow-list-page {
+.follow-list-page {
   max-width: 900px;
   margin: 0 auto;
   padding: 24px;
@@ -30,8 +30,8 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
@@ -73,7 +73,7 @@
 
 .follow-bio {
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -83,5 +83,5 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }

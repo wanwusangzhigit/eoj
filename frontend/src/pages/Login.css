@@ -16,7 +16,7 @@
   justify-content: center;
   width: 80px;
   height: 80px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--accent-light);
   color: var(--accent);
   margin-bottom: 24px;
@@ -142,7 +142,7 @@
 .auth-form input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(108, 140, 255, 0.15);
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.15);
 }
 
 .form-error {
