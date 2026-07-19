@@ -27,6 +27,8 @@ const en: Translations = {
     notifications: 'Notifications',
     closeMenu: 'Close menu',
     openMenu: 'Open menu',
+    personal: 'Personal',
+    adminGroup: 'Admin',
   },
   common: {
     search: 'Search',

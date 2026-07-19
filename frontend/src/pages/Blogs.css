@@ -1,4 +1,4 @@
-.blogs-page {
+﻿.blogs-page {
   max-width: 800px;
   margin: 0 auto;
   padding: 24px;
@@ -44,7 +44,7 @@
 }
 
 .sort-tab.active {
-  background: var(--primary-color, #6366f1);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -68,7 +68,7 @@
 }
 
 .blog-card:hover {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
   transform: translateY(-1px);
 }
 
@@ -91,7 +91,7 @@
 }
 
 .blog-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -129,7 +129,7 @@
 .blog-tag {
   padding: 2px 8px;
   background: rgba(99, 102, 241, 0.12);
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   border-radius: 4px;
   font-size: 11px;
 }
@@ -190,7 +190,7 @@
 }
 
 .article-author {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   text-decoration: none;
   font-weight: 500;
 }
@@ -260,7 +260,7 @@
 }
 
 .action-btn:hover {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
 }
 
 .action-btn.liked {
@@ -305,7 +305,7 @@
 }
 
 .comment-form textarea:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .comments-list {
@@ -334,7 +334,7 @@
 
 .comment-author {
   font-weight: 500;
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   text-decoration: none;
 }
 
@@ -393,7 +393,7 @@
 
 .blog-editor-form input:focus,
 .blog-editor-form textarea:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .editor-actions {

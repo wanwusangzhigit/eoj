@@ -70,12 +70,27 @@ fn main() {
 `,
 };
 
-export const DIFFICULTIES = ['Easy', 'Medium', 'Hard'];
+export const DIFFICULTIES = [
+  '暂无难度', '入门', '普及-', '普及',
+  '提高', '提高+', '省选-', '省选',
+  'NOI', 'NOI+', 'CTSC',
+];
 
 export const DIFFICULTY_COLORS: Record<string, string> = {
-  Easy: '#4ade80',
-  Medium: '#fbbf24',
-  Hard: '#ef4444',
+  '暂无难度': 'var(--diff-none)',
+  '入门': 'var(--diff-easy)',
+  '普及-': 'var(--diff-easy-mid)',
+  '普及': 'var(--diff-mid)',
+  '提高': 'var(--diff-hard)',
+  '提高+': 'var(--diff-hard-plus)',
+  '省选-': 'var(--diff-province)',
+  '省选': 'var(--diff-province-plus)',
+  'NOI': 'var(--diff-noi)',
+  'NOI+': 'var(--diff-noi)',
+  'CTSC': 'var(--diff-noi)',
+  'Easy': 'var(--diff-mid)',
+  'Medium': 'var(--diff-hard)',
+  'Hard': 'var(--diff-easy)',
 };
 
 export const LANGUAGE_EXTENSIONS: Record<string, any> = {

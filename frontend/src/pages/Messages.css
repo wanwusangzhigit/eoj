@@ -1,4 +1,4 @@
-.messages-page {
+﻿.messages-page {
   height: calc(100vh - 60px);
   padding: 16px;
 }
@@ -66,7 +66,7 @@
 
 .conversation-item.active {
   background: rgba(99, 102, 241, 0.12);
-  border-left: 3px solid var(--primary-color, #6366f1);
+  border-left: 3px solid var(--accent);
 }
 
 .conv-avatar {
@@ -78,7 +78,7 @@
 }
 
 .conv-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -179,7 +179,7 @@
 }
 
 .message-input-form input:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .panel-empty {
@@ -197,7 +197,7 @@
 .new-conv-btn {
   margin-left: auto;
   background: var(--bg-tertiary);
-  color: var(--accent, #6366f1);
+  color: var(--accent);
   border: 1px solid var(--border);
   border-radius: 6px;
   cursor: pointer;
@@ -209,9 +209,9 @@
 }
 
 .new-conv-btn:hover {
-  background: var(--accent, #6366f1);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--accent, #6366f1);
+  border-color: var(--accent);
 }
 
 .btn-icon-sm {
@@ -248,8 +248,8 @@
 }
 
 .load-more-btn:hover:not(:disabled) {
-  border-color: var(--accent, #6366f1);
-  color: var(--accent, #6366f1);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .load-more-btn:disabled {
@@ -368,7 +368,7 @@
 }
 
 .msg-user-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -395,7 +395,7 @@
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 8px;
-  background: var(--accent, #6366f1);
+  background: var(--accent);
   color: #fff;
   text-transform: uppercase;
 }

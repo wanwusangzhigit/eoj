@@ -6,59 +6,45 @@
   position: relative;
 }
 
+.layout-body {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  min-height: 0;
+}
+
 .main-content {
   flex: 1;
-  max-width: 1400px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 24px;
-  animation: fadeInUp 0.4s ease-out;
+  min-width: 0;
+  padding: 16px 20px;
+  animation: fadeInUp 0.25s ease-out;
 }
 
 @media (max-width: 768px) {
   .main-content {
-    padding: 24px 16px;
+    padding: 12px;
   }
 }
 
 .site-footer {
   border-top: 1px solid var(--border);
-  background: rgba(10, 11, 15, 0.8);
-  backdrop-filter: var(--backdrop-blur);
-  -webkit-backdrop-filter: var(--backdrop-blur);
-  padding: 32px 24px;
+  background: var(--bg-secondary);
+  padding: 16px 20px;
   margin-top: auto;
-  margin-top: calc(auto + 48px);
-  position: relative;
-  overflow: hidden;
-}
-
-.site-footer::before {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
-}
-
-[data-theme="light"] .site-footer {
-  background: rgba(255, 255, 255, 0.9);
 }
 
 .footer-inner {
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .footer-text {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -76,37 +62,19 @@
 
 .footer-links {
   display: flex;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 
 .footer-links a {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--text-secondary);
   text-decoration: none;
-  transition: all var(--transition);
-  padding: 8px 12px;
-  border-radius: var(--radius);
-  position: relative;
-}
-
-.footer-links a::after {
-  content: '';
-  position: absolute;
-  bottom: 4px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0;
-  height: 2px;
-  background: var(--accent);
-  transition: width var(--transition);
+  transition: color var(--transition-fast);
+  padding: 2px 4px;
 }
 
 .footer-links a:hover {
   color: var(--accent);
-  background: var(--accent-light);
-}
-
-.footer-links a:hover::after {
-  width: 60%;
+  text-decoration: none;
 }

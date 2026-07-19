@@ -1,4 +1,4 @@
-.follow-list-page {
+﻿.follow-list-page {
   max-width: 900px;
   margin: 0 auto;
   padding: 24px;
@@ -39,7 +39,7 @@
 }
 
 .follow-card:hover {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
   background: rgba(99, 102, 241, 0.06);
 }
 
@@ -52,7 +52,7 @@
 }
 
 .follow-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;

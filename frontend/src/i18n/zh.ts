@@ -26,6 +26,8 @@ const zh = {
     notifications: '通知',
     closeMenu: '关闭菜单',
     openMenu: '打开菜单',
+    personal: '个人',
+    adminGroup: '管理',
   },
   // Common
   common: {

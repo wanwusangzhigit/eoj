@@ -1,4 +1,4 @@
-.teams-page {
+﻿.teams-page {
   max-width: 1100px;
   margin: 0 auto;
   padding: 24px;
@@ -68,7 +68,7 @@
 
 .team-card:hover {
   transform: translateY(-2px);
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
 }
 
@@ -81,7 +81,7 @@
 }
 
 .team-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -137,7 +137,7 @@
 }
 
 .back-link:hover {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
 }
 
 .team-detail-header {
@@ -207,8 +207,8 @@
 }
 
 .team-tab.active {
-  color: var(--primary-color, #6366f1);
-  border-bottom-color: var(--primary-color, #6366f1);
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .members-list,
@@ -243,7 +243,7 @@
 }
 
 .member-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -260,7 +260,7 @@
 }
 
 .member-name:hover {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
 }
 
 .member-role {
@@ -326,7 +326,7 @@
 
 .create-team-form input:focus,
 .create-team-form textarea:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .checkbox-label {

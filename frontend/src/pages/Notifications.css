@@ -1,4 +1,4 @@
-.notifications-page {
+﻿.notifications-page {
   max-width: 800px;
   margin: 0 auto;
   padding: 24px;
@@ -42,9 +42,9 @@
 }
 
 .type-tab.active {
-  background: var(--primary-color, #6366f1);
+  background: var(--accent);
   color: #fff;
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .notifications-list {
@@ -67,7 +67,7 @@
 
 .notification-item:hover {
   background: rgba(99, 102, 241, 0.06);
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .notification-item.unread {
@@ -106,7 +106,7 @@
 }
 
 .read-indicator {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   flex-shrink: 0;
   margin-top: 4px;
 }

@@ -6,7 +6,7 @@ interface ThemeState {
   setTheme: (theme: 'dark' | 'light') => void;
 }
 
-const savedTheme = (localStorage.getItem('theme') as 'dark' | 'light') || 'dark';
+const savedTheme = (localStorage.getItem('theme') as 'dark' | 'light') || 'light';
 
 export const useThemeStore = create<ThemeState>((set) => ({
   theme: savedTheme,

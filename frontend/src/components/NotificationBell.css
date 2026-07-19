@@ -1,4 +1,4 @@
-.notification-bell {
+﻿.notification-bell {
   position: relative;
   display: inline-flex;
 }
@@ -131,7 +131,7 @@
 }
 
 .read-indicator {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   flex-shrink: 0;
   margin-top: 4px;
 }
@@ -143,7 +143,7 @@
 }
 
 .bell-dropdown-footer a {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   font-size: 13px;
   text-decoration: none;
 }
