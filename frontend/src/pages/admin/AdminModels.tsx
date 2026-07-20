@@ -9,6 +9,7 @@ import '../Admin.css';
 
 export default function AdminModels() {
   useDocumentTitle(t('admin.aiModels'));
+  const addToast = useToastStore((s) => s.addToast);
   const [aiModels, setAiModels] = useState<AIModelConfig[]>([]);
   const [aiModelsLoading, setAiModelsLoading] = useState(false);
   const [aiModelsSaving, setAiModelsSaving] = useState(false);
@@ -27,7 +28,7 @@ export default function AdminModels() {
       setAiModels(data.models || []);
       setAiModelsLoaded(true);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setAiModelsLoading(false);
     }
@@ -38,9 +39,9 @@ export default function AdminModels() {
     try {
       const data = await api.updateAIModels(aiModels);
       setAiModels(data.models);
-      useToastStore().addToast('success', t('admin.aiModelsSaved'));
+      addToast('success', t('admin.aiModelsSaved'));
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setAiModelsSaving(false);
     }
