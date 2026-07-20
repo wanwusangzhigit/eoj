@@ -10,6 +10,7 @@ import '../Admin.css';
 
 export default function AdminTickets() {
   useDocumentTitle(t('admin.ticketManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -33,10 +34,10 @@ export default function AdminTickets() {
   const handleTicketStatusChange = async (id: number, status: string) => {
     try {
       await api.updateTicketStatus(id, { status });
-      useToastStore().addToast('success', t('common.success'));
+      addToast('success', t('common.success'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
