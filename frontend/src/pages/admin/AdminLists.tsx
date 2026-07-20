@@ -10,6 +10,7 @@ import '../Admin.css';
 
 export default function AdminLists() {
   useDocumentTitle(t('admin.listManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -33,10 +34,10 @@ export default function AdminLists() {
     if (!window.confirm(t('admin.deleteConfirm'))) return;
     try {
       await api.deleteProblemList(id);
-      useToastStore().addToast('success', t('common.deleteSuccess'));
+      addToast('success', t('common.deleteSuccess'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 

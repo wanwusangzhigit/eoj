@@ -12,6 +12,7 @@ import '../Admin.css';
 
 export default function AdminProblems() {
   useDocumentTitle(t('admin.problemManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
@@ -65,10 +66,10 @@ export default function AdminProblems() {
     }
     try {
       await api.deleteProblem(id);
-      useToastStore().addToast('success', t('admin.problemDeleted'));
+      addToast('success', t('admin.problemDeleted'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
@@ -89,12 +90,12 @@ export default function AdminProblems() {
   const handleSaveEdit = async (id: number) => {
     try {
       await api.updateProblem(id, editForm);
-      useToastStore().addToast('success', t('admin.problemUpdated'));
+      addToast('success', t('admin.problemUpdated'));
       setEditingProblem(null);
       setEditForm({});
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
@@ -135,11 +136,11 @@ export default function AdminProblems() {
 
       appendActionLog(t('admin.exportLogFinished'));
       setActionStatus(t('admin.exportComplete'));
-      useToastStore().addToast('success', t('admin.problemsExported'));
+      addToast('success', t('admin.problemsExported'));
     } catch (e: any) {
       appendActionLog(`${t('common.error')}: ${e.message || t('common.error')}`);
       setActionStatus(t('admin.exportFailed'));
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setIsExporting(false);
     }
@@ -165,12 +166,12 @@ export default function AdminProblems() {
       const result = await api.importProblems(problems);
       appendActionLog(t('admin.importLogFinished').replace('{0}', String(result.imported || 0)));
       setActionStatus(t('admin.importComplete'));
-      useToastStore().addToast('success', t('admin.problemsImported').replace('{0}', String(result.imported || 0)));
+      addToast('success', t('admin.problemsImported').replace('{0}', String(result.imported || 0)));
       refresh();
     } catch (e: any) {
       appendActionLog(`${t('common.error')}: ${e.message || t('common.error')}`);
       setActionStatus(t('admin.importFailed'));
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setIsImporting(false);
       if (fileInputRef.current) {

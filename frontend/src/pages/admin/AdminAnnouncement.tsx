@@ -8,6 +8,7 @@ import '../Admin.css';
 
 export default function AdminAnnouncement() {
   useDocumentTitle(t('admin.announcementManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const [announcementContent, setAnnouncementContent] = useState('');
   const [announcementSaving, setAnnouncementSaving] = useState(false);
   const [announcementLoaded, setAnnouncementLoaded] = useState(false);
@@ -32,9 +33,9 @@ export default function AdminAnnouncement() {
     setAnnouncementSaving(true);
     try {
       await api.updateSettings({ announcement: announcementContent });
-      useToastStore().addToast('success', t('admin.announcementSaved'));
+      addToast('success', t('admin.announcementSaved'));
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setAnnouncementSaving(false);
     }
