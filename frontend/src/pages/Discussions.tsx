@@ -34,6 +34,7 @@ export default function Discussions() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
 
   const problemId = searchParams.get('problem_id');
   const problemTitle = searchParams.get('problem_title');
@@ -111,7 +112,7 @@ export default function Discussions() {
       if (e.message?.includes('CAPTCHA')) {
         captchaRef.current?.refresh();
       }
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setSubmitting(false);
     }

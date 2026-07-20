@@ -29,6 +29,7 @@ export default function DiscussionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
 
   const [discussion, setDiscussion] = useState<any>(null);
   const [replies, setReplies] = useState<any[]>([]);
@@ -56,7 +57,7 @@ export default function DiscussionDetail() {
       setDiscussion(data.discussion);
       setReplies(data.replies || []);
     } catch (e: any) {
-      useToastStore().addToast('error', t('common.loadError'));
+      addToast('error', t('common.loadError'));
       console.error('Failed to fetch discussion:', e);
     } finally {
       setLoading(false);
@@ -71,7 +72,7 @@ export default function DiscussionDetail() {
       setReplyContent('');
       fetchDiscussion();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to reply:', e);
     } finally {
       setSubmitting(false);
@@ -85,7 +86,7 @@ export default function DiscussionDetail() {
       await api.deleteDiscussion(Number(id));
       navigate('/discussions');
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to delete discussion:', e);
     }
   };
@@ -97,7 +98,7 @@ export default function DiscussionDetail() {
       await api.deleteDiscussionReply(Number(id), replyId);
       fetchDiscussion();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to delete reply:', e);
     }
   };
@@ -122,7 +123,7 @@ export default function DiscussionDetail() {
       setIsEditing(false);
       fetchDiscussion();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to update discussion:', e);
     } finally {
       setEditSubmitting(false);

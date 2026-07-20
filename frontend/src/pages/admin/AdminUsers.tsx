@@ -10,6 +10,7 @@ import '../Admin.css';
 
 export default function AdminUsers() {
   useDocumentTitle(t('admin.userManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -55,10 +56,10 @@ export default function AdminUsers() {
   const handleRoleChange = async (userId: number, newRole: string) => {
     try {
       await api.updateUserRole(userId, newRole);
-      useToastStore().addToast('success', t('admin.roleUpdated'));
+      addToast('success', t('admin.roleUpdated'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
@@ -71,11 +72,11 @@ export default function AdminUsers() {
     try {
       await api.updateUserPermissions(userId, userPermissions);
       setEditingPermissions(null);
-      useToastStore().addToast('success', t('admin.permissionsUpdated'));
+      addToast('success', t('admin.permissionsUpdated'));
       refresh();
     } catch (e: any) {
       console.error('Failed to update permissions:', e);
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
@@ -88,10 +89,10 @@ export default function AdminUsers() {
   const handleToggleBan = async (userId: number, currentlyBanned: boolean) => {
     try {
       await api.setUserBanned(userId, !currentlyBanned);
-      useToastStore().addToast('success', t('common.success'));
+      addToast('success', t('common.success'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 

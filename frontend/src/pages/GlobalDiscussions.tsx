@@ -27,6 +27,7 @@ const formatDate = (dateStr: string) => {
 };
 
 export default function GlobalDiscussions() {
+  const addToast = useToastStore((s) => s.addToast);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [discussions, setDiscussions] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -55,7 +56,7 @@ export default function GlobalDiscussions() {
       setDiscussions(data.discussions || []);
       setPagination(data.pagination || null);
     } catch (e) {
-      useToastStore().addToast('error', t('common.loadError'));
+      addToast('error', t('common.loadError'));
       console.error('Failed to fetch discussions:', e);
       setLoadError(true);
     } finally {

@@ -31,6 +31,7 @@ export default function SubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [submission, setSubmission] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -110,7 +111,7 @@ export default function SubmissionDetail() {
       await api.rejudgeSubmission(submission.id);
       fetchSubmission();
     } catch {
-      useToastStore().addToast('error', t('submissionDetail.rejudgeFailed'));
+      addToast('error', t('submissionDetail.rejudgeFailed'));
     } finally {
       setRejudging(false);
     }

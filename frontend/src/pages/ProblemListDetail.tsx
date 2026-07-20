@@ -9,6 +9,7 @@ import './ProblemListDetail.css';
 
 export default function ProblemListDetail() {
   const { id } = useParams<{ id: string }>();
+  const addToast = useToastStore((s) => s.addToast);
   const [list, setList] = useState<any>(null);
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +27,7 @@ export default function ProblemListDetail() {
       setList(data.list);
       setItems(data.items || []);
     } catch (e) {
-      useToastStore().addToast('error', t('problemListDetail.loadError'));
+      addToast('error', t('problemListDetail.loadError'));
       console.error('Failed to fetch problem list:', e);
       setLoadError(true);
     } finally {

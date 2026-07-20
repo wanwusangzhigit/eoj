@@ -24,6 +24,7 @@ const SORT_OPTIONS = [
 ];
 
 export default function GlobalSolutions() {
+  const addToast = useToastStore((s) => s.addToast);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [solutions, setSolutions] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -53,7 +54,7 @@ export default function GlobalSolutions() {
       setSolutions(data.solutions || []);
       setPagination(data.pagination || {});
     } catch (e) {
-      useToastStore().addToast('error', t('common.loadError'));
+      addToast('error', t('common.loadError'));
       console.error('Failed to fetch solutions:', e);
       setLoadError(true);
     } finally {

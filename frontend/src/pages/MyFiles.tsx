@@ -12,6 +12,7 @@ import './MyFiles.css';
 
 export default function MyFiles() {
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const getImageUploadEnabled = useSettingsStore((s) => s.getImageUploadEnabled);
   const getUploadEnabled = useSettingsStore((s) => s.getUploadEnabled);
   const perms = usePermissions();
@@ -43,7 +44,7 @@ export default function MyFiles() {
       setUploads(data.uploads);
       setTotalPages(data.pagination.totalPages);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setLoading(false);
     }
@@ -61,14 +62,14 @@ export default function MyFiles() {
     try {
       if (activeTab === 'image') {
         await api.uploadImage(file);
-        useToastStore().addToast('success', t('common.uploadSuccess'));
+        addToast('success', t('common.uploadSuccess'));
       } else {
         await api.uploadFile(file);
-        useToastStore().addToast('success', t('common.uploadSuccess'));
+        addToast('success', t('common.uploadSuccess'));
       }
       fetchUploads(page);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.uploadFailed'));
+      addToast('error', e.message || t('common.uploadFailed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -79,10 +80,10 @@ export default function MyFiles() {
     if (!confirm(t('common.deleteConfirm'))) return;
     try {
       await api.deleteUpload(id);
-      useToastStore().addToast('success', t('common.deleteSuccess'));
+      addToast('success', t('common.deleteSuccess'));
       fetchUploads(page);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 
@@ -97,10 +98,10 @@ export default function MyFiles() {
     try {
       await navigator.clipboard.writeText(markdown);
       setCopiedId(item.id);
-      useToastStore().addToast('success', t('common.copied'));
+      addToast('success', t('common.copied'));
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      useToastStore().addToast('error', t('common.error'));
+      addToast('error', t('common.error'));
     }
   };
 

@@ -11,6 +11,7 @@ interface ImageUploadButtonProps {
 }
 
 export default function ImageUploadButton({ onInsert }: ImageUploadButtonProps) {
+  const addToast = useToastStore((s) => s.addToast);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const getImageUploadEnabled = useSettingsStore((s) => s.getImageUploadEnabled);
@@ -30,9 +31,9 @@ export default function ImageUploadButton({ onInsert }: ImageUploadButtonProps) 
       const result = await api.uploadImage(file);
       const markdown = `![${result.original_name}](${result.url})`;
       onInsert(markdown);
-      useToastStore().addToast('success', t('common.uploadSuccess'));
+      addToast('success', t('common.uploadSuccess'));
     } catch (err: any) {
-      useToastStore().addToast('error', err.message || t('common.uploadFailed'));
+      addToast('error', err.message || t('common.uploadFailed'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';

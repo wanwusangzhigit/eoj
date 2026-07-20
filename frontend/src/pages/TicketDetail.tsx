@@ -32,6 +32,7 @@ const CATEGORY_BADGE_CLASS: Record<string, string> = {
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [ticket, setTicket] = useState<any>(null);
   const [replies, setReplies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,7 @@ export default function TicketDetail() {
       setTicket(data.ticket);
       setReplies(data.replies || []);
     } catch (e: any) {
-      useToastStore().addToast('error', t('ticketDetail.loadError'));
+      addToast('error', t('ticketDetail.loadError'));
       console.error('Failed to fetch ticket:', e);
       setLoadError(true);
     } finally {
@@ -69,7 +70,7 @@ export default function TicketDetail() {
       setReplyContent('');
       fetchTicket();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to reply:', e);
     } finally {
       setSubmitting(false);
@@ -82,7 +83,7 @@ export default function TicketDetail() {
       await api.updateTicketStatus(Number(id), { status: newStatus });
       fetchTicket();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to update status:', e);
     }
   };
@@ -93,7 +94,7 @@ export default function TicketDetail() {
       await api.updateTicketStatus(Number(id), { priority: newPriority });
       fetchTicket();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
       console.error('Failed to update priority:', e);
     }
   };

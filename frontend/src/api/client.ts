@@ -166,7 +166,7 @@ class ApiClient {
     });
   }
 
-  async submitCode(data: { problem_id: number; language: string; source_code: string }) {
+  async submitCode(data: { problem_id: number; language: string; source_code: string; captcha_uuid?: string; captcha_answer?: string }) {
     return this.request<{ submission_id: number; status: string }>('/submissions', {
       method: 'POST',
       body: JSON.stringify(data),

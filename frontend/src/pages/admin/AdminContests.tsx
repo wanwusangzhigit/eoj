@@ -10,6 +10,7 @@ import '../Admin.css';
 
 export default function AdminContests() {
   useDocumentTitle(t('admin.contestManagement'));
+  const addToast = useToastStore((s) => s.addToast);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -33,10 +34,10 @@ export default function AdminContests() {
     if (!window.confirm(t('admin.deleteConfirm'))) return;
     try {
       await api.deleteContest(id);
-      useToastStore().addToast('success', t('common.deleteSuccess'));
+      addToast('success', t('common.deleteSuccess'));
       refresh();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 

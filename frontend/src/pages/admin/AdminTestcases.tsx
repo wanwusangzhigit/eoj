@@ -12,6 +12,7 @@ import '../Admin.css';
 
 export default function AdminTestcases() {
   useDocumentTitle(t('admin.addTestcases'));
+  const addToast = useToastStore((s) => s.addToast);
   const [searchParams] = useSearchParams();
   const [saving, setSaving] = useState(false);
 
@@ -59,7 +60,7 @@ export default function AdminTestcases() {
 
   const handleSaveTestcases = async () => {
     if (!selectedTestcaseProblem) {
-      useToastStore().addToast('error', t('admin.selectProblemFirst'));
+      addToast('error', t('admin.selectProblemFirst'));
       return;
     }
     const isSpj = selectedProblemJudgeType === 'spj';
@@ -70,18 +71,18 @@ export default function AdminTestcases() {
       return tc.input && tc.expected_output;
     });
     if (validTestcases.length === 0) {
-      useToastStore().addToast('error', t('admin.atLeastOneTestcase'));
+      addToast('error', t('admin.atLeastOneTestcase'));
       return;
     }
     setSaving(true);
     try {
       await api.addTestcases(selectedTestcaseProblem.id, validTestcases);
-      useToastStore().addToast('success', t('admin.testcaseAdded'));
+      addToast('success', t('admin.testcaseAdded'));
       setTestcases([{ input: '', expected_output: '', is_sample: false, score: 10 }]);
       const data = await api.getProblemTestcases(selectedTestcaseProblem.id);
       setExistingTestcases(data.testcases);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setSaving(false);
     }
@@ -92,11 +93,11 @@ export default function AdminTestcases() {
     if (!window.confirm(t('admin.deleteTestcaseConfirm'))) return;
     try {
       await api.deleteTestcase(selectedTestcaseProblem.id, index);
-      useToastStore().addToast('success', t('admin.testcaseDeleted'));
+      addToast('success', t('admin.testcaseDeleted'));
       const data = await api.getProblemTestcases(selectedTestcaseProblem.id);
       setExistingTestcases(data.testcases);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     }
   };
 

@@ -23,6 +23,7 @@ const LANGUAGE_NAMES: Record<string, string> = {
 };
 
 export default function Solutions() {
+  const addToast = useToastStore((s) => s.addToast);
   const SORT_OPTIONS = [
     { value: 'newest', label: t('solutions.newest') },
     { value: 'popular', label: t('solutions.popular') },
@@ -80,7 +81,7 @@ export default function Solutions() {
       setSolutions(data.solutions);
       setPagination(data.pagination);
     } catch (e) {
-      useToastStore().addToast('error', t('common.loadError'));
+      addToast('error', t('common.loadError'));
       console.error('Failed to fetch solutions:', e);
       setLoadError(true);
     } finally {

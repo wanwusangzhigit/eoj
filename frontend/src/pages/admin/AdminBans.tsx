@@ -37,6 +37,7 @@ export default function AdminBans() {
 }
 
 function BannedIPsList() {
+  const addToast = useToastStore((s) => s.addToast);
   const [bans, setBans] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -65,7 +66,7 @@ function BannedIPsList() {
       setNewReason('');
       fetchBans();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('admin.banFailed'));
+      addToast('error', e.message || t('admin.banFailed'));
     }
   };
 
@@ -75,7 +76,7 @@ function BannedIPsList() {
       await api.unbanIP(id);
       fetchBans();
     } catch {
-      useToastStore().addToast('error', t('admin.unbanFailed'));
+      addToast('error', t('admin.unbanFailed'));
     }
   };
 
@@ -160,6 +161,7 @@ function BannedIPsList() {
 }
 
 function BannedDevicesList() {
+  const addToast = useToastStore((s) => s.addToast);
   const [bans, setBans] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -188,7 +190,7 @@ function BannedDevicesList() {
       setNewReason('');
       fetchBans();
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('admin.banFailed'));
+      addToast('error', e.message || t('admin.banFailed'));
     }
   };
 
@@ -198,7 +200,7 @@ function BannedDevicesList() {
       await api.unbanDevice(id);
       fetchBans();
     } catch {
-      useToastStore().addToast('error', t('admin.unbanFailed'));
+      addToast('error', t('admin.unbanFailed'));
     }
   };
 

@@ -44,6 +44,7 @@ interface SettingsState {
   getAIEnabled: () => boolean;
   getAIChatEnabled: () => boolean;
   getAICompletionEnabled: () => boolean;
+  getCaptchaSubmitEnabled: () => boolean;
   getAdsConfig: () => {
     clientId: string;
     enabled: boolean;
@@ -117,6 +118,11 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   getAICompletionEnabled: () => {
     const { settings } = get();
     return settings.ai_completion_enabled !== 'false';
+  },
+
+  getCaptchaSubmitEnabled: () => {
+    const { settings } = get();
+    return settings.captcha_enabled !== 'false' && settings.captcha_submit === 'true';
   },
 
   getAdsConfig: () => {

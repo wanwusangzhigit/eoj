@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { useSettingsStore } from '../store/settings';
 import CodeMirror from '@uiw/react-codemirror';
 import ImageUploadButton from '../components/ImageUploadButton';
 import { python } from '@codemirror/lang-python';
@@ -12,6 +13,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { useThemeStore } from '../store/theme';
 import { useToastStore } from '../store/toast';
 import StatusBadge from '../components/StatusBadge';
+import Captcha, { type CaptchaHandle } from '../components/Captcha';
 import { Send, Clock, MemoryStick, ChevronLeft, ChevronRight, Tag, Heart, CheckCircle, XCircle, AlertCircle, Users, BookOpen, MessageSquare, ThumbsUp, Eye, Plus, X, Sparkles, Flag } from 'lucide-react';
 import { LANGUAGES, LANGUAGE_TEMPLATES, DIFFICULTY_COLORS } from '../constants';
 import RatingBadge from '../components/RatingBadge';
@@ -90,6 +92,15 @@ export default function ProblemDetail() {
   const [reportDescription, setReportDescription] = useState('');
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
+
+  // ── Captcha state (only used when captcha_submit is enabled) ──
+  // Subscribe to settings object so component re-renders when settings load.
+  const settings = useSettingsStore((s) => s.settings);
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const captchaEnabled = settings.captcha_enabled !== 'false' && settings.captcha_submit === 'true';
+  const [captchaUuid, setCaptchaUuid] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   // ── Fetch problem on slug change (Bug 8 fix: separate effects) ──
 
@@ -403,6 +414,16 @@ export default function ProblemDetail() {
       return;
     }
     if (!problem || submitting) return;
+    // Wait for settings to load so we know whether captcha is required
+    if (!settingsLoaded) {
+      addToast('error', t('common.loading'));
+      return;
+    }
+
+    if (captchaEnabled && !captchaAnswer.trim()) {
+      addToast('error', t('login.captcha'));
+      return;
+    }
 
     setSubmitting(true);
     setLastStatus('pending');
@@ -411,14 +432,34 @@ export default function ProblemDetail() {
         problem_id: problem.id,
         language,
         source_code: sourceCode,
+        captcha_uuid: captchaEnabled ? captchaUuid : undefined,
+        captcha_answer: captchaEnabled ? captchaAnswer.trim() : undefined,
       });
       setLastSubmissionId(result.submission_id);
       pollSubmission(result.submission_id);
       // Clear draft after successful submission (Bug 6 fix)
       if (slug) localStorage.removeItem(DRAFT_KEY(slug, language));
+      // Reset captcha after successful submission
+      if (captchaEnabled) {
+        setCaptchaAnswer('');
+        captchaRef.current?.refresh();
+      }
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      const msg = e.message || t('common.error');
+      // Detect captcha-related errors and give clear feedback
+      if (/captcha/i.test(msg)) {
+        addToast('error', t('login.captcha') + ': ' + msg);
+      } else {
+        addToast('error', msg);
+      }
       setLastStatus(null);
+      // Always refresh captcha on failure — the used uuid is now invalid
+      // (backend marks it used regardless of success/failure)
+      if (captchaEnabled) {
+        setCaptchaAnswer('');
+        setCaptchaUuid('');
+        captchaRef.current?.refresh();
+      }
     } finally {
       if (isMountedRef.current) setSubmitting(false);
     }
@@ -518,7 +559,7 @@ export default function ProblemDetail() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleSubmit, submitting, problem, user, sourceCode, language]);
+  }, [handleSubmit, submitting, problem, user, sourceCode, language, captchaAnswer, captchaUuid, captchaEnabled, settingsLoaded]);
 
   const getLangExtension = (lang: string) => {
     switch (lang) {
@@ -1167,7 +1208,7 @@ export default function ProblemDetail() {
             <button
               className={`btn btn-primary ${submitting ? 'btn-loading' : ''}`}
               onClick={handleSubmit}
-              disabled={submitting}
+              disabled={submitting || !settingsLoaded}
               title="Ctrl+Enter"
             >
               <Send size={14} />
@@ -1214,6 +1255,17 @@ export default function ProblemDetail() {
             onChange={handleSourceCodeChange}
           />
         </div>
+
+        {captchaEnabled && (
+          <div style={{ padding: '12px 16px', borderTop: '1px solid var(--border-color)', background: 'var(--bg-hover)' }}>
+            <Captcha
+              ref={captchaRef}
+              onCaptchaReady={(data) => setCaptchaUuid(data.uuid)}
+              onCaptchaChange={setCaptchaAnswer}
+              captchaAnswer={captchaAnswer}
+            />
+          </div>
+        )}
 
         {lastStatus && (
           <div className="submit-result">

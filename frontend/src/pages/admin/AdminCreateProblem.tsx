@@ -10,6 +10,7 @@ import '../Admin.css';
 
 export default function AdminCreateProblem() {
   useDocumentTitle(t('admin.createProblem'));
+  const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [problemForm, setProblemForm] = useState({
@@ -43,7 +44,7 @@ export default function AdminCreateProblem() {
 
   const handleCreateProblem = async () => {
     if (!problemForm.title || !problemForm.slug || !problemForm.description) {
-      useToastStore().addToast('error', t('admin.titleRequired'));
+      addToast('error', t('admin.titleRequired'));
       return;
     }
     setSaving(true);
@@ -53,10 +54,10 @@ export default function AdminCreateProblem() {
         data.spj_code = spjCode;
       }
       const result = await api.createProblem(data);
-      useToastStore().addToast('success', t('admin.problemCreated'));
+      addToast('success', t('admin.problemCreated'));
       navigate(`/admin/testcases?problemId=${result.id}&problemTitle=${encodeURIComponent(problemForm.title)}&problemSlug=${encodeURIComponent(problemForm.slug)}&problemDifficulty=${problemForm.difficulty}&problemJudgeType=${problemForm.judge_type}`);
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setSaving(false);
     }

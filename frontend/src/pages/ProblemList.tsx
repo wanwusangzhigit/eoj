@@ -12,6 +12,7 @@ import './ProblemList.css';
 
 export default function ProblemList() {
   const { user } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [problems, setProblems] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>({});
   const [search, setSearch] = useState('');
@@ -58,7 +59,7 @@ export default function ProblemList() {
       setProblems(data.problems);
       setPagination(data.pagination);
     } catch (e: any) {
-      useToastStore().addToast('error', t('common.loadError'));
+      addToast('error', t('common.loadError'));
       console.error('Failed to fetch problems:', e);
       setError(e.message || t('common.error'));
     } finally {
@@ -80,7 +81,7 @@ export default function ProblemList() {
       );
       setAttemptedProblems(attemptedIds);
     } catch (e) {
-      useToastStore().addToast('error', t('common.error'));
+      addToast('error', t('common.error'));
       console.error('Failed to fetch user progress:', e);
     }
   };

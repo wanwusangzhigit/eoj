@@ -41,6 +41,7 @@ export default function AdminSettings() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
+  const addToast = useToastStore((s) => s.addToast);
 
   useEffect(() => {
     if (!settingsLoaded) {
@@ -117,9 +118,9 @@ export default function AdminSettings() {
         captcha_solution: String(settingsCaptchaSolution),
       });
       await fetchSettings(true);
-      useToastStore().addToast('success', t('admin.settingsSaved'));
+      addToast('success', t('admin.settingsSaved'));
     } catch (e: any) {
-      useToastStore().addToast('error', e.message || t('common.error'));
+      addToast('error', e.message || t('common.error'));
     } finally {
       setSettingsSaving(false);
     }
