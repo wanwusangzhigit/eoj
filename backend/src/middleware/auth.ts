@@ -46,6 +46,12 @@ export async function superAdminMiddleware(c: Context<AppType>, next: Next) {
   await next();
 }
 
+// Check if user has admin-level access (admin role or super admin)
+export function isAdmin(user: any): boolean {
+  if (!user) return false;
+  return user.userId === 1 || user.role === 'admin' || user.role === 'super_admin';
+}
+
 // Check if user has a specific permission
 function hasPermission(user: any, permission: string): boolean {
   // Super admin (user id=1) always has all permissions

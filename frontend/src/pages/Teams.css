@@ -1,7 +1,22 @@
+/* ═══════════════════════════════════════════════════
+   Teams — 团队列表 / 详情 / 创建页面
+   三种主题共享基础样式 + 各主题专属优化
+   ═══════════════════════════════════════════════════ */
+
+/* ─── 通用卡片动画 ─── */
+@keyframes team-card-enter {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   团队列表页
+   ============================================================ */
+
 .teams-page {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 24px;
 }
 
 .teams-header {
@@ -9,7 +24,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
   flex-wrap: wrap;
 }
 
@@ -18,7 +33,8 @@
   align-items: center;
   gap: 10px;
   margin: 0;
-  font-size: 22px;
+  font-size: 24px;
+  font-weight: 700;
 }
 
 .teams-actions {
@@ -37,6 +53,12 @@
   border: 1px solid var(--border);
   border-radius: 8px;
   min-width: 240px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.teams-actions .search-bar:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
 }
 
 .teams-actions .search-bar input {
@@ -45,51 +67,109 @@
   background: transparent;
   color: inherit;
   outline: none;
+  font-size: 14px;
 }
 
+.teams-actions .search-bar input::placeholder {
+  color: var(--text-muted);
+}
+
+/* ── 团队网格 ── */
 .teams-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
 
 .team-card {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 16px;
+  gap: 16px;
+  padding: 18px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   text-decoration: none;
   color: inherit;
-  transition: all 0.15s;
+  transition: all var(--transition);
+  animation: team-card-enter 0.35s ease-out backwards;
 }
+
+.team-card:nth-child(1) { animation-delay: 0.00s; }
+.team-card:nth-child(2) { animation-delay: 0.04s; }
+.team-card:nth-child(3) { animation-delay: 0.08s; }
+.team-card:nth-child(4) { animation-delay: 0.12s; }
+.team-card:nth-child(5) { animation-delay: 0.16s; }
+.team-card:nth-child(6) { animation-delay: 0.20s; }
 
 .team-card:hover {
   border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+
+/* Default theme: hover lift */
+[data-theme-style="default"] .team-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), 0 0 20px var(--accent-glow);
+}
+
+/* Luogu theme: subtle lift */
+[data-theme-style="luogu"] .team-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+/* Hydro theme: simple border highlight */
+[data-theme-style="hydro"] .team-card:hover {
+  border-color: var(--accent);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
 }
 
 .team-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
   object-fit: cover;
   flex-shrink: 0;
 }
 
 .team-avatar.placeholder {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.team-avatar.lg {
+/* Default theme: rounded avatar */
+[data-theme-style="default"] .team-avatar {
+  border-radius: 12px;
+}
+[data-theme-style="default"] .team-avatar.lg {
   width: 80px;
   height: 80px;
-  border-radius: 16px;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+/* Luogu theme: circular avatar */
+[data-theme-style="luogu"] .team-avatar {
+  border-radius: 50%;
+}
+[data-theme-style="luogu"] .team-avatar.lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 2px solid var(--border-light);
+}
+
+/* Hydro theme: square avatar */
+[data-theme-style="hydro"] .team-avatar {
+  border-radius: 0;
+}
+[data-theme-style="hydro"] .team-avatar.lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 0;
 }
 
 .team-info {
@@ -99,29 +179,38 @@
 
 .team-info h3 {
   margin: 0 0 4px 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .team-desc {
-  margin: 0 0 4px 0;
-  font-size: 12px;
+  margin: 0 0 6px 0;
+  font-size: 13px;
   color: var(--text-secondary);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.5;
 }
 
 .team-meta {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
+/* ============================================================
+   团队详情页
+   ============================================================ */
+
 .team-detail-page {
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 28px 24px;
 }
 
 .back-link {
@@ -132,50 +221,89 @@
   text-decoration: none;
   font-size: 13px;
   margin-bottom: 16px;
+  transition: color var(--transition-fast);
 }
 
 .back-link:hover {
   color: var(--accent);
+  text-decoration: none;
 }
 
+/* ── 团队头部卡片 ── */
 .team-detail-header {
   display: flex;
-  gap: 20px;
-  padding: 24px;
+  gap: 24px;
+  padding: 28px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-xl);
   margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Default theme: gradient background */
+[data-theme-style="default"] .team-detail-header {
+  background: linear-gradient(135deg, var(--bg-card), var(--bg-tertiary));
+  box-shadow: var(--shadow-md);
+}
+
+/* Luogu theme: clean white */
+[data-theme-style="luogu"] .team-detail-header {
+  background: var(--bg-card);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+/* Hydro theme: flat */
+[data-theme-style="hydro"] .team-detail-header {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
 }
 
 .team-header-info {
   flex: 1;
+  min-width: 0;
 }
 
 .team-header-info h1 {
+  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.team-desc {
+  font-size: 14px;
+  color: var(--text-secondary);
   margin: 0 0 8px 0;
-  font-size: 22px;
+  line-height: 1.6;
 }
 
 .team-meta-row {
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   font-size: 13px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
   margin-top: 6px;
 }
 
 .team-actions {
-  margin-top: 12px;
+  margin-top: 14px;
   display: flex;
-  gap: 8px;
+  gap: 10px;
+  align-items: center;
 }
 
+/* ── Badges ── */
 .badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .owner-badge {
@@ -184,31 +312,451 @@
   border: 1px solid rgba(255, 200, 0, 0.4);
 }
 
+.member-badge {
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid transparent;
+}
+
+/* ── 标签页导航 ── */
 .team-tabs {
   display: flex;
-  gap: 6px;
-  margin-bottom: 16px;
+  gap: 2px;
+  margin-bottom: 20px;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.team-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .team-tab {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  padding: 10px 18px;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--text-secondary);
   cursor: pointer;
   font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  position: relative;
+}
+
+.team-tab:hover {
+  color: var(--text-primary);
+  background: var(--accent-light);
 }
 
 .team-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+  font-weight: 600;
 }
 
+/* Default theme: animated underline */
+[data-theme-style="default"] .team-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+  border-radius: 1px;
+}
+
+/* ── 标签页内容容器 ── */
+.team-tab-content {
+  min-height: 300px;
+}
+
+/* ── 概览标签 ── */
+.overview-tab {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.announcement-preview.card {
+  padding: 20px;
+}
+
+.announcement-preview h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  margin: 0 0 12px 0;
+}
+
+.announcement-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.announcement-item:last-child {
+  border-bottom: none;
+}
+
+.announcement-item .pinned {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.announcement-item .date {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.team-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  transition: all var(--transition);
+}
+
+.stat-card:hover {
+  border-color: var(--accent);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme-style="default"] .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card svg {
+  color: var(--accent);
+}
+
+.stat-card span {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.stat-card label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* ── 公告标签 ── */
+.tab-actions {
+  margin-bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.form-card {
+  padding: 20px;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.form-card .form-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-row label {
+  flex: 1;
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.announcement-card {
+  padding: 18px;
+}
+
+.announcement-card.pinned {
+  border-left: 3px solid var(--accent);
+}
+
+.announcement-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.announcement-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pinned-icon {
+  color: var(--accent);
+}
+
+.announcement-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.announcement-body {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+/* ── 讨论标签 ── */
+.disc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.disc-item {
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.disc-item:hover {
+  border-color: var(--accent);
+}
+
+[data-theme-style="default"] .disc-item:hover {
+  transform: translateX(2px);
+}
+
+.disc-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.disc-item-header h4 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.disc-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.disc-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.disc-content {
+  margin: 12px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+}
+
+.disc-meta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 4px 0 12px 0;
+}
+
+.replies-section {
+  margin-top: 20px;
+}
+
+.replies-section h4 {
+  font-size: 15px;
+  margin: 0 0 10px 0;
+}
+
+.reply-card {
+  padding: 14px;
+  margin-bottom: 8px;
+}
+
+.reply-author {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--accent);
+  margin-right: 10px;
+}
+
+.reply-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.reply-content {
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.reply-form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ── 题目集标签 ── */
+.set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.set-item {
+  padding: 16px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.set-item:hover {
+  border-color: var(--accent);
+}
+
+.set-item h4 {
+  margin: 0 0 4px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.set-item p {
+  margin: 0 0 6px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.set-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.problem-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.problem-row:last-child {
+  border-bottom: none;
+}
+
+.problem-row a {
+  flex: 1;
+  font-weight: 500;
+}
+
+.diff-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: var(--radius);
+  font-weight: 600;
+}
+
+/* ── 竞赛标签 ── */
+.contest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contest-item {
+  padding: 16px;
+}
+
+.contest-item h4 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.contest-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.contest-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── 成员列表 ── */
 .members-list,
 .rankings-list {
   display: flex;
@@ -220,126 +768,429 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.member-row:hover {
+  border-color: var(--border-hover);
+}
+
+[data-theme-style="default"] .member-row:hover {
+  box-shadow: var(--shadow-sm);
 }
 
 .rank {
-  width: 24px;
-  text-align: center;
-  font-weight: 600;
-  color: var(--text-secondary);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text-muted);
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
+/* Top 3 ranks */
+.member-row:nth-child(1) .rank { color: var(--gold); }
+.member-row:nth-child(2) .rank { color: var(--silver); }
+.member-row:nth-child(3) .rank { color: var(--bronze); }
+
 .member-avatar {
-  width: 32px;
-  height: 32px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   object-fit: cover;
+  flex-shrink: 0;
 }
 
 .member-avatar.placeholder {
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: 600;
-  font-size: 13px;
+  font-weight: 700;
+  font-size: 14px;
 }
 
 .member-name {
   flex: 1;
   font-weight: 500;
-  color: inherit;
+  color: var(--text-primary);
   text-decoration: none;
+  font-size: 14px;
 }
 
 .member-name:hover {
   color: var(--accent);
+  text-decoration: none;
 }
 
 .member-role {
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 2px 10px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .member-role.owner {
   background: rgba(255, 200, 0, 0.15);
   color: #ffc800;
+  border: 1px solid rgba(255, 200, 0, 0.3);
 }
 
 .member-role.admin {
-  background: rgba(82, 196, 26, 0.15);
-  color: #52c41a;
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid transparent;
 }
 
 .member-role.member {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--bg-tertiary);
   color: var(--text-secondary);
+  border: 1px solid var(--border-light);
 }
 
 .member-stats {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }
 
-.create-team-page {
+.member-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.btn-icon-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.btn-icon-sm:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.btn-icon-sm.danger:hover {
+  background: var(--error-bg);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* ── 加入申请 ── */
+.join-requests-section {
+  margin-bottom: 20px;
+}
+
+.join-requests-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  margin: 0 0 10px 0;
+}
+
+.request-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.request-row a {
+  font-weight: 500;
+}
+
+.req-msg {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.req-actions {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.btn-success {
+  background: var(--success);
+  color: #fff;
+  border: 1px solid var(--success);
+}
+
+.btn-success:hover {
+  background: var(--success);
+  opacity: 0.85;
+  color: #fff;
+}
+
+/* ── 转让所有权 ── */
+.transfer-section {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+}
+
+.transfer-form {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.transfer-form select {
+  flex: 1;
+  max-width: 240px;
+}
+
+/* ── 设置标签 ── */
+.settings-tab {
   max-width: 600px;
-  margin: 0 auto;
+}
+
+.settings-tab .card {
   padding: 24px;
+}
+
+.settings-tab h3 {
+  margin: 0 0 16px 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+/* ============================================================
+   创建团队页
+   ============================================================ */
+
+.create-team-page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 24px;
+}
+
+.create-team-page h1 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 16px 0 24px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .create-team-form {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  margin-top: 16px;
+  gap: 18px;
 }
 
-.create-team-form label {
+.create-team-form .form-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.create-team-form label span {
-  font-size: 13px;
+.create-team-form .form-group label {
+  font-size: 14px;
   font-weight: 500;
+  color: var(--text-primary);
+}
+
+.create-team-form .form-group .hint {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .create-team-form input,
-.create-team-form textarea {
-  padding: 10px 12px;
+.create-team-form textarea,
+.create-team-form select {
+  width: 100%;
+  padding: 10px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  color: inherit;
+  border-radius: var(--radius);
+  color: var(--text-primary);
   outline: none;
+  font-size: 14px;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .create-team-form input:focus,
-.create-team-form textarea:focus {
+.create-team-form textarea:focus,
+.create-team-form select:focus {
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+.create-team-form textarea {
+  min-height: 100px;
+  resize: vertical;
 }
 
 .checkbox-label {
+  display: flex !important;
   flex-direction: row !important;
   align-items: center;
   gap: 8px !important;
+  cursor: pointer;
 }
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+}
+
+/* ============================================================
+   空状态
+   ============================================================ */
 
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+}
+
+.empty-state svg {
+  margin-bottom: 8px;
+  opacity: 0.5;
 }
 
 .empty-state p {
   margin-top: 12px;
   font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   Loading 状态
+   ============================================================ */
+
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 80px 0;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+/* ============================================================
+   响应式
+   ============================================================ */
+
+@media (max-width: 768px) {
+  .teams-page,
+  .team-detail-page,
+  .create-team-page {
+    padding: 16px;
+  }
+
+  .teams-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .teams-actions {
+    width: 100%;
+  }
+
+  .teams-actions .search-bar {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .teams-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .team-detail-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .team-meta-row {
+    justify-content: center;
+  }
+
+  .team-actions {
+    justify-content: center;
+  }
+
+  .team-tabs {
+    gap: 0;
+  }
+
+  .team-tab {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .team-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .member-row {
+    flex-wrap: wrap;
+  }
+
+  .member-actions {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .team-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    flex-direction: column;
+  }
+
+  .form-row label {
+    min-width: 0;
+  }
+
+  .member-row .member-stats {
+    display: none;
+  }
 }
