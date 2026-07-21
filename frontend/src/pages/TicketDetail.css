@@ -214,7 +214,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }
@@ -225,7 +225,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }
@@ -236,7 +236,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }
@@ -247,7 +247,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
 }

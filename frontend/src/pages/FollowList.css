@@ -30,8 +30,8 @@
   align-items: center;
   gap: 12px;
   padding: 14px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 10px;
   text-decoration: none;
   color: inherit;
@@ -39,7 +39,7 @@
 }
 
 .follow-card:hover {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
   background: rgba(99, 102, 241, 0.06);
 }
 
@@ -52,7 +52,7 @@
 }
 
 .follow-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -73,7 +73,7 @@
 
 .follow-bio {
   font-size: 12px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -83,5 +83,5 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }

@@ -1,4 +1,7 @@
-.layout {
+/* ═══════════════════════════════════════════════════
+   Default Theme  — 主分支默认风格
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="default"] .layout {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -6,7 +9,7 @@
   position: relative;
 }
 
-.main-content {
+[data-theme-style="default"] .main-content {
   flex: 1;
   max-width: 1400px;
   width: 100%;
@@ -15,25 +18,18 @@
   animation: fadeInUp 0.4s ease-out;
 }
 
-@media (max-width: 768px) {
-  .main-content {
-    padding: 24px 16px;
-  }
-}
-
-.site-footer {
+[data-theme-style="default"] .site-footer {
   border-top: 1px solid var(--border);
   background: rgba(10, 11, 15, 0.8);
   backdrop-filter: var(--backdrop-blur);
   -webkit-backdrop-filter: var(--backdrop-blur);
   padding: 32px 24px;
   margin-top: auto;
-  margin-top: calc(auto + 48px);
   position: relative;
   overflow: hidden;
 }
 
-.site-footer::before {
+[data-theme-style="default"] .site-footer::before {
   content: '';
   position: absolute;
   bottom: 0;
@@ -43,11 +39,11 @@
   background: linear-gradient(90deg, transparent, var(--accent-glow), transparent);
 }
 
-[data-theme="light"] .site-footer {
+[data-theme-style="default"][data-theme="light"] .site-footer {
   background: rgba(255, 255, 255, 0.9);
 }
 
-.footer-inner {
+[data-theme-style="default"] .footer-inner {
   max-width: 1400px;
   margin: 0 auto;
   display: flex;
@@ -57,7 +53,7 @@
   flex-wrap: wrap;
 }
 
-.footer-text {
+[data-theme-style="default"] .footer-text {
   font-size: 13px;
   color: var(--text-secondary);
   display: flex;
@@ -65,22 +61,22 @@
   gap: 8px;
 }
 
-.footer-text-multi {
+[data-theme-style="default"] .footer-text-multi {
   flex-wrap: wrap;
   gap: 12px;
 }
 
-.footer-custom-text {
+[data-theme-style="default"] .footer-custom-text {
   white-space: pre-wrap;
 }
 
-.footer-links {
+[data-theme-style="default"] .footer-links {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
 }
 
-.footer-links a {
+[data-theme-style="default"] .footer-links a {
   font-size: 13px;
   color: var(--text-secondary);
   text-decoration: none;
@@ -90,7 +86,7 @@
   position: relative;
 }
 
-.footer-links a::after {
+[data-theme-style="default"] .footer-links a::after {
   content: '';
   position: absolute;
   bottom: 4px;
@@ -102,11 +98,193 @@
   transition: width var(--transition);
 }
 
-.footer-links a:hover {
+[data-theme-style="default"] .footer-links a:hover {
   color: var(--accent);
   background: var(--accent-light);
+  text-decoration: none;
 }
 
-.footer-links a:hover::after {
+[data-theme-style="default"] .footer-links a:hover::after {
   width: 60%;
+}
+
+@media (max-width: 768px) {
+  [data-theme-style="default"] .main-content {
+    padding: 24px 16px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Luogu Theme  — 洛谷风格复刻
+   ═══════════════════════════════════════════════════ */
+:root .layout,
+[data-theme-style="luogu"] .layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+:root .layout-body,
+[data-theme-style="luogu"] .layout-body {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  min-height: 0;
+}
+
+:root .main-content,
+[data-theme-style="luogu"] .main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 16px 20px;
+  animation: fadeInUp 0.25s ease-out;
+}
+
+:root .site-footer,
+[data-theme-style="luogu"] .site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 16px 20px;
+  margin-top: auto;
+}
+
+:root .footer-inner,
+[data-theme-style="luogu"] .footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+:root .footer-text,
+[data-theme-style="luogu"] .footer-text {
+  font-size: 12px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+:root .footer-text-multi,
+[data-theme-style="luogu"] .footer-text-multi {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+:root .footer-custom-text,
+[data-theme-style="luogu"] .footer-custom-text {
+  white-space: pre-wrap;
+}
+
+:root .footer-links,
+[data-theme-style="luogu"] .footer-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+:root .footer-links a,
+[data-theme-style="luogu"] .footer-links a {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  padding: 2px 4px;
+}
+
+:root .footer-links a:hover,
+[data-theme-style="luogu"] .footer-links a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  :root .main-content,
+  [data-theme-style="luogu"] .main-content {
+    padding: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   Hydro Theme  — HydroOJ 风格布局
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="hydro"] .layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+[data-theme-style="hydro"] .main-content {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 24px 16px;
+  animation: fadeInUp 0.25s ease-out;
+}
+
+[data-theme-style="hydro"] .site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  padding: 20px 16px;
+  margin-top: auto;
+}
+
+[data-theme-style="hydro"] .footer-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+[data-theme-style="hydro"] .footer-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-theme-style="hydro"] .footer-text-multi {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+[data-theme-style="hydro"] .footer-custom-text {
+  white-space: pre-wrap;
+}
+
+[data-theme-style="hydro"] .footer-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+[data-theme-style="hydro"] .footer-links a {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+  padding: 4px 6px;
+}
+
+[data-theme-style="hydro"] .footer-links a:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  [data-theme-style="hydro"] .main-content {
+    padding: 16px 12px;
+  }
 }

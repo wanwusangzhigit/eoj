@@ -1,6 +1,12 @@
 .submissions-page {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+}
+
+/* Default & Hydro: larger gap */
+[data-theme-style="default"] .submissions-page,
+[data-theme-style="hydro"] .submissions-page {
   gap: 20px;
 }
 
@@ -8,6 +14,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .filter-select {
@@ -15,13 +22,23 @@
   color: var(--text-primary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 6px 12px;
-  font-size: 14px;
+  padding: 5px 10px;
+  font-size: 13px;
   outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition);
 }
 
-.filter-select:focus {
+.filter-select:focus,
+.filter-select:hover {
   border-color: var(--accent);
+}
+
+/* Default & Hydro: larger filter select */
+[data-theme-style="default"] .filter-select,
+[data-theme-style="hydro"] .filter-select {
+  padding: 6px 12px;
+  font-size: 14px;
 }
 
 .user-search-input {
@@ -31,7 +48,8 @@
   background: var(--bg-secondary);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 6px 12px;
+  padding: 5px 10px;
+  color: var(--text-muted);
 }
 
 .user-search-input input {
@@ -39,7 +57,7 @@
   border: none;
   outline: none;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   width: 140px;
 }
 
@@ -47,10 +65,12 @@
   color: var(--text-muted);
 }
 
+/* ── Submissions Table ── */
 .submissions-table {
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
+  overflow: hidden;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
@@ -63,32 +83,55 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  min-width: 700px;
+}
+
+/* Default & Hydro: uppercase header with letter-spacing */
+[data-theme-style="default"] .submissions-table-header,
+[data-theme-style="hydro"] .submissions-table-header {
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  min-width: 700px;
 }
 
 .submission-row {
   display: flex;
   align-items: center;
   padding: 10px 14px;
-  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   transition: background var(--transition);
   text-decoration: none;
   color: var(--text-primary);
   min-width: 700px;
 }
 
+.submission-row:last-child {
+  border-bottom: none;
+}
+
 .submission-row:hover {
   background: var(--bg-tertiary);
 }
 
-.col-id { width: 60px; color: var(--text-muted); font-size: 14px; }
+/* Default & Hydro: border-top on rows instead of border-bottom */
+[data-theme-style="default"] .submission-row,
+[data-theme-style="hydro"] .submission-row {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+}
+
+[data-theme-style="default"] .submission-row:last-child,
+[data-theme-style="hydro"] .submission-row:last-child {
+  border-bottom: none;
+}
+
+.col-id { width: 60px; color: var(--text-muted); font-size: 13px; }
 .col-user { width: 100px; color: var(--text-secondary); font-size: 13px; }
-.col-problem { flex: 1; font-weight: 500; }
+.col-problem { flex: 1; font-weight: 500; font-size: 14px; }
+.col-problem:hover { color: var(--accent); }
 .col-lang { width: 100px; color: var(--text-secondary); font-size: 13px; }
 .col-status { width: 140px; }
-.col-score { width: 60px; text-align: center; }
+.col-score { width: 60px; text-align: center; font-weight: 600; }
 .col-time { width: 80px; color: var(--text-secondary); font-size: 13px; }
 .col-memory { width: 90px; color: var(--text-secondary); font-size: 13px; }
 .col-date { width: 160px; color: var(--text-muted); font-size: 12px; }
@@ -98,14 +141,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  padding: 80px 0;
+  gap: 12px;
+  padding: 60px 0;
   text-align: center;
 }
 
 .empty-page h2 {
   color: var(--text-secondary);
   font-weight: 500;
+  font-size: 16px;
 }
 
 .empty-page .empty-icon {
@@ -115,7 +159,7 @@
 
 .empty-page .empty-desc {
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
   margin: 0;
 }
 

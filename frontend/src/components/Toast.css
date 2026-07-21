@@ -28,12 +28,27 @@
   border-left: 3px solid var(--success);
 }
 
+[data-theme-style="hydro"] .toast.toast-success {
+  border-left: none;
+  border-top: 3px solid var(--success);
+}
+
 .toast.toast-error {
   border-left: 3px solid var(--error);
 }
 
+[data-theme-style="hydro"] .toast.toast-error {
+  border-left: none;
+  border-top: 3px solid var(--error);
+}
+
 .toast.toast-info {
   border-left: 3px solid var(--info);
+}
+
+[data-theme-style="hydro"] .toast.toast-info {
+  border-left: none;
+  border-top: 3px solid var(--info);
 }
 
 .toast-icon {

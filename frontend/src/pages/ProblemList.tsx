@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { Search, Tag, Clock, MemoryStick, Filter, CheckCircle, AlertCircle } from 'lucide-react';
-import { DIFFICULTY_COLORS } from '../constants';
+import { DIFFICULTY_COLORS, DIFFICULTIES } from '../constants';
 import RatingBadge from '../components/RatingBadge';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
@@ -144,9 +144,9 @@ export default function ProblemList() {
             onChange={(e) => { setSelectedDifficulty(e.target.value); setPage(1); }}
           >
             <option value="">{t('problemList.allDifficulty')}</option>
-            <option value="Easy">{t('problemList.easy')}</option>
-            <option value="Medium">{t('problemList.medium')}</option>
-            <option value="Hard">{t('problemList.hard')}</option>
+            {DIFFICULTIES.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
           </select>
         </div>
 
@@ -204,11 +204,16 @@ export default function ProblemList() {
           {problems.map((problem, index) => {
             const status = getProblemStatus(problem.id);
             const displayId = (pagination.page - 1) * pagination.pageSize + index + 1;
+            const rateLevel = problem.pass_rate != null
+              ? (problem.pass_rate >= 0.6 ? 'high' : problem.pass_rate >= 0.3 ? 'medium' : 'low')
+              : '';
+            const ratePct = problem.pass_rate != null ? Math.round(problem.pass_rate * 100) : null;
             return (
               <Link
                 key={problem.id}
                 to={`/problems/${problem.slug}`}
                 className={`problem-row ${status}`}
+                data-difficulty={problem.difficulty || ''}
               >
                 <span className="col-status">
                   {status === 'accepted' && <CheckCircle size={16} className="status-icon accepted" />}
@@ -220,7 +225,7 @@ export default function ProblemList() {
                   {problem.rating && problem.rating >= 800 ? (
                     <RatingBadge rating={problem.rating} size="sm" />
                   ) : (
-                    <span style={{ color: DIFFICULTY_COLORS[problem.difficulty] }}>
+                    <span style={{ color: DIFFICULTY_COLORS[problem.difficulty] || 'var(--text-secondary)' }}>
                       {problem.difficulty}
                     </span>
                   )}
@@ -237,7 +242,21 @@ export default function ProblemList() {
                   })()}
                 </span>
                 <span className="col-submissions">{problem.submission_count || 0}</span>
-                <span className={`col-rate ${problem.pass_rate != null ? (problem.pass_rate >= 0.6 ? 'high' : problem.pass_rate >= 0.3 ? 'medium' : 'low') : ''}`}>{problem.pass_rate != null ? `${Math.round(problem.pass_rate * 100)}%` : '-'}</span>
+                <span className="col-rate">
+                  {ratePct !== null ? (
+                    <>
+                      <span className="pass-rate-bar">
+                        <span
+                          className={`pass-rate-fill ${rateLevel}`}
+                          style={{ width: `${ratePct}%` }}
+                        />
+                      </span>
+                      <span className={`pass-rate-text ${rateLevel}`}>{ratePct}%</span>
+                    </>
+                  ) : (
+                    <span className="pass-rate-text">-</span>
+                  )}
+                </span>
                 <span className="col-limit">
                   <span className="limit-item">
                     <Clock size={12} /> {problem.time_limit}ms

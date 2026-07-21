@@ -15,7 +15,7 @@ import { useToastStore } from '../store/toast';
 import StatusBadge from '../components/StatusBadge';
 import Captcha, { type CaptchaHandle } from '../components/Captcha';
 import { Send, Clock, MemoryStick, ChevronLeft, ChevronRight, Tag, Heart, CheckCircle, XCircle, AlertCircle, Users, BookOpen, MessageSquare, ThumbsUp, Eye, Plus, X, Sparkles, Flag } from 'lucide-react';
-import { LANGUAGES, LANGUAGE_TEMPLATES, DIFFICULTY_COLORS } from '../constants';
+import { LANGUAGES, LANGUAGE_TEMPLATES } from '../constants';
 import RatingBadge from '../components/RatingBadge';
 import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
@@ -670,7 +670,7 @@ export default function ProblemDetail() {
             ) : (
               <div
                 className="difficulty-badge"
-                style={{ background: `${DIFFICULTY_COLORS[problem.difficulty]}20`, color: DIFFICULTY_COLORS[problem.difficulty], borderColor: DIFFICULTY_COLORS[problem.difficulty] }}
+                data-difficulty={problem.difficulty || ''}
               >
                 {problem.difficulty}
               </div>

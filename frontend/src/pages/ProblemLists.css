@@ -36,7 +36,7 @@
   padding: 8px 14px;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   color: var(--text-muted);
   min-width: 240px;
 }

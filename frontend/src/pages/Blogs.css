@@ -27,8 +27,8 @@
 .sort-tabs {
   display: flex;
   gap: 4px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 2px;
 }
@@ -37,14 +37,14 @@
   padding: 4px 12px;
   background: transparent;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   border-radius: 6px;
   font-size: 13px;
 }
 
 .sort-tab.active {
-  background: var(--primary-color, #6366f1);
+  background: var(--accent);
   color: #fff;
 }
 
@@ -59,8 +59,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 16px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   text-decoration: none;
   color: inherit;
@@ -68,8 +68,7 @@
 }
 
 .blog-card:hover {
-  border-color: var(--primary-color, #6366f1);
-  transform: translateY(-1px);
+  border-color: var(--accent);
 }
 
 .blog-card-header {
@@ -91,7 +90,7 @@
 }
 
 .blog-avatar.placeholder {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -111,7 +110,7 @@
 }
 
 .blog-date {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .blog-title {
@@ -129,7 +128,7 @@
 .blog-tag {
   padding: 2px 8px;
   background: rgba(99, 102, 241, 0.12);
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   border-radius: 4px;
   font-size: 11px;
 }
@@ -138,7 +137,7 @@
   display: flex;
   gap: 16px;
   font-size: 12px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .blog-stats span {
@@ -158,22 +157,22 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 13px;
   margin-bottom: 16px;
 }
 
 .blog-article {
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
 }
 
 .article-header {
   padding: 24px;
-  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--border);
 }
 
 .article-header h1 {
@@ -186,17 +185,17 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .article-author {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   text-decoration: none;
   font-weight: 500;
 }
 
 .meta-sep {
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .draft-badge {
@@ -236,7 +235,7 @@
 
 .article-footer {
   padding: 16px 24px;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-top: 1px solid var(--border);
 }
 
 .article-actions {
@@ -251,7 +250,7 @@
   gap: 6px;
   background: transparent;
   border: none;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   cursor: pointer;
   font-size: 14px;
   padding: 4px 8px;
@@ -260,7 +259,7 @@
 }
 
 .action-btn:hover {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
 }
 
 .action-btn.liked {
@@ -276,8 +275,8 @@
 /* Comments */
 .comments-section {
   margin-top: 24px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
 }
@@ -296,8 +295,8 @@
 
 .comment-form textarea {
   padding: 10px 12px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: inherit;
   outline: none;
@@ -305,7 +304,7 @@
 }
 
 .comment-form textarea:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .comments-list {
@@ -334,13 +333,13 @@
 
 .comment-author {
   font-weight: 500;
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   text-decoration: none;
 }
 
 .comment-time {
   font-size: 11px;
-  color: var(--text-secondary, #888);
+  color: var(--text-secondary);
 }
 
 .comment-text {
@@ -351,7 +350,7 @@
 .empty-text {
   text-align: center;
   padding: 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -383,8 +382,8 @@
 .blog-editor-form input,
 .blog-editor-form textarea {
   padding: 10px 12px;
-  background: var(--card-bg, rgba(255, 255, 255, 0.04));
-  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 8px;
   color: inherit;
   outline: none;
@@ -393,7 +392,7 @@
 
 .blog-editor-form input:focus,
 .blog-editor-form textarea:focus {
-  border-color: var(--primary-color, #6366f1);
+  border-color: var(--accent);
 }
 
 .editor-actions {
@@ -405,7 +404,7 @@
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  color: var(--text-secondary, #aaa);
+  color: var(--text-secondary);
 }
 
 .empty-state p {

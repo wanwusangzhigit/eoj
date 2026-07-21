@@ -21,6 +21,10 @@
   background: rgba(255, 255, 255, 0.08);
 }
 
+[data-theme-style="hydro"] .bell-button:hover {
+  background: var(--bg-tertiary);
+}
+
 .unread-badge {
   position: absolute;
   top: 2px;
@@ -55,6 +59,13 @@
   overflow: hidden;
 }
 
+[data-theme-style="hydro"] .bell-dropdown {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: var(--shadow-lg);
+}
+
 .bell-dropdown-header {
   display: flex;
   align-items: center;
@@ -63,6 +74,10 @@
   border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
   font-weight: 600;
   font-size: 14px;
+}
+
+[data-theme-style="hydro"] .bell-dropdown-header {
+  border-bottom: 1px solid var(--border);
 }
 
 .bell-dropdown-body {
@@ -88,12 +103,24 @@
   transition: background 0.15s;
 }
 
+[data-theme-style="hydro"] .bell-item {
+  border-bottom: 1px solid var(--border-light);
+}
+
 .bell-item:hover {
   background: rgba(255, 255, 255, 0.04);
 }
 
+[data-theme-style="hydro"] .bell-item:hover {
+  background: var(--bg-tertiary);
+}
+
 .bell-item.unread {
   background: rgba(99, 102, 241, 0.06);
+}
+
+[data-theme-style="hydro"] .bell-item.unread {
+  background: var(--accent-light);
 }
 
 .type-dot {
@@ -131,7 +158,7 @@
 }
 
 .read-indicator {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   flex-shrink: 0;
   margin-top: 4px;
 }
@@ -142,8 +169,12 @@
   text-align: center;
 }
 
+[data-theme-style="hydro"] .bell-dropdown-footer {
+  border-top: 1px solid var(--border);
+}
+
 .bell-dropdown-footer a {
-  color: var(--primary-color, #6366f1);
+  color: var(--accent);
   font-size: 13px;
   text-decoration: none;
 }

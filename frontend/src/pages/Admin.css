@@ -75,8 +75,8 @@
 
 .announcement-preview {
   padding: 12px 16px;
-  background: linear-gradient(135deg, var(--color-primary-alpha, rgba(59,130,246,0.08)), var(--color-info-alpha, rgba(14,165,233,0.08)));
-  border: 1px solid var(--color-primary-alpha, rgba(59,130,246,0.2));
+  background: var(--accent-light);
+  border: 1px solid var(--accent);
   border-radius: var(--radius);
   font-size: 14px;
   line-height: 1.6;
@@ -84,7 +84,7 @@
 }
 
 .announcement-preview a {
-  color: var(--color-primary, #3b82f6);
+  color: var(--accent);
   text-decoration: underline;
 }
 
@@ -208,15 +208,13 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+  background: var(--accent);
   opacity: 0;
   transition: opacity var(--transition);
 }
 
 .stat-card:hover {
-  border-color: var(--border-hover);
-  box-shadow: var(--shadow-card);
-  transform: translateY(-2px);
+  border-color: var(--accent);
 }
 
 .stat-card:hover::before {
@@ -239,27 +237,27 @@
 }
 
 .stat-icon-wrapper.blue {
-  background: linear-gradient(135deg, var(--info-bg), rgba(59, 130, 246, 0.05));
+  background: var(--info-bg);
   color: var(--info);
 }
 
 .stat-icon-wrapper.green {
-  background: linear-gradient(135deg, var(--success-bg), rgba(34, 197, 94, 0.05));
+  background: var(--success-bg);
   color: var(--success);
 }
 
 .stat-icon-wrapper.purple {
-  background: linear-gradient(135deg, rgba(167, 139, 250, 0.15), rgba(139, 92, 246, 0.05));
-  color: #a78bfa;
+  background: var(--accent-light);
+  color: var(--accent);
 }
 
 .stat-icon-wrapper.orange {
-  background: linear-gradient(135deg, var(--warning-bg), rgba(245, 158, 11, 0.05));
+  background: var(--warning-bg);
   color: var(--warning);
 }
 
 .stat-icon-wrapper.red {
-  background: linear-gradient(135deg, var(--error-bg), rgba(239, 68, 68, 0.05));
+  background: var(--error-bg);
   color: var(--error);
 }
 
@@ -271,10 +269,7 @@
   font-size: 32px;
   font-weight: 700;
   line-height: 1.1;
-  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
 }
 
 .stat-label {
@@ -328,7 +323,6 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
@@ -690,7 +684,6 @@
 .testcase-io label {
   font-size: 11px;
   color: var(--text-muted);
-  text-transform: uppercase;
 }
 
 .testcase-io pre {
@@ -1478,7 +1471,7 @@
   max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
   overflow: hidden;
 }
 
@@ -1554,7 +1547,7 @@
 }
 
 .visibility-toggle.private {
-  color: var(--text-muted, #888);
+  color: var(--text-muted);
   background: rgba(136, 136, 136, 0.1);
 }
 
@@ -1590,7 +1583,7 @@
 }
 
 .msg-row-admin.own-b {
-  border-left: 3px solid var(--accent, #6366f1);
+  border-left: 3px solid var(--accent);
 }
 
 .msg-row-header {
@@ -1642,7 +1635,6 @@
   font-weight: 600;
   border: 1px solid;
   border-radius: 10px;
-  text-transform: capitalize;
 }
 
 .link {
@@ -1677,7 +1669,7 @@
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 500;
   background: var(--bg-tertiary);
@@ -1818,7 +1810,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--accent), transparent);
+  background: var(--accent);
 }
 
 .admin-sidebar-title {
@@ -2051,4 +2043,38 @@
 
 .ads-help ol li {
   margin-bottom: 4px;
+}
+
+/* ═══════════════════════════════════════════════════
+   Hydro Theme  — 覆盖 luogu 特定样式
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="hydro"] .stat-card::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .stat-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme-style="hydro"] .stat-card:hover::before {
+  opacity: 0;
+}
+
+[data-theme-style="hydro"] .ads-intro {
+  border-left: none;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+[data-theme-style="hydro"] .admin-sidebar-inner::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .admin-sidebar-link::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .admin-sidebar-link.active::before {
+  display: none;
 }

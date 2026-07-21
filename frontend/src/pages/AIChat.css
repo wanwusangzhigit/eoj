@@ -51,7 +51,7 @@
   padding: 3px 10px;
   background: var(--accent-light);
   color: var(--accent);
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -702,7 +702,7 @@
 .ai-prompt-chip {
   padding: 7px 14px;
   border: 1px solid var(--border);
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--bg-card);
   color: var(--text-secondary);
   font-size: 13px;

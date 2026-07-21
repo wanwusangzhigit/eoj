@@ -36,7 +36,7 @@
   padding: 4px 12px;
   background: var(--accent-light);
   color: var(--accent);
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 500;
 }
@@ -78,7 +78,7 @@
   border: 1px solid var(--border);
   background: var(--bg-card);
   color: var(--text-secondary);
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -122,6 +122,11 @@
 
 .discussion-card.pinned {
   border-left: 3px solid var(--warning);
+}
+
+[data-theme-style="hydro"] .discussion-card.pinned {
+  border-left: none;
+  border-top: 2px solid var(--warning);
 }
 
 .discussion-card-stats {
@@ -175,7 +180,7 @@
   padding: 2px 8px;
   background: var(--warning-bg);
   color: var(--warning);
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
@@ -185,7 +190,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 10px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
   flex-shrink: 0;
