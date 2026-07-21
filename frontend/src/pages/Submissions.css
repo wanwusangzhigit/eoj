@@ -4,6 +4,12 @@
   gap: 16px;
 }
 
+/* Default & Hydro: larger gap */
+[data-theme-style="default"] .submissions-page,
+[data-theme-style="hydro"] .submissions-page {
+  gap: 20px;
+}
+
 .filter-bar {
   display: flex;
   align-items: center;
@@ -26,6 +32,13 @@
 .filter-select:focus,
 .filter-select:hover {
   border-color: var(--accent);
+}
+
+/* Default & Hydro: larger filter select */
+[data-theme-style="default"] .filter-select,
+[data-theme-style="hydro"] .filter-select {
+  padding: 6px 12px;
+  font-size: 14px;
 }
 
 .user-search-input {
@@ -74,6 +87,13 @@
   min-width: 700px;
 }
 
+/* Default & Hydro: uppercase header with letter-spacing */
+[data-theme-style="default"] .submissions-table-header,
+[data-theme-style="hydro"] .submissions-table-header {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .submission-row {
   display: flex;
   align-items: center;
@@ -91,6 +111,18 @@
 
 .submission-row:hover {
   background: var(--bg-tertiary);
+}
+
+/* Default & Hydro: border-top on rows instead of border-bottom */
+[data-theme-style="default"] .submission-row,
+[data-theme-style="hydro"] .submission-row {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+}
+
+[data-theme-style="default"] .submission-row:last-child,
+[data-theme-style="hydro"] .submission-row:last-child {
+  border-bottom: none;
 }
 
 .col-id { width: 60px; color: var(--text-muted); font-size: 13px; }

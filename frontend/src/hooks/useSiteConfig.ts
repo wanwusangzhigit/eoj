@@ -9,6 +9,7 @@ const defaults: SiteConfig = {
     description: 'Online Judge',
     icon: 'default',
     favicon: '/favicon.svg',
+    theme: 'default',
   },
   footer: {
     enabled: true,

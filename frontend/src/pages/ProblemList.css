@@ -4,6 +4,12 @@
   gap: 16px;
 }
 
+/* Default & Hydro: larger gap */
+[data-theme-style="default"] .problem-list-page,
+[data-theme-style="hydro"] .problem-list-page {
+  gap: 20px;
+}
+
 .page-header {
   display: flex;
   align-items: center;
@@ -28,6 +34,18 @@
   height: 18px;
   background: var(--accent);
   border-radius: 2px;
+}
+
+/* Default & Hydro: no left accent bar on h1 */
+[data-theme-style="default"] .page-header h1,
+[data-theme-style="hydro"] .page-header h1 {
+  padding-left: 0;
+  font-size: 24px;
+}
+
+[data-theme-style="default"] .page-header h1::before,
+[data-theme-style="hydro"] .page-header h1::before {
+  display: none;
 }
 
 /* ── Search ── */
@@ -61,6 +79,18 @@
   color: var(--text-muted);
 }
 
+/* Default & Hydro: larger search bar */
+[data-theme-style="default"] .search-bar,
+[data-theme-style="hydro"] .search-bar {
+  padding: 8px 14px;
+  color: inherit;
+}
+
+[data-theme-style="default"] .search-bar input,
+[data-theme-style="hydro"] .search-bar input {
+  font-size: 14px;
+}
+
 /* ── Filters ── */
 .filters {
   display: flex;
@@ -70,6 +100,15 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 12px 16px;
+}
+
+/* Default & Hydro: no card-style filters */
+[data-theme-style="default"] .filters,
+[data-theme-style="hydro"] .filters {
+  background: none;
+  border: none;
+  padding: 0;
+  gap: 12px;
 }
 
 .difficulty-filter,
@@ -196,6 +235,28 @@
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
   min-width: 800px;
+}
+
+/* Default & Hydro: uppercase header with letter-spacing */
+[data-theme-style="default"] .problem-table-header,
+[data-theme-style="hydro"] .problem-table-header {
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  grid-template-columns: 36px 50px 1fr 80px 160px 70px 60px 140px;
+}
+
+/* Default & Hydro: no border-bottom on header, border-top on rows */
+[data-theme-style="default"] .problem-row,
+[data-theme-style="hydro"] .problem-row {
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+  grid-template-columns: 36px 50px 1fr 80px 160px 70px 60px 140px;
+}
+
+[data-theme-style="default"] .problem-row:last-child,
+[data-theme-style="hydro"] .problem-row:last-child {
+  border-bottom: none;
 }
 
 .problem-row {
@@ -439,6 +500,42 @@
   }
 
   .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
+/* Default & Hydro: responsive */
+@media (max-width: 768px) {
+  [data-theme-style="default"] .page-header,
+  [data-theme-style="hydro"] .page-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  [data-theme-style="default"] .search-bar,
+  [data-theme-style="hydro"] .search-bar {
+    width: 100%;
+  }
+
+  [data-theme-style="default"] .problem-table-header,
+  [data-theme-style="default"] .problem-row {
+    grid-template-columns: 30px 40px 1fr 80px;
+  }
+
+  [data-theme-style="default"] .col-tags,
+  [data-theme-style="default"] .col-limit,
+  [data-theme-style="default"] .col-submissions,
+  [data-theme-style="default"] .col-rate,
+  [data-theme-style="hydro"] .col-tags,
+  [data-theme-style="hydro"] .col-limit,
+  [data-theme-style="hydro"] .col-submissions,
+  [data-theme-style="hydro"] .col-rate {
+    display: none;
+  }
+
+  [data-theme-style="default"] .pagination,
+  [data-theme-style="hydro"] .pagination {
     flex-wrap: wrap;
     justify-content: center;
   }

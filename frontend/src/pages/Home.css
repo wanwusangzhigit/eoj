@@ -16,6 +16,14 @@
   border-radius: var(--radius-lg);
 }
 
+/* Default & Hydro theme: hero with gradient background */
+[data-theme-style="default"] .home-hero,
+[data-theme-style="hydro"] .home-hero {
+  background: linear-gradient(135deg, var(--accent-light), var(--info-bg));
+  border: 1px solid var(--accent-light);
+  padding: 32px;
+}
+
 .home-hero-left {
   display: flex;
   flex-direction: column;
@@ -27,6 +35,17 @@
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+}
+
+/* Default & Hydro: larger gradient title */
+[data-theme-style="default"] .home-title,
+[data-theme-style="hydro"] .home-title {
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--info));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .home-date {
@@ -42,11 +61,26 @@
   color: var(--text-secondary);
 }
 
+/* Default & Hydro: larger welcome text */
+[data-theme-style="default"] .home-welcome,
+[data-theme-style="hydro"] .home-welcome {
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .home-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   min-width: 320px;
+}
+
+/* Default & Hydro: no min-width on stats grid */
+[data-theme-style="default"] .home-stats-grid,
+[data-theme-style="hydro"] .home-stats-grid {
+  min-width: auto;
+  gap: 10px;
 }
 
 .home-stat-card {
@@ -64,9 +98,22 @@
   transition: all var(--transition, 0.15s);
 }
 
+/* Default & Hydro: stat card uses bg-card */
+[data-theme-style="default"] .home-stat-card,
+[data-theme-style="hydro"] .home-stat-card {
+  background: var(--bg-card);
+}
+
 .home-stat-card:hover {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Default & Hydro: stat card hover changes bg */
+[data-theme-style="default"] .home-stat-card:hover,
+[data-theme-style="hydro"] .home-stat-card:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .home-stat-card svg:first-child {
@@ -93,6 +140,16 @@
   color: var(--text-primary);
   font-size: 13px;
   line-height: 1.6;
+}
+
+/* Default & Hydro: announcement with gradient bg and full border */
+[data-theme-style="default"] .home-announcement,
+[data-theme-style="hydro"] .home-announcement {
+  border-left: none;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-light);
+  padding: 12px 16px;
+  font-size: 14px;
 }
 
 .home-announcement .announcement-icon {
@@ -350,6 +407,13 @@
   background: var(--bg-tertiary);
 }
 
+/* Default & Hydro: no tertiary bg on card header */
+[data-theme-style="default"] .home-card-header,
+[data-theme-style="hydro"] .home-card-header {
+  background: none;
+  padding: 14px 18px;
+}
+
 .home-card-header h2 {
   display: flex;
   align-items: center;
@@ -372,6 +436,18 @@
   height: 14px;
   background: var(--accent);
   border-radius: 2px;
+}
+
+/* Default & Hydro: no left accent bar on h2 */
+[data-theme-style="default"] .home-card-header h2,
+[data-theme-style="hydro"] .home-card-header h2 {
+  padding-left: 0;
+  font-size: 15px;
+}
+
+[data-theme-style="default"] .home-card-header h2::before,
+[data-theme-style="hydro"] .home-card-header h2::before {
+  display: none;
 }
 
 .home-card-header h2 svg {
@@ -419,6 +495,19 @@
 .home-item:hover {
   background: var(--bg-tertiary);
   border-left-color: var(--accent);
+}
+
+/* Default & Hydro: no left accent bar, larger padding */
+[data-theme-style="default"] .home-item,
+[data-theme-style="hydro"] .home-item {
+  border-left: none;
+  padding: 10px 18px;
+}
+
+[data-theme-style="default"] .home-item:hover,
+[data-theme-style="hydro"] .home-item:hover {
+  background: var(--bg-secondary);
+  border-left-color: transparent;
 }
 
 .home-item-title {
@@ -484,5 +573,25 @@
 
   .hitokoto-from {
     display: none;
+  }
+}
+
+/* Default & Hydro: centered hero on mobile */
+@media (max-width: 768px) {
+  [data-theme-style="default"] .home-hero,
+  [data-theme-style="hydro"] .home-hero {
+    text-align: center;
+    align-items: center;
+    padding: 20px;
+  }
+
+  [data-theme-style="default"] .home-hero-left,
+  [data-theme-style="hydro"] .home-hero-left {
+    align-items: center;
+  }
+
+  [data-theme-style="default"] .home-stats-grid,
+  [data-theme-style="hydro"] .home-stats-grid {
+    width: 100%;
   }
 }

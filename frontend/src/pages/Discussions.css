@@ -124,6 +124,11 @@
   border-left: 3px solid var(--warning);
 }
 
+[data-theme-style="hydro"] .discussion-card.pinned {
+  border-left: none;
+  border-top: 2px solid var(--warning);
+}
+
 .discussion-card-stats {
   display: flex;
   flex-direction: column;

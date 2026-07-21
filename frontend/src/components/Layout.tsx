@@ -25,15 +25,18 @@ export default function Layout({ children }: { children: ReactNode }) {
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadMsg, setUnreadMsg] = useState(0);
+  const isLuogu = config.site.theme === 'luogu';
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    document.documentElement.setAttribute('data-theme-style', config.site.theme);
+  }, [theme, config.site.theme]);
 
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
 
+  // Poll unread messages (for luogu sidebar + default header)
   useEffect(() => {
     if (!user) {
       setUnreadMsg(0);
@@ -56,22 +59,28 @@ export default function Layout({ children }: { children: ReactNode }) {
         onMenuClick={() => setSidebarOpen((v) => !v)}
         unreadMsg={unreadMsg}
       />
-      <div className="layout-body">
-        <Sidebar
-          open={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          unreadMsg={unreadMsg}
-        />
-        {sidebarOpen && (
-          <div
-            className="sidebar-mask"
-            onClick={() => setSidebarOpen(false)}
+      {isLuogu ? (
+        <div className="layout-body">
+          <Sidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            unreadMsg={unreadMsg}
           />
-        )}
+          {sidebarOpen && (
+            <div
+              className="sidebar-mask"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          <main className="main-content">
+            {children}
+          </main>
+        </div>
+      ) : (
         <main className="main-content">
           {children}
         </main>
-      </div>
+      )}
       <footer className="site-footer">
         <div className="footer-inner">
           <div className="footer-text footer-text-multi">

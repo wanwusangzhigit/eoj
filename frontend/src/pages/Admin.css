@@ -2044,3 +2044,37 @@
 .ads-help ol li {
   margin-bottom: 4px;
 }
+
+/* ═══════════════════════════════════════════════════
+   Hydro Theme  — 覆盖 luogu 特定样式
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="hydro"] .stat-card::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .stat-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme-style="hydro"] .stat-card:hover::before {
+  opacity: 0;
+}
+
+[data-theme-style="hydro"] .ads-intro {
+  border-left: none;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+[data-theme-style="hydro"] .admin-sidebar-inner::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .admin-sidebar-link::before {
+  display: none;
+}
+
+[data-theme-style="hydro"] .admin-sidebar-link.active::before {
+  display: none;
+}

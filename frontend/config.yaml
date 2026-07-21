@@ -4,6 +4,7 @@ site:
   description: "Online Judge"
   icon: "default"
   favicon: "/favicon.svg"
+  theme: "default"          # "default" / "luogu" / "hydro"，控制 UI 配色方案
 
 footer:
   enabled: true
