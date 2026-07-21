@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
@@ -62,7 +63,7 @@ export default function AdminAnnouncement() {
           <label>{t('admin.announcementPreview')}</label>
           <div
             className="announcement-preview"
-            dangerouslySetInnerHTML={{ __html: announcementContent }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(announcementContent) }}
           />
         </div>
       )}

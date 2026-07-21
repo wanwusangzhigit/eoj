@@ -12,10 +12,15 @@ on:
       - master
       - develop
 
+permissions:
+  contents: read
+
 jobs:
   backend:
     name: Backend typecheck
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v5
@@ -34,6 +39,8 @@ jobs:
     name: Frontend build
     runs-on: ubuntu-latest
     needs: backend
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v5
