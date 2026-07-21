@@ -2,7 +2,10 @@
 
 这是一个基于 Cloudflare Workers 的在线判题系统，覆盖题目管理、用户认证、提交评测、竞赛、讨论、题单、后台管理与可选广告位配置。
 
-> **UI 变体**：本仓库提供两套前端视觉风格——`main` 分支为默认风格，[`luogu-style`](https://github.com/wanwusangzhigit/eoj/tree/luogu-style) 分支为洛谷风格完整复刻（50px 蓝粉渐变顶栏 + 240px 左侧边栏双栏布局、9 级难度色板、3-4px 小圆角扁平设计、浅色默认支持暗色切换，覆盖 20+ 页面）。详见该分支 README 的「Luogu 风格 UI 特性」章节。
+> **UI 主题**：本仓库提供三种前端视觉风格，可通过 `frontend/config.yaml` 中的 `site.theme` 字段切换：
+> - **`default`**（默认）— 暗色为主，大圆角（10px），靛蓝渐变强调色，全宽导航栏
+> - **`luogu`** — 洛谷风格复刻，50px 蓝粉渐变顶栏 + 240px 左侧边栏双栏布局，9 级难度色板，3-4px 小圆角扁平设计
+> - **`hydro`** — HydroOJ 风格，蓝色主调 `#5f9fd6`，完全扁平（border-radius: 0），极简设计，浅灰背景
 
 
 ## 技术栈
