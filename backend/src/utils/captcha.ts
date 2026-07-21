@@ -12,10 +12,31 @@ const CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0, 1 to avoid conf
 
 function randomCode(length: number): string {
   let code = '';
+  const randomValues = new Uint8Array(length);
+  crypto.getRandomValues(randomValues);
   for (let i = 0; i < length; i++) {
-    code += CHARS[Math.floor(Math.random() * CHARS.length)];
+    code += CHARS[randomValues[i] % CHARS.length];
   }
   return code;
+}
+
+// ── Crypto-secure random helpers ──
+
+function secureRandom(): number {
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return arr[0] / 0xFFFFFFFF;
+}
+
+function secureRandInt(min: number, max: number): number {
+  const range = max - min;
+  const arr = new Uint32Array(1);
+  crypto.getRandomValues(arr);
+  return min + (arr[0] % range);
+}
+
+function secureRandFloat(min: number, max: number): number {
+  return min + secureRandom() * (max - min);
 }
 
 // ── SVG rendering ──
@@ -34,7 +55,7 @@ function hsl(h: number, s: number, l: number): string {
 }
 
 function rand(min: number, max: number): number {
-  return Math.random() * (max - min) + min;
+  return secureRandFloat(min, max);
 }
 
 function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
@@ -104,15 +125,15 @@ interface MathProblem {
 
 function generateMathProblem(cfg: { length: number }): MathProblem {
   const ops = ['+', '-'];
-  const op = ops[Math.floor(Math.random() * ops.length)];
+  const op = ops[secureRandInt(0, ops.length)];
   let a: number, b: number;
 
   if (op === '+') {
-    a = Math.floor(Math.random() * 50) + 10;
-    b = Math.floor(Math.random() * 50) + 10;
+    a = secureRandInt(10, 60);
+    b = secureRandInt(10, 60);
   } else {
-    a = Math.floor(Math.random() * 80) + 20;
-    b = Math.floor(Math.random() * a) + 1; // ensure positive result
+    a = secureRandInt(20, 100);
+    b = secureRandInt(1, a);
   }
 
   const answer = op === '+' ? a + b : a - b;
