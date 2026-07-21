@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware, isAdmin } from '../middleware/auth';
 
 const training = new Hono<AppType>();
 
@@ -208,7 +208,7 @@ training.put('/:id', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Training plan not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  if ((plan as any).user_id !== user.userId && user.role !== 'admin' && user.role !== 'super_admin' && user.userId !== 1) {
+  if ((plan as any).user_id !== user.userId && !isAdmin(user)) {
     return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
   }
 

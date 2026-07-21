@@ -188,9 +188,7 @@ admin.post('/problems/import', authMiddleware, problemAdminMiddleware, async (c)
         item.judge_type === 'spj' ? (item.spj_language || null) : null,
       ).run();
 
-      if (result.meta.last_row_id) {
-        // keep reference for later use
-      }
+      // result.meta.last_row_id is available for later use if needed
     }
 
     if (Array.isArray(item?.testcases) && item.testcases.length > 0) {

@@ -148,11 +148,14 @@ problems.get('/recommend', authMiddleware, async (c) => {
   const attemptedIds = new Set((attemptedRows.results as any[]).map((r) => r.problem_id));
 
   // 5. Query candidate problems: not solved, public, with rating close to user's
-  //    Score each candidate: rating closeness, tag overlap, pass_rate signal (mid-range is better for learning)
+  //    Score each candidate: rating closeness, tag overlap, pass_rate signal
+  //    Use a generous limit (200) to avoid loading all problems into memory
   const candidates = await c.env.DB.prepare(
     `SELECT id, title, slug, tags, difficulty, rating
      FROM problems
-     WHERE is_public = 1`
+     WHERE is_public = 1
+     ORDER BY rating ASC
+     LIMIT 200`
   ).all();
 
   const recommendations: any[] = [];

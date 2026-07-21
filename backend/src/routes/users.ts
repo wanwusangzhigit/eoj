@@ -220,19 +220,37 @@ users.get('/submissions', authMiddleware, async (c) => {
 
 users.get('/solved', authMiddleware, async (c) => {
   const user = c.get('user');
-  
+  const page = Math.max(1, parseInt(c.req.query('page') || '1'));
+  const pageSize = Math.min(50, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
+  const offset = (page - 1) * pageSize;
+
+  const countResult = await c.env.DB.prepare(`
+    SELECT COUNT(DISTINCT p.id) as total
+    FROM problems p
+    JOIN submissions s ON p.id = s.problem_id
+    WHERE s.user_id = ? AND s.status = 'accepted'
+  `).bind(user.userId).first();
+  const total = (countResult as any)?.total || 0;
+
   const results = await c.env.DB.prepare(`
-    SELECT DISTINCT p.* 
+    SELECT DISTINCT p.*
     FROM problems p
     JOIN submissions s ON p.id = s.problem_id
     WHERE s.user_id = ? AND s.status = 'accepted'
     ORDER BY p.id ASC
-  `).bind(user.userId).all();
-  
+    LIMIT ? OFFSET ?
+  `).bind(user.userId, pageSize, offset).all();
+
   return c.json({
     success: true,
     data: {
       problems: results.results,
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.ceil(total / pageSize),
+      },
     },
   });
 });

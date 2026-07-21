@@ -1058,7 +1058,7 @@ class ApiClient {
   }
 
   async getTeam(slug: string) {
-    return this.request<{ team: any; members: any[] }>(`/teams/${slug}`);
+    return this.request<{ team: any; members: any[]; announcements?: any[]; user_membership?: any; join_request?: any; stats?: any }>(`/teams/${slug}`);
   }
 
   async createTeam(data: { name: string; slug: string; description?: string; avatar_url?: string; is_public?: boolean }) {
@@ -1077,7 +1077,7 @@ class ApiClient {
   }
 
   async joinTeam(id: number) {
-    return this.request<{ message: string }>(`/teams/${id}/join`, { method: 'POST' });
+    return this.request<{ message: string }>(`/teams/${id}/join`, { method: 'POST', body: '{}' });
   }
 
   async leaveTeam(id: number) {
@@ -1090,6 +1090,136 @@ class ApiClient {
 
   async getTeamRankings(id: number) {
     return this.request<{ rankings: any[] }>(`/teams/${id}/rankings`);
+  }
+
+  async transferTeam(id: number, userId: number) {
+    return this.request<{ message: string }>(`/teams/${id}/transfer`, { method: 'POST', body: JSON.stringify({ user_id: userId }) });
+  }
+
+  async updateTeamMemberRole(teamId: number, userId: number, role: string) {
+    return this.request<{ message: string }>(`/teams/${teamId}/role`, { method: 'PUT', body: JSON.stringify({ user_id: userId, role }) });
+  }
+
+  async getTeamMembers(teamId: number) {
+    return this.request<{ members: any[] }>(`/teams/${teamId}/members`);
+  }
+
+  async getTeamJoinRequests(teamId: number, status: string = 'pending') {
+    return this.request<{ requests: any[]; pagination: any }>(`/teams/${teamId}/join-requests?status=${status}`);
+  }
+
+  async approveTeamJoinRequest(teamId: number, requestId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/join-requests/${requestId}`, { method: 'PUT', body: JSON.stringify({ status: 'approved' }) });
+  }
+
+  async rejectTeamJoinRequest(teamId: number, requestId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/join-requests/${requestId}`, { method: 'PUT', body: JSON.stringify({ status: 'rejected' }) });
+  }
+
+  // ── Team Announcements ──
+  async getTeamAnnouncements(teamId: number, params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    return this.request<{ announcements: any[]; pagination: any }>(`/teams/${teamId}/announcements?${query.toString()}`);
+  }
+
+  async createTeamAnnouncement(teamId: number, data: { title: string; content: string; is_pinned?: boolean }) {
+    return this.request<{ id: number; message: string }>(`/teams/${teamId}/announcements`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateTeamAnnouncement(teamId: number, announcementId: number, data: any) {
+    return this.request<{ message: string }>(`/teams/${teamId}/announcements/${announcementId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteTeamAnnouncement(teamId: number, announcementId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/announcements/${announcementId}`, { method: 'DELETE' });
+  }
+
+  // ── Team Discussions ──
+  async getTeamDiscussions(teamId: number, params?: { page?: number; pageSize?: number; sort?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.sort) query.set('sort', params.sort);
+    return this.request<{ discussions: any[]; pagination: any }>(`/teams/${teamId}/discussions?${query.toString()}`);
+  }
+
+  async createTeamDiscussion(teamId: number, data: { title: string; content: string }) {
+    return this.request<{ id: number; message: string }>(`/teams/${teamId}/discussions`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getTeamDiscussion(teamId: number, discussionId: number) {
+    return this.request<{ discussion: any; replies: any[] }>(`/teams/${teamId}/discussions/${discussionId}`);
+  }
+
+  async replyTeamDiscussion(teamId: number, discussionId: number, content: string) {
+    return this.request<{ message: string }>(`/teams/${teamId}/discussions/${discussionId}/replies`, { method: 'POST', body: JSON.stringify({ content }) });
+  }
+
+  async deleteTeamDiscussion(teamId: number, discussionId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/discussions/${discussionId}`, { method: 'DELETE' });
+  }
+
+  // ── Team Problem Sets ──
+  async getTeamProblemSets(teamId: number, params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    return this.request<{ problem_sets: any[]; pagination: any }>(`/teams/${teamId}/problem-sets?${query.toString()}`);
+  }
+
+  async createTeamProblemSet(teamId: number, data: { title: string; description?: string; is_public?: boolean }) {
+    return this.request<{ id: number; message: string }>(`/teams/${teamId}/problem-sets`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getTeamProblemSet(teamId: number, setId: number) {
+    return this.request<{ problem_set: any; problems: any[] }>(`/teams/${teamId}/problem-sets/${setId}`);
+  }
+
+  async deleteTeamProblemSet(teamId: number, setId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/problem-sets/${setId}`, { method: 'DELETE' });
+  }
+
+  async addTeamProblemSetItem(teamId: number, setId: number, data: { problem_id: number; note?: string; sort_order?: number }) {
+    return this.request<{ message: string }>(`/teams/${teamId}/problem-sets/${setId}/items`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async removeTeamProblemSetItem(teamId: number, setId: number, itemId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/problem-sets/${setId}/items/${itemId}`, { method: 'DELETE' });
+  }
+
+  // ── Team Contests ──
+  async getTeamContests(teamId: number, params?: { page?: number; pageSize?: number; status?: string }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    if (params?.status) query.set('status', params.status);
+    return this.request<{ contests: any[]; pagination: any }>(`/teams/${teamId}/contests?${query.toString()}`);
+  }
+
+  async createTeamContest(teamId: number, data: any) {
+    return this.request<{ id: number; message: string }>(`/teams/${teamId}/contests`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async getTeamContest(teamId: number, contestId: number) {
+    return this.request<{ contest: any; problems: any[]; participant_count: number; is_registered: boolean }>(`/teams/${teamId}/contests/${contestId}`);
+  }
+
+  async registerTeamContest(teamId: number, contestId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/contests/${contestId}/register`, { method: 'POST' });
+  }
+
+  async getTeamContestRankings(teamId: number, contestId: number) {
+    return this.request<{ rankings: any[] }>(`/teams/${teamId}/contests/${contestId}/rankings`);
+  }
+
+  async addTeamContestProblem(teamId: number, contestId: number, data: { problem_id: number; sort_order?: number; score?: number }) {
+    return this.request<{ message: string }>(`/teams/${teamId}/contests/${contestId}/problems`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async removeTeamContestProblem(teamId: number, contestId: number, problemId: number) {
+    return this.request<{ message: string }>(`/teams/${teamId}/contests/${contestId}/problems/${problemId}`, { method: 'DELETE' });
   }
 
   // Blogs

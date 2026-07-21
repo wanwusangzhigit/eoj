@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { Env } from '../types';
 import { AppType } from '../types';
 import { signJWT } from '../utils/jwt';
 import { validateUsername, validateEmail } from '../utils/validator';
