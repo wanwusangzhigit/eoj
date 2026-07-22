@@ -61,6 +61,18 @@ app.use('/api/*', async (c, next) => {
 app.use('/api/*', banCheckMiddleware);
 app.use('/api/*', auditMiddleware);
 
+// Cache control for public GET endpoints
+app.use('/api/*', async (c, next) => {
+  await next();
+  if (c.req.method === 'GET' && c.res.status === 200) {
+    const path = c.req.path;
+    // Only cache public, non-admin endpoints
+    if (!path.includes('/admin/') && !path.includes('/internal/') && !path.includes('/auth/')) {
+      c.res.headers.set('Cache-Control', 'public, max-age=10, s-maxage=30');
+    }
+  }
+});
+
 app.onError((err, c) => {
   if (err instanceof SyntaxError && err.message.includes('JSON')) {
     return c.json({

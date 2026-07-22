@@ -6,6 +6,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { t } from '../../i18n';
 import {
   Users, FileText, Send, TrendingUp, CheckCircle, Swords, BookOpen, Ticket,
+  Clock, Activity,
 } from 'lucide-react';
 import '../Admin.css';
 
@@ -36,8 +37,22 @@ export default function AdminDashboard() {
     );
   }
 
+  const submissionRate = stats && stats.submissions > 0
+    ? Math.round((stats.accepted / stats.submissions) * 100) : 0;
+
   return (
     <div className="admin-dashboard">
+      <div className="dashboard-header">
+        <h1>
+          <BarChart3 size={24} />
+          {t('admin.dashboard')}
+        </h1>
+        <span className="dashboard-time">
+          <Clock size={14} />
+          {new Date().toLocaleString()}
+        </span>
+      </div>
+
       <div className="dashboard-stats">
         <div className="stat-card">
           <div className="stat-icon-wrapper blue">
@@ -68,7 +83,7 @@ export default function AdminDashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-icon-wrapper orange">
-            <TrendingUp size={24} />
+            <Activity size={24} />
           </div>
           <div className="stat-info">
             <div className="stat-number">{stats?.today_submissions ?? '-'}</div>
@@ -80,12 +95,11 @@ export default function AdminDashboard() {
             <CheckCircle size={24} />
           </div>
           <div className="stat-info">
-            <div className="stat-number">
-              {stats && stats.submissions > 0
-                ? `${Math.round((stats.accepted / stats.submissions) * 100)}%`
-                : '-'}
-            </div>
+            <div className="stat-number">{submissionRate}%</div>
             <div className="stat-label">{t('admin.acceptRate')}</div>
+            <div className="stat-bar">
+              <div className="stat-bar-fill" style={{ width: `${submissionRate}%` }} />
+            </div>
           </div>
         </div>
         <div className="stat-card">
@@ -119,12 +133,15 @@ export default function AdminDashboard() {
 
       {stats?.recent_submissions && stats.recent_submissions.length > 0 && (
         <div className="admin-recent-section">
-          <h2 className="admin-section-title">{t('admin.recentSubmissions')}</h2>
+          <h2 className="admin-section-title">
+            <Send size={18} />
+            {t('admin.recentSubmissions')}
+          </h2>
           <div className="admin-table-container">
             <div className="pm-table-header">
               <span className="pm-col pm-col-id">{t('common.id')}</span>
               <span className="pm-col pm-col-title">{t('admin.problemTitle')}</span>
-              <span className="pm-col" style={{width:'100px'}}>{t('admin.user')}</span>
+              <span className="pm-col" style={{width:'100px'}}>{t('common.admin')}</span>
               <span className="pm-col" style={{width:'80px'}}>{t('admin.status')}</span>
               <span className="pm-col" style={{width:'80px'}}>{t('admin.language')}</span>
               <span className="pm-col" style={{width:'140px'}}>{t('admin.time')}</span>
@@ -136,7 +153,7 @@ export default function AdminDashboard() {
                 <span className="pm-col" style={{width:'100px',fontSize:'12px'}}>{s.username}</span>
                 <span className="pm-col" style={{width:'80px'}}>
                   <span className={`badge ${s.status === 'accepted' ? 'badge-success' : s.status === 'pending' || s.status === 'judging' ? 'badge-info' : 'badge-error'}`}>
-                    {s.status}
+                    {s.status === 'accepted' ? 'AC' : s.status}
                   </span>
                 </span>
                 <span className="pm-col" style={{width:'80px',fontSize:'12px'}}>{s.language}</span>
