@@ -58,10 +58,64 @@ function rand(min: number, max: number): number {
   return secureRandFloat(min, max);
 }
 
+// ── 5×7 bitmap font (no <text> elements, only <path>) ──
+// Each character is a 5-wide × 7-tall grid of dots.
+// 1 = filled dot, 0 = empty
+const BITMAP_FONT: Record<string, number[]> = {
+  'A': [0,1,0,1,0, 1,0,1,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
+  'B': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
+  'C': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,1, 0,1,1,1,0],
+  'D': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
+  'E': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
+  'F': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0],
+  'G': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,1,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  'H': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
+  'J': [0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  'K': [1,0,0,0,1, 1,0,0,1,0, 1,0,1,0,0, 1,1,0,0,0, 1,0,1,0,0, 1,0,0,1,0, 1,0,0,0,1],
+  'L': [1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
+  'M': [1,0,0,0,1, 1,1,0,1,1, 1,0,1,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
+  'N': [1,0,0,0,1, 1,1,0,0,1, 1,0,1,0,1, 1,0,0,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
+  'P': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0],
+  'Q': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,1,0,1, 0,1,1,1,0, 0,0,0,1,0],
+  'R': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,1,0,0, 1,0,0,1,0, 1,0,0,0,1],
+  'S': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 0,1,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
+  'T': [1,1,1,1,1, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
+  'U': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  'V': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0],
+  'W': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,1,0,1, 1,1,0,1,1, 1,0,0,0,1],
+  'X': [1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0, 0,1,0,1,0, 1,0,0,0,1, 1,0,0,0,1],
+  'Y': [1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
+  'Z': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,1,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
+  '2': [0,1,1,1,0, 1,0,0,0,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,1,0,0,0, 1,1,1,1,1],
+  '3': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
+  '4': [0,0,0,1,0, 0,0,1,1,0, 0,1,0,1,0, 1,0,0,1,0, 1,1,1,1,1, 0,0,0,1,0, 0,0,0,1,0],
+  '5': [1,1,1,1,1, 1,0,0,0,0, 1,1,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  '6': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  '7': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
+  '8': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
+  '9': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
+};
+
+/** Render a single character as SVG path data using bitmap font */
+function charToPath(ch: string, px: number, py: number, cellW: number, cellH: number, dotR: number): string {
+  const bitmap = BITMAP_FONT[ch];
+  if (!bitmap) return '';
+  const paths: string[] = [];
+  for (let row = 0; row < 7; row++) {
+    for (let col = 0; col < 5; col++) {
+      if (bitmap[row * 5 + col]) {
+        const cx = px + col * cellW + cellW / 2;
+        const cy = py + row * cellH + cellH / 2;
+        paths.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${dotR.toFixed(1)}"/>`);
+      }
+    }
+  }
+  return paths.join('');
+}
+
 function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
   const W = opts.width || 200;
   const H = opts.height || 70;
-  const FS = opts.fontSize || 36;
   const noiseLines = opts.noiseLines ?? 8;
   const noiseDots = opts.noiseDots ?? 30;
   const rotationRange = opts.rotationRange ?? 25;
@@ -94,22 +148,26 @@ function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
     lines.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="0.6"/>`);
   }
 
-  // Characters (with individual rotation, position, color)
+  // Characters rendered as bitmap font paths (no <text> elements)
   const charWidth = W / code.length;
+  const cellW = charWidth / 6;
+  const cellH = 5;
+  const dotR = cellW * 0.55;
   for (let i = 0; i < code.length; i++) {
     const ch = code[i];
-    const x = charWidth * i + charWidth * 0.2 + rand(2, 8);
-    const y = H / 2 + rand(-8, 8);
+    const baseX = charWidth * i + charWidth * 0.15 + rand(2, 6);
+    const baseY = H / 2 - 12 + rand(-4, 4);
     const rot = rand(-rotationRange, rotationRange);
-    const fontSize = FS + rand(-6, 6);
     const hue = Math.floor(rand(0, 360));
     const sat = Math.floor(rand(50, 80));
     const lit = Math.floor(rand(30, 50));
-    lines.push(
-      `<text x="${x}" y="${y}" font-size="${fontSize}" font-family="monospace,sans-serif" ` +
-      `font-weight="bold" fill="${hsl(hue, sat, lit)}" ` +
-      `transform="rotate(${rot.toFixed(1)},${x + 8},${y - 6})" opacity="0.9">${ch}</text>`
-    );
+    const fill = hsl(hue, sat, lit);
+    const pathData = charToPath(ch, baseX, baseY, cellW, cellH, dotR);
+    if (pathData) {
+      lines.push(
+        `<g fill="${fill}" opacity="0.9" transform="rotate(${rot.toFixed(1)},${(baseX + charWidth / 2).toFixed(1)},${(baseY + 14).toFixed(1)})">${pathData}</g>`
+      );
+    }
   }
 
   lines.push('</svg>');
@@ -230,17 +288,34 @@ export async function isCaptchaRequired(db: D1Database, feature: string): Promis
 /**
  * Verify a CAPTCHA answer. Returns true if valid, false otherwise.
  * Marks the code as used (one-time) regardless of success/failure.
+ * Limits to 3 attempts per UUID, then forces expiry.
  */
 export async function verifyCaptcha(db: D1Database, uuid: string, answer: string): Promise<boolean> {
   if (!uuid || !answer) return false;
 
   const row = await db.prepare(
-    "SELECT id, answer, used FROM captcha_codes WHERE uuid = ? AND expires_at > datetime('now') AND used = 0"
+    "SELECT id, answer, used, attempts, expires_at FROM captcha_codes WHERE uuid = ?"
   ).bind(uuid).first() as any;
 
   if (!row) return false;
 
-  // Mark as used (one-time) — auto-delete after use
+  // Check TTL
+  const now = new Date().toISOString();
+  if (row.expires_at <= now) return false;
+
+  // Already used
+  if (row.used === 1) return false;
+
+  // Increment attempts counter
+  await db.prepare('UPDATE captcha_codes SET attempts = COALESCE(attempts, 0) + 1 WHERE id = ?').bind(row.id).run();
+
+  // Max 3 attempts per UUID
+  if ((row.attempts || 0) >= 3) {
+    await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
+    return false;
+  }
+
+  // Mark as used (one-time)
   await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
 
   // Compare (case-insensitive)

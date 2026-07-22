@@ -40,7 +40,8 @@ export default defineConfig({
   },
   base: isProduction ? '/' : '/',
   build: {
-    // ASSETS 模式下不拆分 chunk，生成单一入口
+    minify: 'esbuild',
+    sourcemap: false,
     rollupOptions: isProduction ? {
       output: {
         manualChunks: undefined,
