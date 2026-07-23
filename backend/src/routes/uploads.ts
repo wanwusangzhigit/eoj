@@ -338,3 +338,63 @@ uploads.delete('/:id', authMiddleware, async (c) => {
 });
 
 export default uploads;
+
+// Avatar upload endpoint (reuses image upload logic)
+uploads.post('/avatar', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const formData = await c.req.formData();
+  const file = formData.get('file') as File | null;
+
+  if (!file) {
+    return c.json({ success: false, error: { message: 'No file uploaded', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+    return c.json({ success: false, error: { message: 'Invalid image type. Allowed: JPEG, PNG, GIF, WebP, SVG', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (file.size > MAX_IMAGE_SIZE) {
+    return c.json({ success: false, error: { message: 'Image too large. Max 5MB', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const buffer = await file.arrayBuffer();
+  const base64 = encodeBase64(buffer);
+  const ext = file.name.split('.').pop() || 'png';
+  const filename = `avatars/${user.userId}_${Date.now()}.${ext}`;
+
+  // Save to GitHub (same as image upload)
+  try {
+    const githubResponse = await fetch(
+      `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${filename}`,
+      {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
+          'User-Agent': 'OJ-System',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: `Upload avatar for user ${user.userId}`,
+          content: base64,
+        }),
+      }
+    );
+
+    if (!githubResponse.ok) {
+      const err = await githubResponse.json();
+      console.error('GitHub upload error:', err);
+      return c.json({ success: false, error: { message: 'Failed to upload avatar', code: 'INTERNAL_ERROR' } }, 500);
+    }
+
+    const githubData = (await githubResponse.json()) as { content: { download_url: string } };
+    const avatarUrl = githubData.content.download_url;
+
+    // Update user's avatar_url
+    await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(avatarUrl, user.userId).run();
+
+    return c.json({ success: true, data: { avatar_url: avatarUrl, message: 'Avatar updated' } });
+  } catch (e) {
+    console.error('Avatar upload error:', e);
+    return c.json({ success: false, error: { message: 'Failed to upload avatar', code: 'INTERNAL_ERROR' } }, 500);
+  }
+});

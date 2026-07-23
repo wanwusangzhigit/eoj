@@ -74,6 +74,8 @@ const AdminAds = lazy(() => import('./pages/admin/AdminAds'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const Terms = lazy(() => import('./pages/Terms'));
 const Contact = lazy(() => import('./pages/Contact'));
+const UserSettings = lazy(() => import('./pages/UserSettings'));
+const SubmissionCompare = lazy(() => import('./pages/SubmissionCompare'));
 
 function App() {
   const { fetchUser, token } = useAuthStore();
@@ -95,6 +97,7 @@ function App() {
             <Route path="/problems/:slug" element={<ProblemDetail />} />
             <Route path="/submissions" element={<Submissions />} />
             <Route path="/submissions/:id" element={<SubmissionDetail />} />
+            <Route path="/submissions/compare/:id1/:id2" element={<SubmissionCompare />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/users/:username" element={<Profile />} />
@@ -162,6 +165,7 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/settings" element={<UserSettings />} />
             <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

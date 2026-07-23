@@ -5,8 +5,8 @@ import { usePermissions } from '../../hooks/usePermissions';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { t } from '../../i18n';
 import {
-  Users, FileText, Send, TrendingUp, CheckCircle, Swords, BookOpen, Ticket,
-  Clock, Activity,
+  Users, FileText, Send, CheckCircle, Swords, BookOpen, Ticket,
+  Clock, Activity, BarChart3,
 } from 'lucide-react';
 import '../Admin.css';
 

@@ -25,6 +25,12 @@ import messages from './routes/messages';
 import teams from './routes/teams';
 import blogs from './routes/blogs';
 import captcha from './routes/captcha';
+import notes from './routes/notes';
+import achievements from './routes/achievements';
+import search from './routes/search';
+import templates from './routes/templates';
+import userSettings from './routes/userSettings';
+import collections from './routes/collections';
 import { seedDatabase } from './seed';
 import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 
@@ -138,6 +144,12 @@ api.route('/messages', messages);
 api.route('/teams', teams);
 api.route('/blogs', blogs);
 api.route('/captcha', captcha);
+api.route('/notes', notes);
+api.route('/achievements', achievements);
+api.route('/search', search);
+api.route('/templates', templates);
+api.route('/user/settings', userSettings);
+api.route('/collections', collections);
 
 app.route('/api/v1', api);
 

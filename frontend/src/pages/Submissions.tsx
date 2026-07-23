@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth';
 import StatusBadge from '../components/StatusBadge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
-import { Filter, Inbox, Search, LogIn, AlertCircle } from 'lucide-react';
+import { Filter, Inbox, Search, LogIn, AlertCircle, Download } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import './Submissions.css';
@@ -128,6 +128,9 @@ export default function Submissions() {
             <option value="java">Java</option>
             <option value="javascript">JavaScript</option>
           </select>
+          <button className="btn btn-secondary btn-sm" onClick={() => window.open('/api/v1/submissions/export?format=csv', '_blank')} title="导出提交记录">
+            <Download size={14} /> 导出
+          </button>
         </div>
       </div>
 

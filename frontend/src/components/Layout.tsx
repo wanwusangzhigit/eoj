@@ -8,6 +8,7 @@ import { useThemeStore } from '../store/theme';
 import { useSettingsStore } from '../store/settings';
 import { useAuthStore } from '../store/auth';
 import { useSiteConfig } from '../hooks/useSiteConfig';
+import { useContestNotifications } from '../hooks/useContestNotifications';
 import { api } from '../api/client';
 import { t } from '../i18n';
 import './Layout.css';
@@ -53,6 +54,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     const timer = setInterval(fetchUnread, 30000);
     return () => clearInterval(timer);
   }, [user]);
+
+  // Contest notifications
+  useContestNotifications();
 
   // Global keyboard shortcuts
   useEffect(() => {

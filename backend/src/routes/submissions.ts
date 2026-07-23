@@ -243,6 +243,40 @@ submissions.get('/:id/logs', authMiddleware, async (c) => {
   return c.json({ success: true, data: { logs: results.results } });
 });
 
+// Compare two submissions (side-by-side)
+submissions.get('/compare/:id1/:id2', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const id1 = parseInt(c.req.param('id1') || '0');
+  const id2 = parseInt(c.req.param('id2') || '0');
+  const isAdmin = user.role === 'admin' || user.role === 'super_admin';
+
+  const [s1, s2] = await Promise.all([
+    c.env.DB.prepare(
+      `SELECT s.id, s.user_id, s.problem_id, s.language, s.source_code, s.status, s.score, s.created_at,
+              u.username, p.title as problem_title
+       FROM submissions s JOIN users u ON s.user_id = u.id JOIN problems p ON s.problem_id = p.id
+       WHERE s.id = ?`
+    ).bind(id1).first(),
+    c.env.DB.prepare(
+      `SELECT s.id, s.user_id, s.problem_id, s.language, s.source_code, s.status, s.score, s.created_at,
+              u.username, p.title as problem_title
+       FROM submissions s JOIN users u ON s.user_id = u.id JOIN problems p ON s.problem_id = p.id
+       WHERE s.id = ?`
+    ).bind(id2).first(),
+  ]);
+
+  if (!s1 || !s2) {
+    return c.json({ success: false, error: { message: 'Submission not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  // Check permissions
+  if (!isAdmin && ((s1 as any).user_id !== user.userId || (s2 as any).user_id !== user.userId)) {
+    return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+  }
+
+  return c.json({ success: true, data: { submission_a: s1, submission_b: s2 } });
+});
+
 // Rejudge endpoint (admin only)
 submissions.post('/:id/rejudge', authMiddleware, adminMiddleware, async (c) => {
   const id = parseInt(c.req.param('id') || '0');
@@ -318,6 +352,37 @@ submissions.post('/:id/rejudge', authMiddleware, adminMiddleware, async (c) => {
   }
 
   return c.json({ success: true, data: { submission_id: id, status: 'pending', message: 'Rejudge triggered' } });
+});
+
+// GET /submissions/export — 导出当前用户的提交记录（CSV格式）
+submissions.get('/export', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const format = c.req.query('format') || 'csv';
+
+  const results = await c.env.DB.prepare(
+    `SELECT s.id, s.problem_id, s.language, s.status, s.score, s.time_used, s.memory_used, s.created_at,
+            p.title as problem_title, p.slug as problem_slug
+     FROM submissions s
+     JOIN problems p ON s.problem_id = p.id
+     WHERE s.user_id = ?
+     ORDER BY s.created_at DESC`
+  ).bind(user.userId).all();
+
+  const rows = results.results as any[];
+
+  if (format === 'json') {
+    return c.json({ success: true, data: { submissions: rows } });
+  }
+
+  // CSV format
+  const header = 'ID,Problem,Language,Status,Score,Time,Memory,Date\n';
+  const csv = header + rows.map((r) =>
+    `${r.id},"${r.problem_title}",${r.language},${r.status},${r.score || 0},${r.time_used || 0},${r.memory_used || 0},${r.created_at}`
+  ).join('\n');
+
+  c.header('Content-Type', 'text/csv; charset=utf-8');
+  c.header('Content-Disposition', `attachment; filename="submissions_${user.userId}.csv"`);
+  return c.body(csv);
 });
 
 export default submissions;

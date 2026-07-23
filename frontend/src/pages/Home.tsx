@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
 import {
   Megaphone, X, Target, Swords, BookOpen, MessageSquare,
-  ChevronRight, Calendar, Quote, AlertCircle, RefreshCw, Sparkles
+  ChevronRight, Calendar, Quote, AlertCircle, RefreshCw, Sparkles, Trophy,
 } from 'lucide-react';
 import { DIFFICULTY_COLORS } from '../constants';
 import { t } from '../i18n';
@@ -35,6 +35,7 @@ export default function Home() {
   const [recentLists, setRecentLists] = useState<any[]>([]);
   const [recentDiscussions, setRecentDiscussions] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [topUsers, setTopUsers] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState('');
   const [fetchError, setFetchError] = useState(false);
   useDocumentTitle(t('home.title'));
@@ -52,6 +53,7 @@ export default function Home() {
     fetchAll();
     fetchHitokoto();
     if (user) fetchRecommendations();
+    fetchTopUsers();
   }, [user]);
 
   const fetchAll = async () => {
@@ -104,6 +106,15 @@ export default function Home() {
       setRecommendations(data.recommendations || []);
     } catch (e) {
       // ignore — recommendations are optional
+    }
+  };
+
+  const fetchTopUsers = async () => {
+    try {
+      const data = await api.getRankings(10);
+      setTopUsers(data.rankings || []);
+    } catch {
+      // ignore
     }
   };
 
@@ -339,6 +350,27 @@ export default function Home() {
             )}
           </div>
         </div>
+
+        {/* Top Users */}
+        {topUsers.length > 0 && (
+          <div className="home-card">
+            <div className="home-card-header">
+              <h2><Trophy size={18} /> 排行榜 Top 10</h2>
+              <Link to="/rankings" className="home-card-more">{t('home.viewAll')} <ChevronRight size={14} /></Link>
+            </div>
+            <div className="home-card-body">
+              {topUsers.map((u: any, idx: number) => (
+                <Link key={u.user_id || idx} to={`/users/${u.username}`} className="home-item">
+                  <span className="home-item-rank" style={{ fontWeight: 700, color: idx < 3 ? 'var(--gold)' : 'var(--text-muted)', width: 24 }}>
+                    {idx + 1}
+                  </span>
+                  <span className="home-item-title">{u.username}</span>
+                  <span className="home-item-meta">{u.solved_count || 0} 题</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

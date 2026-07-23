@@ -6,7 +6,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { DIFFICULTY_COLORS } from '../../constants';
 import { t } from '../../i18n';
 import {
-  Plus, Save, Trash2, X, ChevronUp, ChevronDown,
+  Plus, Save, Trash2, X, ChevronUp, ChevronDown, Upload,
 } from 'lucide-react';
 import '../Admin.css';
 
@@ -56,6 +56,34 @@ export default function AdminTestcases() {
 
   const handleAddTestcaseRow = () => {
     setTestcases([...testcases, { input: '', expected_output: '', is_sample: false, score: 10 }]);
+  };
+
+  const handleBatchUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        const batch = Array.isArray(data) ? data : [data];
+        const parsed = batch.map((item: any) => ({
+          input: item.input || '',
+          expected_output: item.expected_output || item.output || '',
+          is_sample: item.is_sample || false,
+          score: item.score || 10,
+        }));
+        if (parsed.length === 0) {
+          addToast('error', '文件中没有有效的测试数据');
+          return;
+        }
+        setTestcases(parsed);
+        addToast('success', `已导入 ${parsed.length} 个测试用例`);
+      } catch {
+        addToast('error', 'JSON 格式错误');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   const handleSaveTestcases = async () => {
@@ -297,6 +325,10 @@ export default function AdminTestcases() {
               </div>
             ))}
             <div className="form-actions">
+              <label className="btn btn-secondary" style={{ cursor: 'pointer' }}>
+                <Upload size={14} /> 批量导入
+                <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleBatchUpload} />
+              </label>
               <button className="btn btn-secondary" onClick={handleAddTestcaseRow}>
                 <Plus size={14} /> {t('admin.addTestcase')}
               </button>
