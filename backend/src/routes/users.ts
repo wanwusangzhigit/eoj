@@ -486,10 +486,16 @@ users.put('/profile', authMiddleware, async (c) => {
   const body: any = await c.req.json();
   const avatarUrl = body.avatar_url;
   const bio = body.bio;
+  const signature = body.signature;
 
   // Validate bio length
   if (bio !== undefined && bio.length > 500) {
     return c.json({ success: false, error: { message: 'Bio too long (max 500 characters)', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // Validate signature length
+  if (signature !== undefined && signature.length > 200) {
+    return c.json({ success: false, error: { message: 'Signature too long (max 200 characters)', code: 'BAD_REQUEST' } }, 400);
   }
 
   // Build update query dynamically
@@ -497,6 +503,7 @@ users.put('/profile', authMiddleware, async (c) => {
   const params: any[] = [];
   if (avatarUrl !== undefined) { updates.push('avatar_url = ?'); params.push(avatarUrl); }
   if (bio !== undefined) { updates.push('bio = ?'); params.push(bio); }
+  if (signature !== undefined) { updates.push('signature = ?'); params.push(signature); }
 
   if (updates.length === 0) {
     return c.json({ success: false, error: { message: 'No fields to update', code: 'BAD_REQUEST' } }, 400);
@@ -505,7 +512,7 @@ users.put('/profile', authMiddleware, async (c) => {
   params.push(user.userId);
   await c.env.DB.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).bind(...params).run();
 
-  const updatedUser = await c.env.DB.prepare('SELECT id, username, avatar_url, bio, role, created_at FROM users WHERE id = ?').bind(user.userId).first();
+  const updatedUser = await c.env.DB.prepare('SELECT id, username, avatar_url, bio, signature, role, created_at FROM users WHERE id = ?').bind(user.userId).first();
   return c.json({ success: true, data: { user: updatedUser } });
 });
 

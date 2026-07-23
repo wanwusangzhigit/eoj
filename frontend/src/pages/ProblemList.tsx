@@ -20,6 +20,8 @@ export default function ProblemList() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [selectedTag, setSelectedTag] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
+  const [passRateFilter, setPassRateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -34,7 +36,7 @@ export default function ProblemList() {
       fetchUserProgress();
     }
     fetchTags();
-  }, [page, debouncedSearch, selectedTag, selectedDifficulty, user]);
+  }, [page, debouncedSearch, selectedTag, selectedDifficulty, passRateFilter, statusFilter, user]);
 
   const fetchTags = async () => {
     try {
@@ -114,6 +116,8 @@ export default function ProblemList() {
     setDebouncedSearch('');
     setSelectedTag('');
     setSelectedDifficulty('');
+    setPassRateFilter('');
+    setStatusFilter('');
     setPage(1);
   };
 
@@ -166,9 +170,32 @@ export default function ProblemList() {
             )}
           </div>
         )}
+
+        {user && (
+          <div className="status-filter">
+            <Filter size={14} />
+            <span className="filter-label">状态:</span>
+            <select className="filter-select" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}>
+              <option value="">全部</option>
+              <option value="accepted">已通过</option>
+              <option value="attempted">已尝试</option>
+            </select>
+          </div>
+        )}
+
+        <div className="passrate-filter">
+          <Filter size={14} />
+          <span className="filter-label">通过率:</span>
+          <select className="filter-select" value={passRateFilter} onChange={(e) => { setPassRateFilter(e.target.value); setPage(1); }}>
+            <option value="">全部</option>
+            <option value="high">高 (&gt;60%)</option>
+            <option value="medium">中 (30-60%)</option>
+            <option value="low">低 (&lt;30%)</option>
+          </select>
+        </div>
       </div>
 
-      {(selectedTag || selectedDifficulty || debouncedSearch) && (
+      {(selectedTag || selectedDifficulty || debouncedSearch || passRateFilter || statusFilter) && (
         <button className="clear-filters-btn" onClick={clearFilters}>
           {t('problemList.clearFilters')}
         </button>

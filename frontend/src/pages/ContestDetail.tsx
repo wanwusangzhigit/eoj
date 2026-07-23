@@ -469,11 +469,13 @@ export default function ContestDetail() {
                 <div className="problems-table-header">
                   <span className="col-label">#</span>
                   <span className="col-title">{t('problemList.titleCol')}</span>
+                  <span className="col-difficulty" style={{width:'80px'}}>难度</span>
                   <span className="col-score">{t('admin.score')}</span>
                   <span className="col-actions">{t('common.actions')}</span>
                 </div>
                 {problems.map((problem, idx) => {
                   const label = problem.label || getProblemLabel(idx);
+                  const diffColor = problem.difficulty === 'Easy' ? 'var(--success)' : problem.difficulty === 'Medium' ? 'var(--warning)' : 'var(--error)';
                   return (
                     <div key={problem.id} className="problem-row">
                       <span className="col-label">
@@ -485,6 +487,9 @@ export default function ContestDetail() {
                       <Link to={`/problems/${problem.slug || problem.id}`} className="problem-link">
                         {problem.title}
                       </Link>
+                    </span>
+                    <span className="col-difficulty" style={{width:'80px',fontSize:'12px',color: diffColor,fontWeight:600}}>
+                      {problem.difficulty || '-'}
                     </span>
                     <span className="col-score">{problem.score ?? '-'}</span>
                     <span className="col-actions">

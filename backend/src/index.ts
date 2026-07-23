@@ -25,6 +25,12 @@ import messages from './routes/messages';
 import teams from './routes/teams';
 import blogs from './routes/blogs';
 import captcha from './routes/captcha';
+import notes from './routes/notes';
+import achievements from './routes/achievements';
+import search from './routes/search';
+import templates from './routes/templates';
+import userSettings from './routes/userSettings';
+import collections from './routes/collections';
 import { seedDatabase } from './seed';
 import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 
@@ -60,6 +66,18 @@ app.use('/api/*', async (c, next) => {
 // Ban check + audit logging for all API routes
 app.use('/api/*', banCheckMiddleware);
 app.use('/api/*', auditMiddleware);
+
+// Cache control for public GET endpoints
+app.use('/api/*', async (c, next) => {
+  await next();
+  if (c.req.method === 'GET' && c.res.status === 200) {
+    const path = c.req.path;
+    // Only cache public, non-admin endpoints
+    if (!path.includes('/admin/') && !path.includes('/internal/') && !path.includes('/auth/')) {
+      c.res.headers.set('Cache-Control', 'public, max-age=10, s-maxage=30');
+    }
+  }
+});
 
 app.onError((err, c) => {
   if (err instanceof SyntaxError && err.message.includes('JSON')) {
@@ -126,6 +144,12 @@ api.route('/messages', messages);
 api.route('/teams', teams);
 api.route('/blogs', blogs);
 api.route('/captcha', captcha);
+api.route('/notes', notes);
+api.route('/achievements', achievements);
+api.route('/search', search);
+api.route('/templates', templates);
+api.route('/user/settings', userSettings);
+api.route('/collections', collections);
 
 app.route('/api/v1', api);
 

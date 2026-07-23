@@ -157,9 +157,6 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
             <NavLink to="/rankings" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               <Trophy size={16} />{t('nav.rankings')}
             </NavLink>
-            <NavLink to="/lists" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-              <BookOpen size={16} />{t('nav.lists')}
-            </NavLink>
             <NavLink to="/training" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               <GraduationCap size={16} />{t('nav.training')}
             </NavLink>
@@ -175,19 +172,8 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
               </NavLink>
             )}
             {user && (
-              <NavLink to="/messages" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-                <Mail size={16} />{t('nav.messages')}
-                {effectiveUnread > 0 && <span className="nav-unread-pill">{effectiveUnread > 99 ? '99+' : effectiveUnread}</span>}
-              </NavLink>
-            )}
-            {user && (
               <NavLink to="/submissions" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
                 <ListChecks size={16} />{t('nav.submissions')}
-              </NavLink>
-            )}
-            {user && (
-              <NavLink to="/tickets" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
-                <Ticket size={16} />{t('nav.tickets')}
               </NavLink>
             )}
             {user && (
@@ -212,6 +198,22 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
             )}
           </div>
         </nav>
+
+        {/* Global Search Bar */}
+        <div className="header-search-wrapper">
+          <Search size={14} className="header-search-icon" />
+          <input
+            type="text"
+            className="header-search-input"
+            placeholder="搜索题目、用户、博客..."
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                const q = (e.target as HTMLInputElement).value.trim();
+                if (q) navigate(`/problems?search=${encodeURIComponent(q)}`);
+              }
+            }}
+          />
+        </div>
 
         <button className="mobile-menu-btn" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label={mobileMenuOpen ? t('nav.closeMenu') : t('nav.openMenu')}>
           {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}

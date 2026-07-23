@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
+import { useToastStore } from '../store/toast';
 import StatusBadge from '../components/StatusBadge';
 import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
@@ -9,7 +10,7 @@ import RatingChart from '../components/RatingChart';
 import { DIFFICULTY_COLORS } from '../constants';
 import RatingBadge from '../components/RatingBadge';
 import { getRatingColor, getRatingTier } from '../utils/rating';
-import { Trophy, Target, Clock, Calendar, UserX, Swords, Edit3, Key, X, Check, Mail, Users, TrendingUp } from 'lucide-react';
+import { Trophy, Target, Clock, Calendar, UserX, Swords, Edit3, Key, X, Check, Mail, Users, TrendingUp, Award } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import FollowButton from '../components/FollowButton';
@@ -18,6 +19,7 @@ import './Profile.css';
 export default function Profile() {
   const { username } = useParams<{ username?: string }>();
   const { user: currentUser, fetchUser } = useAuthStore();
+  const addToast = useToastStore((s) => s.addToast);
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +29,13 @@ export default function Profile() {
   const [heatmap, setHeatmap] = useState<Record<string, number>>({});
   const [ratingHistory, setRatingHistory] = useState<any[]>([]);
   const [ratingInfo, setRatingInfo] = useState<{ rating: number; max_rating: number } | null>(null);
+  const [achievements, setAchievements] = useState<any[]>([]);
 
   // Edit profile state
   const [editing, setEditing] = useState(false);
   const [editAvatar, setEditAvatar] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editSignature, setEditSignature] = useState('');
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
 
@@ -110,6 +114,13 @@ export default function Profile() {
       } catch {
         // user has no rating history yet — ignore
       }
+      // Fetch achievements
+      try {
+        const achData = await api.getAchievements();
+        setAchievements(achData.achievements || []);
+      } catch {
+        // ignore
+      }
     };
     if (data?.user) fetchExtraData();
   }, [data?.user]);
@@ -128,6 +139,7 @@ export default function Profile() {
   const startEditing = () => {
     setEditAvatar(user.avatar_url || '');
     setEditBio(user.bio || '');
+    setEditSignature(user.signature || '');
     setEditError('');
     setEditing(true);
   };
@@ -136,7 +148,7 @@ export default function Profile() {
     setEditSaving(true);
     setEditError('');
     try {
-      const result = await api.updateProfile({ avatar_url: editAvatar, bio: editBio });
+      const result = await api.updateProfile({ avatar_url: editAvatar, bio: editBio, signature: editSignature });
       setData({ ...data, user: result.user });
       await fetchUser();
       setEditing(false);
@@ -204,15 +216,37 @@ export default function Profile() {
           <div className="profile-edit-form">
             <div className="form-group">
               <label htmlFor="edit-avatar">{t('profile.avatarUrl')}</label>
-              <input
-                id="edit-avatar"
-                type="text"
-                className="form-input"
-                value={editAvatar}
-                onChange={(e) => setEditAvatar(e.target.value)}
-                placeholder={t('profile.avatarUrlPlaceholder')}
-                autoComplete="off"
-              />
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input
+                  id="edit-avatar"
+                  type="text"
+                  className="form-input"
+                  value={editAvatar}
+                  onChange={(e) => setEditAvatar(e.target.value)}
+                  placeholder={t('profile.avatarUrlPlaceholder')}
+                  autoComplete="off"
+                  style={{ flex: 1 }}
+                />
+                <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                  上传
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: 'none' }}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      try {
+                        const result = await api.uploadAvatar(file);
+                        setEditAvatar(result.avatar_url);
+                        addToast('success', '头像已上传');
+                      } catch (err: any) {
+                        addToast('error', err.message || '上传失败');
+                      }
+                    }}
+                  />
+                </label>
+              </div>
             </div>
             <div className="form-group">
               <label htmlFor="edit-bio">{t('profile.bio')}</label>
@@ -226,6 +260,19 @@ export default function Profile() {
                 rows={3}
               />
               <div className="char-count">{editBio.length}/500</div>
+            </div>
+            <div className="form-group">
+              <label htmlFor="edit-signature">个性签名</label>
+              <input
+                id="edit-signature"
+                type="text"
+                className="form-input"
+                value={editSignature}
+                onChange={(e) => setEditSignature(e.target.value)}
+                placeholder="一句话介绍自己..."
+                maxLength={200}
+              />
+              <div className="char-count">{editSignature.length}/200</div>
             </div>
             {editError && <div className="form-error">{editError}</div>}
             <div className="form-actions">
@@ -253,6 +300,7 @@ export default function Profile() {
                 </div>
               )}
               {user.bio && <p className="profile-bio">{user.bio}</p>}
+              {user.signature && <p className="profile-signature" style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', marginTop: 4 }}>「{user.signature}」</p>}
               <div className="profile-meta">
                 <span className="meta-item">
                   <Calendar size={14} />
@@ -316,6 +364,54 @@ export default function Profile() {
         </div>
       </div>
 
+      {achievements.length > 0 && (
+        <div className="profile-achievements-section">
+          <h2 className="section-title">
+            <Award size={18} />
+            成就徽章
+          </h2>
+          <div className="achievements-grid">
+            {achievements.map((ach: any) => (
+              <div key={ach.key} className={`achievement-card ${ach.earned ? 'earned' : 'locked'}`}>
+                <span className="achievement-icon">{ach.icon}</span>
+                <span className="achievement-name">{ach.title}</span>
+                <span className="achievement-desc">{ach.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {stats && (
+        <div className="profile-submission-stats">
+          <h2 className="section-title">
+            <TrendingUp size={18} />
+            提交统计
+          </h2>
+          <div className="submission-stats-bars">
+            {[
+              { label: '已通过', key: 'accepted', count: stats.solved_count, color: 'var(--success)' },
+              { label: '总提交', key: 'total', count: stats.total_submissions, color: 'var(--accent)' },
+              { label: '尝试题目', key: 'attempted', count: stats.attempted_count, color: 'var(--warning)' },
+            ].map((item) => {
+              const maxVal = Math.max(stats.total_submissions, stats.attempted_count, stats.solved_count, 1);
+              const pct = Math.round((item.count / maxVal) * 100);
+              return (
+                <div key={item.key} className="stat-bar-item">
+                  <div className="stat-bar-header">
+                    <span className="stat-bar-label">{item.label}</span>
+                    <span className="stat-bar-count">{item.count}</span>
+                  </div>
+                  <div className="stat-bar-track">
+                    <div className="stat-bar-fill" style={{ width: `${pct}%`, background: item.color }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {ratingHistory.length > 0 && (
         <div className="profile-rating-section">
           <h2 className="section-title">
@@ -328,7 +424,43 @@ export default function Profile() {
 
       {isOwnProfile && Object.keys(heatmap).length > 0 && (
         <div className="heatmap-section">
-          <h2 className="section-title">{t('profile.activityHeatmap')}</h2>
+          <h2 className="section-title">
+            <Calendar size={18} />
+            {t('profile.activityHeatmap')}
+          </h2>
+          <div className="heatmap-stats" style={{display:'flex',gap:16,marginBottom:12,flexWrap:'wrap'}}>
+            {(() => {
+              const values = Object.values(heatmap) as number[];
+              const total = values.reduce((a, b) => a + b, 0);
+              const activeDays = values.filter(v => v > 0).length;
+              let longestStreak = 0, currentStreak = 0;
+              const dates = Object.keys(heatmap).sort();
+              for (let i = 0; i < dates.length; i++) {
+                if (heatmap[dates[i]] > 0) {
+                  currentStreak++;
+                  longestStreak = Math.max(longestStreak, currentStreak);
+                } else {
+                  currentStreak = 0;
+                }
+              }
+              return (
+                <>
+                  <div className="stat-card mini" style={{flex:1,minWidth:120,padding:12,textAlign:'center',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--radius)'}}>
+                    <div className="stat-value" style={{fontSize:20,fontWeight:700}}>{total}</div>
+                    <div className="stat-label" style={{fontSize:12,color:'var(--text-secondary)'}}>总提交</div>
+                  </div>
+                  <div className="stat-card mini" style={{flex:1,minWidth:120,padding:12,textAlign:'center',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--radius)'}}>
+                    <div className="stat-value" style={{fontSize:20,fontWeight:700}}>{activeDays}</div>
+                    <div className="stat-label" style={{fontSize:12,color:'var(--text-secondary)'}}>活跃天数</div>
+                  </div>
+                  <div className="stat-card mini" style={{flex:1,minWidth:120,padding:12,textAlign:'center',background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--radius)'}}>
+                    <div className="stat-value" style={{fontSize:20,fontWeight:700}}>{longestStreak}</div>
+                    <div className="stat-label" style={{fontSize:12,color:'var(--text-secondary)'}}>最长连续</div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
           <div className="heatmap-grid">
             {(() => {
               const now = new Date();

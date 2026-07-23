@@ -45,10 +45,12 @@ export default function ProblemDetail() {
   const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
   const [prevProblem, setPrevProblem] = useState<any>(null);
   const [nextProblem, setNextProblem] = useState<any>(null);
+  const [relatedProblems, setRelatedProblems] = useState<any[]>([]);
+  const [problemLanguages, setProblemLanguages] = useState<any[]>([]);
   useDocumentTitle(problem?.title);
 
   // ── Tab state ──
-  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'discussions'>('description');
+  const [activeTab, setActiveTab] = useState<'description' | 'solutions' | 'discussions' | 'notes'>('description');
 
   // ── Solutions state ──
   const [solutions, setSolutions] = useState<any[]>([]);
@@ -122,6 +124,20 @@ export default function ProblemDetail() {
       .finally(() => {
         if (isMountedRef.current) setLoading(false);
       });
+
+    // Fetch related problems
+    api.getRelatedProblems(slug)
+      .then((data) => {
+        if (isMountedRef.current) setRelatedProblems(data.problems || []);
+      })
+      .catch(() => {});
+
+    // Fetch language distribution
+    api.getProblemLanguages(slug)
+      .then((data) => {
+        if (isMountedRef.current) setProblemLanguages(data.languages || []);
+      })
+      .catch(() => {});
   }, [slug]);
 
   // ── Fetch user-specific data when user + problem are available ──
@@ -400,10 +416,20 @@ export default function ProblemDetail() {
     }
   };
 
-  const handleLanguageChange = (lang: string) => {
+  const handleLanguageChange = async (lang: string) => {
     const isTemplate = Object.values(LANGUAGE_TEMPLATES).some(tmpl => tmpl === sourceCode);
     if (isTemplate) {
-      setSourceCode(LANGUAGE_TEMPLATES[lang] || '');
+      // Try to load user's saved template
+      try {
+        const data = await api.getTemplate(lang);
+        if (data.template?.content) {
+          setSourceCode(data.template.content);
+        } else {
+          setSourceCode(LANGUAGE_TEMPLATES[lang] || '');
+        }
+      } catch {
+        setSourceCode(LANGUAGE_TEMPLATES[lang] || '');
+      }
     }
     setLanguage(lang);
   };
@@ -729,6 +755,20 @@ export default function ProblemDetail() {
               <span className={`meta-item pass-rate ${stats.pass_rate != null ? (stats.pass_rate >= 0.6 ? 'high' : stats.pass_rate >= 0.3 ? 'medium' : 'low') : ''}`}>
                 {t('problemDetail.passRate')}: {stats.pass_rate != null ? `${Math.round(stats.pass_rate * 100)}%` : 'N/A'}
               </span>
+              {stats.submission_count > 0 && (
+                <div className="submission-stats-bar">
+                  <div className="stat-bar-track">
+                    <div
+                      className="stat-bar-fill accepted"
+                      style={{ width: `${stats.submission_count > 0 ? (stats.accepted_count / stats.submission_count) * 100 : 0}%` }}
+                      title={`AC: ${stats.accepted_count}`}
+                    />
+                  </div>
+                  <span className="stat-bar-label">
+                    {Math.round(stats.submission_count > 0 ? (stats.accepted_count / stats.submission_count) * 100 : 0)}%
+                  </span>
+                </div>
+              )}
             </>
           )}
           {(() => {
@@ -741,6 +781,40 @@ export default function ProblemDetail() {
             } catch { return null; }
           })()}
         </div>
+
+        {relatedProblems.length > 0 && (
+          <div className="related-problems-section">
+            <h3>关联题目</h3>
+            <div className="related-problems-list">
+              {relatedProblems.map((p: any) => (
+                <Link key={p.id} to={`/problems/${p.slug}`} className="related-problem-item">
+                  <span className="related-problem-title">{p.title}</span>
+                  <span className="related-problem-difficulty">{p.difficulty}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {problemLanguages.length > 0 && (
+          <div className="problem-languages-section">
+            <h3>提交语言分布</h3>
+            <div className="language-bars" style={{display:'flex',flexDirection:'column',gap:8,margin:'12px 0'}}>
+              {(() => {
+                const total = problemLanguages.reduce((s: number, l: any) => s + l.count, 0);
+                return problemLanguages.map((lang: any) => (
+                  <div key={lang.language} className="language-bar-item" style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{width:80,fontSize:13,color:'var(--text-secondary)'}}>{lang.language}</span>
+                    <div style={{flex:1,height:16,background:'var(--bg-tertiary)',borderRadius:8,overflow:'hidden'}}>
+                      <div style={{width:`${(lang.count / total) * 100}%`,height:'100%',background:'var(--accent)',borderRadius:8,transition:'width 0.3s'}} />
+                    </div>
+                    <span style={{width:40,fontSize:12,color:'var(--text-muted)',textAlign:'right'}}>{lang.count}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
 
         <div className="problem-description">
           <h3>{t('problemDetail.description')}</h3>
@@ -800,6 +874,15 @@ export default function ProblemDetail() {
             <MessageSquare size={14} />
             {t('problemDetail.tabDiscussions')}
           </button>
+          {user && (
+            <button
+              className={`problem-tab ${activeTab === 'notes' ? 'active' : ''}`}
+              onClick={() => setActiveTab('notes')}
+            >
+              <BookOpen size={14} />
+              笔记
+            </button>
+          )}
         </div>
 
         {/* ── Solutions Tab Content ── */}

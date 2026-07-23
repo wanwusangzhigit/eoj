@@ -145,6 +145,14 @@ class ApiClient {
     return this.request<{ problem: any; sampleTestcases: any[]; stats: any }>(`/problems/${slug}`);
   }
 
+  async getProblemLanguages(slug: string) {
+    return this.request<{ languages: any[] }>(`/problems/${slug}/languages`);
+  }
+
+  async getRelatedProblems(slug: string, limit = 5) {
+    return this.request<{ problems: any[] }>(`/problems/${slug}/related?limit=${limit}`);
+  }
+
   async createProblem(data: any) {
     return this.request<{ id: number; message: string }>('/problems', {
       method: 'POST',
@@ -194,6 +202,14 @@ class ApiClient {
 
   async getSubmissionLogs(id: number) {
     return this.request<{ logs: any[] }>(`/submissions/${id}/logs`);
+  }
+
+  async exportSubmissions(format: 'csv' | 'json' = 'csv') {
+    return this.request<{ submissions?: any[] } | string>(`/submissions/export?format=${format}`);
+  }
+
+  async compareSubmissions(id1: number, id2: number) {
+    return this.request<{ submission_a: any; submission_b: any }>(`/submissions/compare/${id1}/${id2}`);
   }
 
   async rejudgeSubmission(id: number) {
@@ -281,6 +297,35 @@ class ApiClient {
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
     const qs = query.toString();
     return this.request<{ problems: any[]; pagination: any }>(`/problems/user/favorites${qs ? `?${qs}` : ''}`);
+  }
+
+  // ── Problem Collections ──
+  async getCollections() {
+    return this.request<{ collections: any[] }>(`/collections`);
+  }
+
+  async createCollection(data: { name: string; description?: string; is_public?: boolean }) {
+    return this.request<{ id: number; message: string }>('/collections', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateCollection(id: number, data: any) {
+    return this.request<{ message: string }>(`/collections/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteCollection(id: number) {
+    return this.request<{ message: string }>(`/collections/${id}`, { method: 'DELETE' });
+  }
+
+  async getCollectionItems(id: number) {
+    return this.request<{ collection: any; items: any[] }>(`/collections/${id}/items`);
+  }
+
+  async addCollectionItem(collectionId: number, problemId: number, note?: string) {
+    return this.request<{ message: string }>(`/collections/${collectionId}/items`, { method: 'POST', body: JSON.stringify({ problem_id: problemId, note }) });
+  }
+
+  async removeCollectionItem(collectionId: number, itemId: number) {
+    return this.request<{ message: string }>(`/collections/${collectionId}/items/${itemId}`, { method: 'DELETE' });
   }
 
   async getUserList(params?: { page?: number; pageSize?: number; search?: string }) {
@@ -664,7 +709,7 @@ class ApiClient {
     });
   }
 
-  async updateProfile(data: { avatar_url?: string; bio?: string }) {
+  async updateProfile(data: { avatar_url?: string; bio?: string; signature?: string }) {
     return this.request<{ user: any }>('/users/profile', {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -719,6 +764,15 @@ class ApiClient {
     const formData = new FormData();
     formData.append('file', file);
     return this.request<{ id: number; url: string; filename: string; original_name: string; file_type: string; size_bytes: number }>('/uploads/file', {
+      method: 'POST',
+      body: formData,
+    }, true);
+  }
+
+  async uploadAvatar(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.request<{ avatar_url: string; message: string }>('/uploads/avatar', {
       method: 'POST',
       body: formData,
     }, true);
@@ -996,6 +1050,14 @@ class ApiClient {
 
   async markAllNotificationsRead() {
     return this.request<{ message: string }>('/notifications/read-all', { method: 'POST' });
+  }
+
+  async getNotificationPreferences() {
+    return this.request<{ preferences: Record<string, string> }>('/notifications/preferences');
+  }
+
+  async saveNotificationPreferences(preferences: Record<string, string>) {
+    return this.request<{ message: string }>('/notifications/preferences', { method: 'PUT', body: JSON.stringify({ preferences }) });
   }
 
   // Follows
@@ -1419,6 +1481,70 @@ class ApiClient {
 
   async deleteConversationAdmin(id: number) {
     return this.request<{ message: string }>(`/admin/messages/conversations/${id}`, { method: 'DELETE' });
+  }
+
+  async sendSystemAnnouncement(title: string, content: string, link?: string) {
+    return this.request<{ message: string; sent: number }>(`/admin/announcement/send`, { method: 'POST', body: JSON.stringify({ title, content, link }) });
+  }
+
+  // ── Problem Notes ──
+  async getNotes(params?: { page?: number; pageSize?: number }) {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.pageSize) query.set('pageSize', String(params.pageSize));
+    return this.request<{ notes: any[]; pagination: any }>(`/notes?${query.toString()}`);
+  }
+
+  async getNote(problemId: number) {
+    return this.request<{ note: any }>(`/notes/${problemId}`);
+  }
+
+  async saveNote(problemId: number, content: string, is_public = false) {
+    return this.request<{ message: string }>(`/notes/${problemId}`, { method: 'PUT', body: JSON.stringify({ content, is_public }) });
+  }
+
+  async deleteNote(problemId: number) {
+    return this.request<{ message: string }>(`/notes/${problemId}`, { method: 'DELETE' });
+  }
+
+  // ── Achievements ──
+  async getAchievements() {
+    return this.request<{ achievements: any[] }>(`/achievements`);
+  }
+
+  async checkAchievements() {
+    return this.request<{ new_achievements: any[]; solved_count: number }>(`/achievements/check`);
+  }
+
+  // ── Search ──
+  async search(q: string, type: string = 'all') {
+    return this.request<{ results: any[]; total: number; query: string }>(`/search?q=${encodeURIComponent(q)}&type=${type}`);
+  }
+
+  // ── Code Templates ──
+  async getTemplates() {
+    return this.request<{ templates: any[] }>(`/templates`);
+  }
+
+  async getTemplate(language: string) {
+    return this.request<{ template: any }>(`/templates/${language}`);
+  }
+
+  async saveTemplate(language: string, content: string, name?: string) {
+    return this.request<{ message: string }>(`/templates/${language}`, { method: 'PUT', body: JSON.stringify({ content, name }) });
+  }
+
+  async deleteTemplate(language: string) {
+    return this.request<{ message: string }>(`/templates/${language}`, { method: 'DELETE' });
+  }
+
+  // ── User Settings ──
+  async getUserSettings() {
+    return this.request<{ settings: Record<string, string> }>(`/user/settings`);
+  }
+
+  async saveUserSettings(settings: Record<string, string>) {
+    return this.request<{ message: string }>(`/user/settings`, { method: 'PUT', body: JSON.stringify({ settings }) });
   }
 }
 

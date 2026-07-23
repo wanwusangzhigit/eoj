@@ -67,4 +67,49 @@ notifications.post('/read-all', authMiddleware, async (c) => {
   return c.json({ success: true, data: { message: 'All marked as read' } });
 });
 
+// GET /notifications/preferences — 获取通知偏好
+notifications.get('/preferences', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const results = await c.env.DB.prepare(
+    'SELECT setting_key, setting_value FROM user_settings WHERE user_id = ? AND setting_key LIKE ?'
+  ).bind(user.userId, 'notify_%').all();
+
+  const prefs: Record<string, string> = {};
+  for (const row of results.results as any[]) {
+    prefs[row.setting_key] = row.setting_value;
+  }
+
+  return c.json({ success: true, data: { preferences: prefs } });
+});
+
+// PUT /notifications/preferences — 更新通知偏好
+notifications.put('/preferences', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const body = await c.req.json();
+  const { preferences } = body;
+
+  if (!preferences || typeof preferences !== 'object') {
+    return c.json({ success: false, error: { message: 'preferences object is required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  for (const [key, value] of Object.entries(preferences)) {
+    if (!key.startsWith('notify_')) continue;
+    const existing = await c.env.DB.prepare(
+      'SELECT id FROM user_settings WHERE user_id = ? AND setting_key = ?'
+    ).bind(user.userId, key).first();
+
+    if (existing) {
+      await c.env.DB.prepare(
+        'UPDATE user_settings SET setting_value = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ? AND setting_key = ?'
+      ).bind(String(value), user.userId, key).run();
+    } else {
+      await c.env.DB.prepare(
+        'INSERT INTO user_settings (user_id, setting_key, setting_value) VALUES (?, ?, ?)'
+      ).bind(user.userId, key, String(value)).run();
+    }
+  }
+
+  return c.json({ success: true, data: { message: 'Preferences saved' } });
+});
+
 export default notifications;
