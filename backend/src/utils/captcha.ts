@@ -58,11 +58,11 @@ function rand(min: number, max: number): number {
   return secureRandFloat(min, max);
 }
 
-// ── 5×7 bitmap font (no <text> elements, only <path>) ──
+// ── 5×7 bitmap font (no <text> elements, only <circle> paths) ──
 // Each character is a 5-wide × 7-tall grid of dots.
 // 1 = filled dot, 0 = empty
 const BITMAP_FONT: Record<string, number[]> = {
-  'A': [0,1,0,1,0, 1,0,1,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
+  'A': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
   'B': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
   'C': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,1, 0,1,1,1,0],
   'D': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
@@ -116,6 +116,7 @@ function charToPath(ch: string, px: number, py: number, cellW: number, cellH: nu
 function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
   const W = opts.width || 200;
   const H = opts.height || 70;
+  const FS = opts.fontSize || 36;
   const noiseLines = opts.noiseLines ?? 8;
   const noiseDots = opts.noiseDots ?? 30;
   const rotationRange = opts.rotationRange ?? 25;
@@ -148,26 +149,22 @@ function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
     lines.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="0.6"/>`);
   }
 
-  // Characters rendered as bitmap font paths (no <text> elements)
+  // Characters (with individual rotation, position, color) — using <text> for readability
   const charWidth = W / code.length;
-  const cellW = charWidth / 6;
-  const cellH = 5;
-  const dotR = cellW * 0.55;
   for (let i = 0; i < code.length; i++) {
     const ch = code[i];
-    const baseX = charWidth * i + charWidth * 0.15 + rand(2, 6);
-    const baseY = H / 2 - 12 + rand(-4, 4);
+    const x = charWidth * i + charWidth * 0.2 + rand(2, 8);
+    const y = H / 2 + rand(-8, 8);
     const rot = rand(-rotationRange, rotationRange);
+    const fontSize = FS + rand(-6, 6);
     const hue = Math.floor(rand(0, 360));
     const sat = Math.floor(rand(50, 80));
     const lit = Math.floor(rand(30, 50));
-    const fill = hsl(hue, sat, lit);
-    const pathData = charToPath(ch, baseX, baseY, cellW, cellH, dotR);
-    if (pathData) {
-      lines.push(
-        `<g fill="${fill}" opacity="0.9" transform="rotate(${rot.toFixed(1)},${(baseX + charWidth / 2).toFixed(1)},${(baseY + 14).toFixed(1)})">${pathData}</g>`
-      );
-    }
+    lines.push(
+      `<text x="${x}" y="${y}" font-size="${fontSize}" font-family="monospace,sans-serif" ` +
+      `font-weight="bold" fill="${hsl(hue, sat, lit)}" ` +
+      `transform="rotate(${rot.toFixed(1)},${x + 8},${y - 6})" opacity="0.9">${ch}</text>`
+    );
   }
 
   lines.push('</svg>');
@@ -287,23 +284,19 @@ export async function isCaptchaRequired(db: D1Database, feature: string): Promis
 
 /**
  * Verify a CAPTCHA answer. Returns true if valid, false otherwise.
- * Marks the code as used (one-time) regardless of success/failure.
- * Limits to 3 attempts per UUID, then forces expiry.
+ * Allows up to 3 attempts per UUID, then expires.
+ * Only marks as used (one-time) on successful verification.
  */
 export async function verifyCaptcha(db: D1Database, uuid: string, answer: string): Promise<boolean> {
   if (!uuid || !answer) return false;
 
   const row = await db.prepare(
-    "SELECT id, answer, used, attempts, expires_at FROM captcha_codes WHERE uuid = ?"
+    "SELECT id, answer, used, attempts, expires_at FROM captcha_codes WHERE uuid = ? AND expires_at > datetime('now')"
   ).bind(uuid).first() as any;
 
   if (!row) return false;
 
-  // Check TTL
-  const now = new Date().toISOString();
-  if (row.expires_at <= now) return false;
-
-  // Already used
+  // Already successfully verified
   if (row.used === 1) return false;
 
   // Increment attempts counter
@@ -315,9 +308,13 @@ export async function verifyCaptcha(db: D1Database, uuid: string, answer: string
     return false;
   }
 
-  // Mark as used (one-time)
-  await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
-
   // Compare (case-insensitive)
-  return String(row.answer).toUpperCase() === String(answer).toUpperCase();
+  const isValid = String(row.answer).toUpperCase() === String(answer).toUpperCase();
+
+  if (isValid) {
+    // Mark as used only on success (one-time use)
+    await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
+  }
+
+  return isValid;
 }
