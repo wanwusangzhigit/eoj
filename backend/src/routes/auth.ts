@@ -365,6 +365,37 @@ auth.post('/register', captchaMiddleware('register'), createRateLimiter('registe
     }
   }
 
+  // Check email verification code if email is provided
+  if (email) {
+    const verificationCode = body.verification_code;
+    if (!verificationCode) {
+      return c.json({ success: false, error: { message: 'Verification code is required', code: 'BAD_REQUEST' } }, 400);
+    }
+
+    const record: any = await c.env.DB.prepare(
+      'SELECT id, code, used, expires_at FROM email_verification_codes WHERE email = ? ORDER BY id DESC LIMIT 1'
+    ).bind(email).first();
+
+    if (!record) {
+      return c.json({ success: false, error: { message: 'No verification code found. Please request one first.', code: 'BAD_REQUEST' } }, 400);
+    }
+
+    if (record.used === 1) {
+      return c.json({ success: false, error: { message: 'Verification code already used', code: 'BAD_REQUEST' } }, 400);
+    }
+
+    if (record.code !== verificationCode) {
+      return c.json({ success: false, error: { message: 'Invalid verification code', code: 'BAD_REQUEST' } }, 400);
+    }
+
+    if (new Date(record.expires_at) < new Date()) {
+      return c.json({ success: false, error: { message: 'Verification code expired. Please request a new one.', code: 'BAD_REQUEST' } }, 400);
+    }
+
+    // Mark code as used
+    await c.env.DB.prepare('UPDATE email_verification_codes SET used = 1 WHERE id = ?').bind(record.id).run();
+  }
+
   // Check existing user
   const emailParam = email ?? null;
   const existing: any = await c.env.DB.prepare('SELECT id FROM users WHERE username = ? OR email = ?').bind(username, emailParam).first();
@@ -420,6 +451,69 @@ auth.post('/login', captchaMiddleware('login'), createRateLimiter('login', 10, 3
     console.error('JWT Sign Error:', e);
     return c.json({ success: false, error: { message: 'Server configuration error', code: 'INTERNAL_ERROR' } }, 500);
   }
+});
+
+// Send email verification code for registration
+auth.post('/send-verification-code', createRateLimiter('sendVerificationCode', 3, 120_000), async (c) => {
+  const body: any = await c.req.json();
+  const email = (body.email || '').trim().toLowerCase();
+
+  if (!email) {
+    return c.json({ success: false, error: { message: 'Email is required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const emailError = validateEmail(email);
+  if (emailError) {
+    return c.json({ success: false, error: { message: 'Invalid email format', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // Check if email is already registered
+  const existing: any = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+  if (existing) {
+    return c.json({ success: false, error: { message: 'Email already registered', code: 'CONFLICT' } }, 409);
+  }
+
+  // Delete old verification codes for this email
+  await c.env.DB.prepare('DELETE FROM email_verification_codes WHERE email = ?').bind(email).run();
+
+  // Generate 6-digit code
+  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
+
+  // Store the code
+  await c.env.DB.prepare(
+    'INSERT INTO email_verification_codes (email, code, expires_at) VALUES (?, ?, ?)'
+  ).bind(email, code, expiresAt).run();
+
+  // Send email via Cloudflare Email Binding
+  const sendEmail = (c.env as any).SEND_EMAIL;
+  if (!sendEmail || typeof sendEmail.send !== 'function') {
+    // Development mode — binding not available, return code directly
+    console.log('SEND_EMAIL binding not available (dev mode), returning code:', code);
+    return c.json({ success: true, data: { message: 'Verification code sent', code } });
+  }
+
+  try {
+    await sendEmail.send({
+      from: c.env.DEFAULT_FROM_EMAIL,
+      to: [email],
+      subject: 'Your Registration Verification Code',
+      text: `Your verification code is: ${code}\n\nThis code will expire in 10 minutes.\n\nIf you did not request this, please ignore this email.`,
+    });
+  } catch (e) {
+    const errMsg = typeof e === 'object' && e !== null ? String((e as any).message || (e as any).toString?.() || e) : String(e);
+    console.error('Failed to send verification email:', errMsg);
+    // In development (localhost), binding may exist but can't actually send — return code for testing
+    try {
+      const url = new URL(c.req.url);
+      if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+        return c.json({ success: true, data: { message: 'Verification code sent (dev)', code } });
+      }
+    } catch { /* ignore parse errors */ }
+    return c.json({ success: false, error: { message: 'Failed to send email: ' + errMsg, code: 'EMAIL_SEND_FAILED' } }, 500);
+  }
+
+  return c.json({ success: true, data: { message: 'Verification code sent' } });
 });
 
 auth.get('/me', async (c) => {

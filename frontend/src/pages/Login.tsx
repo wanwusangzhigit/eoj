@@ -1,4 +1,4 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
@@ -36,6 +36,13 @@ export default function Login() {
   const [captchaAnswerLen, setCaptchaAnswerLen] = useState(4);
   const [captchaAnswer, setCaptchaAnswer] = useState('');
 
+  // Email verification code state
+  const [verificationCode, setVerificationCode] = useState('');
+  const [codeSent, setCodeSent] = useState(false);
+  const [codeSending, setCodeSending] = useState(false);
+  const [codeCountdown, setCodeCountdown] = useState(0);
+  const codeTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   useEffect(() => {
     setRegistrationOpen(getRegistrationOpen());
     setEmailRequired(getEmailRequired());
@@ -57,6 +64,57 @@ export default function Login() {
       setCaptchaAnswer('');
     } catch {
       // captcha unavailable, proceed without
+    }
+  };
+
+  // Cleanup countdown timer on unmount
+  useEffect(() => {
+    return () => {
+      if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+    };
+  }, []);
+
+  // Countdown effect
+  useEffect(() => {
+    if (codeCountdown > 0 && !codeTimerRef.current) {
+      codeTimerRef.current = setInterval(() => {
+        setCodeCountdown((prev) => {
+          if (prev <= 1) {
+            if (codeTimerRef.current) clearInterval(codeTimerRef.current);
+            codeTimerRef.current = null;
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+    return () => {
+      if (codeCountdown <= 0 && codeTimerRef.current) {
+        clearInterval(codeTimerRef.current);
+        codeTimerRef.current = null;
+      }
+    };
+  }, [codeCountdown]);
+
+  const sendCode = async () => {
+    if (!email.trim()) {
+      setError(t('login.emailRequiredError'));
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError(t('common.emailInvalid'));
+      return;
+    }
+    setCodeSending(true);
+    setError(null);
+    try {
+      await api.sendVerificationCode(email.trim());
+      setCodeSent(true);
+      setCodeCountdown(60);
+    } catch (err: any) {
+      setError(err.message || t('common.error'));
+    } finally {
+      setCodeSending(false);
     }
   };
 
@@ -112,12 +170,16 @@ export default function Login() {
         setError(t('login.mustAgree'));
         return;
       }
+      if (email.trim() && !verificationCode) {
+        setError(t('login.verificationCodeRequired'));
+        return;
+      }
     }
 
     try {
       setLoading(true);
       const data = mode === 'register'
-        ? await api.register(username.trim(), password, email.trim() || undefined, captchaUuid, captchaAnswer)
+        ? await api.register(username.trim(), password, email.trim() || undefined, captchaUuid, captchaAnswer, verificationCode || undefined)
         : await api.login(username.trim(), password, captchaUuid, captchaAnswer);
 
       setToken(data.token);
@@ -201,6 +263,27 @@ export default function Login() {
                     {t('login.emailSuffixHint').replace('{0}', emailSuffixes)}
                   </p>
                 )}
+                {/* Email verification code */}
+                <div className="verification-code-row" style={{display:'flex',gap:'8px',marginTop:'8px',alignItems:'center'}}>
+                  <input
+                    type="text"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g,'').slice(0,6))}
+                    placeholder={t('login.verificationCodePlaceholder')}
+                    maxLength={6}
+                    style={{flex:1,textAlign:'center',letterSpacing:'4px',fontWeight:'bold'}}
+                    inputMode="numeric"
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    onClick={sendCode}
+                    disabled={codeSending || codeCountdown > 0}
+                    style={{whiteSpace:'nowrap',minWidth:'100px'}}
+                  >
+                    {codeSending ? t('common.loading') : codeCountdown > 0 ? `${codeCountdown}s` : (codeSent ? t('login.resendCode') : t('login.sendCode'))}
+                  </button>
+                </div>
               </div>
             )}
 
