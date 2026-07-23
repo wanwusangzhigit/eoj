@@ -13,6 +13,9 @@ directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
+[[send_email]]
+name = "SEND_EMAIL"
+
 [vars]
 GITHUB_CLIENT_ID = ""
 GITHUB_CLIENT_SECRET = ""
@@ -24,3 +27,4 @@ JWT_SECRET = "your secret"
 JUDGE_REPO = "your-username/oj-judge"
 FRONTEND_URL = "https://your-frontend-url"
 REGISTRATION_OPEN = "true"
+DEFAULT_FROM_EMAIL = "noreply@your-domain.com"

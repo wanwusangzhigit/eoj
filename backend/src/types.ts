@@ -11,6 +11,18 @@ export interface Env {
   JUDGE_REPO: string;
   FRONTEND_URL: string;
   REGISTRATION_OPEN: string;
+  SEND_EMAIL: SendEmail;
+  DEFAULT_FROM_EMAIL: string;
+}
+
+export interface SendEmail {
+  send: (msg: {
+    from: { name?: string; email: string };
+    to: Array<{ email: string }>;
+    subject: string;
+    html?: string;
+    text?: string;
+  }) => Promise<void>;
 }
 
 export interface UserPayload {

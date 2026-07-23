@@ -43,6 +43,7 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
     { to: '/teams', icon: Users, label: t('nav.teams') },
     { to: '/messages', icon: Mail, label: t('nav.messages'), badge: unreadMsg },
     { to: '/favorites', icon: Heart, label: t('nav.favorites') },
+    { to: '/collections', icon: FolderOpen, label: t('nav.collections') },
     { to: '/tickets', icon: Ticket, label: t('nav.tickets') },
     ...(showMyFiles ? [{ to: '/my-files', icon: FolderOpen, label: t('common.myFiles') }] : []),
     ...(showAI ? [{ to: '/ai', icon: Bot, label: t('nav.ai') }] : []),
