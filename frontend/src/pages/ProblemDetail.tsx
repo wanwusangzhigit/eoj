@@ -434,7 +434,46 @@ export default function ProblemDetail() {
     setLanguage(lang);
   };
 
-  const handleSubmit = async () => {
+  // ── Polling with cleanup (Bug 2 fix) ──
+
+  const pollSubmission = useCallback((id: number) => {
+    const maxAttempts = 120;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (!isMountedRef.current) return;
+      try {
+        const data = await api.getSubmission(id);
+        if (!isMountedRef.current) return;
+        const status = data.submission.status;
+        setLastStatus(status);
+
+        if (status !== 'pending' && status !== 'running') {
+          if (status === 'accepted') {
+            setSubmissionStatus('accepted');
+          } else {
+            setSubmissionStatus((prev) => prev === 'none' ? 'attempted' : prev);
+          }
+          return;
+        }
+
+        attempts++;
+        if (attempts < maxAttempts) {
+          pollingRef.current = setTimeout(poll, 1500);
+        }
+      } catch {
+        attempts++;
+        if (attempts < maxAttempts && isMountedRef.current) {
+          pollingRef.current = setTimeout(poll, 2000);
+        }
+      }
+    };
+
+    poll();
+  }, []);
+
+  // fixed bug handleSubmit
+  const handleSubmit = useCallback(async () => {
     if (!user) {
       navigate('/login');
       return;
@@ -463,7 +502,7 @@ export default function ProblemDetail() {
       });
       setLastSubmissionId(result.submission_id);
       pollSubmission(result.submission_id);
-      // Clear draft after successful submission (Bug 6 fix)
+      // Clear draft after successful submission
       if (slug) localStorage.removeItem(DRAFT_KEY(slug, language));
       // Reset captcha after successful submission
       if (captchaEnabled) {
@@ -471,13 +510,8 @@ export default function ProblemDetail() {
         captchaRef.current?.refresh();
       }
     } catch (e: any) {
-      const msg = e.message || t('common.error');
-      // Detect captcha-related errors and give clear feedback
-      if (/captcha/i.test(msg)) {
-        addToast('error', t('login.captcha') + ': ' + msg);
-      } else {
-        addToast('error', msg);
-      }
+      console.error("提交代码异常：", e);
+      addToast('error', e.message || t('common.error'));
       setLastStatus(null);
       // Always refresh captcha on failure — the used uuid is now invalid
       // (backend marks it used regardless of success/failure)
@@ -489,7 +523,7 @@ export default function ProblemDetail() {
     } finally {
       if (isMountedRef.current) setSubmitting(false);
     }
-  };
+  }, [user, navigate, problem, submitting, api, language, sourceCode, pollSubmission, slug, addToast]);
 
   // ── AI code completion ──
 
@@ -535,44 +569,6 @@ export default function ProblemDetail() {
       setAiInstruction('');
     }
   };
-
-  // ── Polling with cleanup (Bug 2 fix) ──
-
-  const pollSubmission = useCallback((id: number) => {
-    const maxAttempts = 120;
-    let attempts = 0;
-
-    const poll = async () => {
-      if (!isMountedRef.current) return;
-      try {
-        const data = await api.getSubmission(id);
-        if (!isMountedRef.current) return;
-        const status = data.submission.status;
-        setLastStatus(status);
-
-        if (status !== 'pending' && status !== 'running') {
-          if (status === 'accepted') {
-            setSubmissionStatus('accepted');
-          } else {
-            setSubmissionStatus((prev) => prev === 'none' ? 'attempted' : prev);
-          }
-          return;
-        }
-
-        attempts++;
-        if (attempts < maxAttempts) {
-          pollingRef.current = setTimeout(poll, 1500);
-        }
-      } catch {
-        attempts++;
-        if (attempts < maxAttempts && isMountedRef.current) {
-          pollingRef.current = setTimeout(poll, 2000);
-        }
-      }
-    };
-
-    poll();
-  }, []);
 
   // ── Ctrl+Enter shortcut (Bug 7 fix) ──
 
