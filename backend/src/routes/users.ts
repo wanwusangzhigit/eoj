@@ -583,39 +583,4 @@ users.put('/change-password', authMiddleware, async (c) => {
   return c.json({ success: true, data: { message: 'Password changed successfully' } });
 });
 
-// GET /users/heatmap - Current user's submission heatmap (last 365 days)
-users.get('/heatmap', authMiddleware, async (c) => {
-  const user = c.get('user');
-  const results = await c.env.DB.prepare(`
-    SELECT date(created_at) as date, COUNT(*) as count
-    FROM submissions
-    WHERE user_id = ? AND created_at >= date('now', '-365 days')
-    GROUP BY date(created_at)
-    ORDER BY date ASC
-  `).bind(user.userId).all();
-
-  const heatmap: Record<string, number> = {};
-  for (const row of results.results as any[]) {
-    heatmap[row.date] = row.count;
-  }
-
-  return c.json({ success: true, data: { heatmap } });
-});
-
-// GET /users/language-stats - Current user's submission stats by language
-users.get('/language-stats', authMiddleware, async (c) => {
-  const user = c.get('user');
-  const results = await c.env.DB.prepare(`
-    SELECT language,
-      COUNT(*) as total,
-      SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted
-    FROM submissions
-    WHERE user_id = ?
-    GROUP BY language
-    ORDER BY total DESC
-  `).bind(user.userId).all();
-
-  return c.json({ success: true, data: { languages: results.results } });
-});
-
 export default users;
