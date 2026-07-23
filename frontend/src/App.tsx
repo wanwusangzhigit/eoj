@@ -76,6 +76,7 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Contact = lazy(() => import('./pages/Contact'));
 const UserSettings = lazy(() => import('./pages/UserSettings'));
 const SubmissionCompare = lazy(() => import('./pages/SubmissionCompare'));
+const Collections = lazy(() => import('./pages/Collections'));
 
 function App() {
   const { fetchUser, token } = useAuthStore();
@@ -166,6 +167,8 @@ function App() {
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
             <Route path="/settings" element={<UserSettings />} />
+            <Route path="/collections" element={<Collections />} />
+            <Route path="/collections/:id" element={<Collections />} />
             <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

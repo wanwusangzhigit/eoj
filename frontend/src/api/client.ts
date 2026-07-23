@@ -226,10 +226,17 @@ class ApiClient {
     return this.request<{ uuid: string; svg: string; type: 'text' | 'math'; answer_length: number }>('/captcha/generate');
   }
 
-  async register(username: string, password: string, email?: string, captcha_uuid?: string, captcha_answer?: string) {
+  async register(username: string, password: string, email?: string, captcha_uuid?: string, captcha_answer?: string, verification_code?: string) {
     return this.request<{ token: string }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, password, email, captcha_uuid, captcha_answer }),
+      body: JSON.stringify({ username, password, email, captcha_uuid, captcha_answer, verification_code }),
+    });
+  }
+
+  async sendVerificationCode(email: string) {
+    return this.request<{ message: string; code?: string }>('/auth/send-verification-code', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     });
   }
 
