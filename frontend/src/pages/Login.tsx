@@ -31,7 +31,7 @@ export default function Login() {
   const [emailSuffixes, setEmailSuffixes] = useState('');
   const [agreed, setAgreed] = useState(false);
   const [captchaUuid, setCaptchaUuid] = useState('');
-  const [captchaSvg, setCaptchaSvg] = useState('');
+  const [captchaPng, setCaptchaPng] = useState('');
   const [captchaType, setCaptchaType] = useState<'text' | 'math'>('text');
   const [captchaAnswerLen, setCaptchaAnswerLen] = useState(4);
   const [captchaAnswer, setCaptchaAnswer] = useState('');
@@ -58,7 +58,7 @@ export default function Login() {
     try {
       const data = await api.getCaptcha();
       setCaptchaUuid(data.uuid);
-      setCaptchaSvg(data.svg);
+      setCaptchaPng(data.png);
       setCaptchaType(data.type);
       setCaptchaAnswerLen(data.answer_length);
       setCaptchaAnswer('');
@@ -332,14 +332,15 @@ export default function Login() {
             )}
 
             {/* CAPTCHA */}
-            {captchaSvg && (
+            {captchaPng && (
               <div className="form-group captcha-group">
                 <label>{t('login.captcha')}</label>
                 <div className="captcha-container" style={{display:'flex', alignItems:'center', gap:'8px', flexWrap:'wrap'}}>
-                  <div
+                  <img
                     className="captcha-image"
-                    dangerouslySetInnerHTML={{ __html: captchaSvg }}
-                    style={{border:'1px solid var(--border)', borderRadius:'6px', cursor:'pointer', lineHeight:0}}
+                    src={`data:image/png;base64,${captchaPng}`}
+                    alt="captcha"
+                    style={{border:'1px solid var(--border)', borderRadius:'6px', cursor:'pointer', width:'200px', height:'70px'}}
                     onClick={fetchCaptcha}
                     title={t('login.captchaRefresh')}
                   />
