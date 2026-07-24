@@ -1,10 +1,54 @@
 /**
  * SVG CAPTCHA generator and D1-based verification.
  *
- * Generates a simple SVG image with distorted text + noise.
+ * Generates a simple SVG image with distorted text + noise,
+ * then renders it to PNG via @resvg/resvg-wasm.
  * Stores the answer in D1 by UUID for server-side verification.
  * Supports configurable strength levels via settings.
  */
+
+// ── resvg-wasm: lazy singleton for SVG→PNG ──
+
+// Direct import of the .wasm binary — wrangler/esbuild bundles it as WebAssembly.Module
+import resvgWasmModule from '@resvg/resvg-wasm/index_bg.wasm';
+import { getInterFontBuffer } from '../fonts/inter';
+
+let resvgInitPromise: Promise<void> | null = null;
+
+/**
+ * Initialize the resvg WASM module exactly once.
+ * Safe to call multiple times — subsequent calls return the existing promise.
+ */
+function ensureResvg(): Promise<void> {
+  if (!resvgInitPromise) {
+    resvgInitPromise = (async () => {
+      const { initWasm } = await import('@resvg/resvg-wasm');
+      await initWasm(resvgWasmModule);
+    })();
+  }
+  return resvgInitPromise;
+}
+
+/**
+ * Render an SVG string to PNG bytes using resvg-wasm.
+ * @param svg - The SVG string to render.
+ * @returns PNG as Uint8Array.
+ */
+export async function svgToPng(svg: string): Promise<Uint8Array> {
+  await ensureResvg();
+  const { Resvg } = await import('@resvg/resvg-wasm');
+  const resvg = new Resvg(svg, {
+    background: '#ffffff',
+    fitTo: { mode: 'original' },
+    font: {
+      fontBuffers: [getInterFontBuffer()],
+      defaultFontFamily: 'Inter',
+      sansSerifFamily: 'Inter',
+    },
+  });
+  const rendered = resvg.render();
+  return rendered.asPng();
+}
 
 // ── Generate a random code ──
 
@@ -58,61 +102,6 @@ function rand(min: number, max: number): number {
   return secureRandFloat(min, max);
 }
 
-// ── 5×7 bitmap font (no <text> elements, only <path>) ──
-// Each character is a 5-wide × 7-tall grid of dots.
-// 1 = filled dot, 0 = empty
-const BITMAP_FONT: Record<string, number[]> = {
-  'A': [0,1,0,1,0, 1,0,1,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
-  'B': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
-  'C': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,1, 0,1,1,1,0],
-  'D': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0],
-  'E': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
-  'F': [1,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0],
-  'G': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,1,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  'H': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
-  'J': [0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 0,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  'K': [1,0,0,0,1, 1,0,0,1,0, 1,0,1,0,0, 1,1,0,0,0, 1,0,1,0,0, 1,0,0,1,0, 1,0,0,0,1],
-  'L': [1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
-  'M': [1,0,0,0,1, 1,1,0,1,1, 1,0,1,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
-  'N': [1,0,0,0,1, 1,1,0,0,1, 1,0,1,0,1, 1,0,0,1,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1],
-  'P': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,0,0,0, 1,0,0,0,0, 1,0,0,0,0],
-  'Q': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,1,0,1, 0,1,1,1,0, 0,0,0,1,0],
-  'R': [1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 1,1,1,1,0, 1,0,1,0,0, 1,0,0,1,0, 1,0,0,0,1],
-  'S': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 0,1,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
-  'T': [1,1,1,1,1, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
-  'U': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  'V': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0],
-  'W': [1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,0,0,1, 1,0,1,0,1, 1,1,0,1,1, 1,0,0,0,1],
-  'X': [1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0, 0,1,0,1,0, 1,0,0,0,1, 1,0,0,0,1],
-  'Y': [1,0,0,0,1, 1,0,0,0,1, 0,1,0,1,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
-  'Z': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,1,0,0,0, 1,0,0,0,0, 1,1,1,1,1],
-  '2': [0,1,1,1,0, 1,0,0,0,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,1,0,0,0, 1,1,1,1,1],
-  '3': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
-  '4': [0,0,0,1,0, 0,0,1,1,0, 0,1,0,1,0, 1,0,0,1,0, 1,1,1,1,1, 0,0,0,1,0, 0,0,0,1,0],
-  '5': [1,1,1,1,1, 1,0,0,0,0, 1,1,1,1,0, 0,0,0,0,1, 0,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  '6': [0,1,1,1,1, 1,0,0,0,0, 1,0,0,0,0, 1,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  '7': [1,1,1,1,1, 0,0,0,0,1, 0,0,0,1,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0, 0,0,1,0,0],
-  '8': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,0],
-  '9': [0,1,1,1,0, 1,0,0,0,1, 1,0,0,0,1, 0,1,1,1,1, 0,0,0,0,1, 0,0,0,0,1, 1,1,1,1,0],
-};
-
-/** Render a single character as SVG path data using bitmap font */
-function charToPath(ch: string, px: number, py: number, cellW: number, cellH: number, dotR: number): string {
-  const bitmap = BITMAP_FONT[ch];
-  if (!bitmap) return '';
-  const paths: string[] = [];
-  for (let row = 0; row < 7; row++) {
-    for (let col = 0; col < 5; col++) {
-      if (bitmap[row * 5 + col]) {
-        const cx = px + col * cellW + cellW / 2;
-        const cy = py + row * cellH + cellH / 2;
-        paths.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${dotR.toFixed(1)}"/>`);
-      }
-    }
-  }
-  return paths.join('');
-}
-
 function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
   const W = opts.width || 200;
   const H = opts.height || 70;
@@ -138,7 +127,7 @@ function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
     lines.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="${rand(1, 2.5)}" opacity="0.5"/>`);
   }
 
-  // Noise dots
+  // Noise dots / decorative circles
   const dCount = Math.floor(rand(noiseDots, noiseDots + 20));
   for (let i = 0; i < dCount; i++) {
     const cx = rand(0, W);
@@ -148,30 +137,39 @@ function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
     lines.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="0.6"/>`);
   }
 
-  // Characters rendered as bitmap font paths (no <text> elements)
+  // Characters rendered as <text> elements (resvg renders them to PNG server-side)
   const charWidth = W / code.length;
-  const cellW = charWidth / 6;
-  const cellH = 5;
-  const dotR = cellW * 0.55;
+  const fontSize = charWidth * 0.7;
+
   for (let i = 0; i < code.length; i++) {
     const ch = code[i];
-    const baseX = charWidth * i + charWidth * 0.15 + rand(2, 6);
-    const baseY = H / 2 - 12 + rand(-4, 4);
+    const x = charWidth * i + charWidth / 2;
+    const y = H / 2 + fontSize * 0.35;
     const rot = rand(-rotationRange, rotationRange);
     const hue = Math.floor(rand(0, 360));
     const sat = Math.floor(rand(50, 80));
     const lit = Math.floor(rand(30, 50));
     const fill = hsl(hue, sat, lit);
-    const pathData = charToPath(ch, baseX, baseY, cellW, cellH, dotR);
-    if (pathData) {
-      lines.push(
-        `<g fill="${fill}" opacity="0.9" transform="rotate(${rot.toFixed(1)},${(baseX + charWidth / 2).toFixed(1)},${(baseY + 14).toFixed(1)})">${pathData}</g>`
-      );
-    }
+
+    lines.push(
+      `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" ` +
+      `font-family="Inter, sans-serif" ` +
+      `font-size="${fontSize.toFixed(1)}" ` +
+      `font-weight="bold" ` +
+      `fill="${fill}" ` +
+      `text-anchor="middle" ` +
+      `transform="rotate(${rot.toFixed(1)},${x.toFixed(1)},${y.toFixed(1)})" ` +
+      `opacity="0.9">${escXml(ch)}</text>`
+    );
   }
 
   lines.push('</svg>');
   return lines.join('\n');
+}
+
+/** Escape <, >, & in XML text content to prevent injection */
+function escXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 // ── Math problem captcha ──
@@ -210,7 +208,7 @@ const STRENGTH_CONFIGS: Record<string, { length: number; noiseLines: number; noi
 
 export interface CaptchaRecord {
   uuid: string;
-  svg: string;
+  pngBase64: string;
   type: 'text' | 'math';
   answer_length: number;
 }
@@ -228,7 +226,7 @@ async function getSetting(db: D1Database, key: string, fallback: string): Promis
 }
 
 /**
- * Generate a new CAPTCHA, store in D1, return { uuid, svg, type, answer_length }.
+ * Generate a new CAPTCHA, store in D1, return { uuid, pngBase64, type, answer_length }.
  * Strength and type are read from settings.
  */
 export async function createCaptcha(db: D1Database): Promise<CaptchaRecord> {
@@ -266,11 +264,23 @@ export async function createCaptcha(db: D1Database): Promise<CaptchaRecord> {
     answer_length = cfg.length;
   }
 
+  // Render SVG to PNG bytes, then encode as base64
+  const pngBytes = await svgToPng(svg);
+  const pngBase64 = arrayBufferToBase64(pngBytes);
+
   await db.prepare(
     'INSERT INTO captcha_codes (uuid, answer, expires_at) VALUES (?, ?, datetime(\'now\', \'+5 minutes\'))'
   ).bind(uuid, code).run();
 
-  return { uuid, svg, type, answer_length };
+  return { uuid, pngBase64, type, answer_length };
+}
+
+function arrayBufferToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 /**
@@ -294,14 +304,10 @@ export async function verifyCaptcha(db: D1Database, uuid: string, answer: string
   if (!uuid || !answer) return false;
 
   const row = await db.prepare(
-    "SELECT id, answer, used, attempts, expires_at FROM captcha_codes WHERE uuid = ?"
+    "SELECT id, answer, used, attempts FROM captcha_codes WHERE uuid = ? AND expires_at > datetime('now')"
   ).bind(uuid).first() as any;
 
   if (!row) return false;
-
-  // Check TTL
-  const now = new Date().toISOString();
-  if (row.expires_at <= now) return false;
 
   // Already used
   if (row.used === 1) return false;

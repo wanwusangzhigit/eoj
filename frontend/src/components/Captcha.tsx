@@ -18,7 +18,7 @@ export interface CaptchaHandle {
 }
 
 const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(({ onCaptchaReady, onCaptchaChange, captchaAnswer }, ref) => {
-  const [svg, setSvg] = useState('');
+  const [png, setPng] = useState('');
   const [type, setType] = useState<'text' | 'math'>('text');
   const [answerLen, setAnswerLen] = useState(4);
   const readyRef = useRef(onCaptchaReady);
@@ -29,7 +29,7 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(({ onCaptchaReady, onCap
   const fetchCaptcha = useCallback(async () => {
     try {
       const data = await api.getCaptcha();
-      setSvg(data.svg);
+      setPng(data.png);
       setType(data.type);
       setAnswerLen(data.answer_length);
       readyRef.current({ uuid: data.uuid, answer: '' });
@@ -49,11 +49,12 @@ const Captcha = forwardRef<CaptchaHandle, CaptchaProps>(({ onCaptchaReady, onCap
     <div className="form-group captcha-group">
       <label>{t('login.captcha')}</label>
       <div className="captcha-container" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-        {svg && (
-          <div
+        {png && (
+          <img
             className="captcha-image"
-            dangerouslySetInnerHTML={{ __html: svg }}
-            style={{ border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', lineHeight: 0 }}
+            src={`data:image/png;base64,${png}`}
+            alt="captcha"
+            style={{ border: '1px solid var(--border)', borderRadius: '6px', cursor: 'pointer', width: '200px', height: '70px' }}
             onClick={fetchCaptcha}
             title={t('login.captchaRefresh')}
           />
