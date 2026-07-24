@@ -4,13 +4,13 @@ import { createCaptcha, verifyCaptcha } from '../utils/captcha';
 
 const captcha = new Hono<AppType>();
 
-// GET /captcha/generate — Generate a new CAPTCHA image
+// GET /captcha/generate — Generate a new CAPTCHA image (PNG base64)
 captcha.get('/generate', async (c) => {
   try {
-    const { uuid, svg, type, answer_length } = await createCaptcha(c.env.DB);
+    const { uuid, pngBase64, type, answer_length } = await createCaptcha(c.env.DB);
     return c.json({
       success: true,
-      data: { uuid, svg, type, answer_length },
+      data: { uuid, png: pngBase64, type, answer_length },
     });
   } catch (e: any) {
     console.error('Captcha generation error:', e);
