@@ -223,7 +223,7 @@ class ApiClient {
   }
 
   async getCaptcha() {
-    return this.request<{ uuid: string; svg: string; type: 'text' | 'math'; answer_length: number }>('/captcha/generate');
+    return this.request<{ uuid: string; png: string; type: 'text' | 'math'; answer_length: number }>('/captcha/generate');
   }
 
   async register(username: string, password: string, email?: string, captcha_uuid?: string, captcha_answer?: string, verification_code?: string) {
