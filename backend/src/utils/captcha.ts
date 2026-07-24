@@ -105,6 +105,7 @@ function rand(min: number, max: number): number {
 function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
   const W = opts.width || 200;
   const H = opts.height || 70;
+  const FS = opts.fontSize || 36;
   const noiseLines = opts.noiseLines ?? 8;
   const noiseDots = opts.noiseDots ?? 30;
   const rotationRange = opts.rotationRange ?? 25;
@@ -137,30 +138,29 @@ function renderSvg(code: string, opts: CaptchaSvgOptions = {}): string {
     lines.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="0.6"/>`);
   }
 
-  // Characters rendered as <text> elements (resvg renders them to PNG server-side)
-  const charWidth = W / code.length;
-  const fontSize = charWidth * 0.7;
+// Characters (with individual rotation, position, color) — using <text> for readability
+const charWidth = W / code.length;
+for (let i = 0; i < code.length; i++) {
+  const ch = code[i];
+  const x = charWidth * i + charWidth / 2;
+  const y = H / 2 + rand(-8, 8);
+  const rot = rand(-rotationRange, rotationRange);
+  const fontSize = FS + rand(-6, 6);
+  const hue = Math.floor(rand(0, 360));
+  const sat = Math.floor(rand(50, 80));
+  const lit = Math.floor(rand(30, 50));
+  const fill = hsl(hue, sat, lit);
 
-  for (let i = 0; i < code.length; i++) {
-    const ch = code[i];
-    const x = charWidth * i + charWidth / 2;
-    const y = H / 2 + fontSize * 0.35;
-    const rot = rand(-rotationRange, rotationRange);
-    const hue = Math.floor(rand(0, 360));
-    const sat = Math.floor(rand(50, 80));
-    const lit = Math.floor(rand(30, 50));
-    const fill = hsl(hue, sat, lit);
-
-    lines.push(
-      `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" ` +
-      `font-family="Inter, sans-serif" ` +
-      `font-size="${fontSize.toFixed(1)}" ` +
-      `font-weight="bold" ` +
-      `fill="${fill}" ` +
-      `text-anchor="middle" ` +
-      `transform="rotate(${rot.toFixed(1)},${x.toFixed(1)},${y.toFixed(1)})" ` +
-      `opacity="0.9">${escXml(ch)}</text>`
-    );
+  lines.push(
+    `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" ` +
+    `font-family="Inter, sans-serif" ` +
+    `font-size="${fontSize}" ` +
+    `font-weight="bold" ` +
+    `fill="${fill}" ` +
+    `text-anchor="middle" ` +
+    `transform="rotate(${rot.toFixed(1)},${x.toFixed(1)},${y.toFixed(1)})" ` +
+    `opacity="0.9">${escXml(ch)}</text>`
+  );
   }
 
   lines.push('</svg>');
@@ -297,19 +297,19 @@ export async function isCaptchaRequired(db: D1Database, feature: string): Promis
 
 /**
  * Verify a CAPTCHA answer. Returns true if valid, false otherwise.
- * Marks the code as used (one-time) regardless of success/failure.
- * Limits to 3 attempts per UUID, then forces expiry.
+ * Allows up to 3 attempts per UUID, then expires.
+ * Only marks as used (one-time) on successful verification.
  */
 export async function verifyCaptcha(db: D1Database, uuid: string, answer: string): Promise<boolean> {
   if (!uuid || !answer) return false;
 
   const row = await db.prepare(
-    "SELECT id, answer, used, attempts FROM captcha_codes WHERE uuid = ? AND expires_at > datetime('now')"
+    "SELECT id, answer, used, attempts, expires_at FROM captcha_codes WHERE uuid = ? AND expires_at > datetime('now')"
   ).bind(uuid).first() as any;
 
   if (!row) return false;
 
-  // Already used
+  // Already successfully verified
   if (row.used === 1) return false;
 
   // Increment attempts counter
@@ -321,9 +321,13 @@ export async function verifyCaptcha(db: D1Database, uuid: string, answer: string
     return false;
   }
 
-  // Mark as used (one-time)
-  await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
-
   // Compare (case-insensitive)
-  return String(row.answer).toUpperCase() === String(answer).toUpperCase();
+  const isValid = String(row.answer).toUpperCase() === String(answer).toUpperCase();
+
+  if (isValid) {
+    // Mark as used only on success (one-time use)
+    await db.prepare('UPDATE captcha_codes SET used = 1 WHERE id = ?').bind(row.id).run();
+  }
+
+  return isValid;
 }
