@@ -18,10 +18,8 @@ if __name__ == "__main__":
     input = sys.stdin.read()
     print(solve())
 `,
-  cpp: `#include <iostream>
-#include <vector>
+  cpp: `#include<bits/stdc++.h>
 using namespace std;
-
 int main() {
     ios_base::sync_with_stdio(false);
     cin.tie(nullptr);

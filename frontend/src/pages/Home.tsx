@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -22,6 +22,12 @@ interface Hitokoto {
   from_who: string;
 }
 
+declare global {
+  interface Window {
+    likeMe: (opts: { el: string; serverURL: string; color: string }) => void;
+  }
+}
+
 export default function Home() {
   const { user } = useAuthStore();
   const config = useSiteConfig();
@@ -38,7 +44,67 @@ export default function Home() {
   const [topUsers, setTopUsers] = useState<any[]>([]);
   const [currentDate, setCurrentDate] = useState('');
   const [fetchError, setFetchError] = useState(false);
+
+  const likeMeContainerRef = useRef<HTMLDivElement>(null);
+  const likeMeInitFlag = useRef(false);
+
   useDocumentTitle(t('home.title'));
+
+  useEffect(() => {
+
+    const existScript = document.querySelector('script[src="/static/js/likeme.js"]');
+    const existCss = document.querySelector('link[href="/static/css/likeme.css"]');
+
+    if (!existCss) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = '/static/css/likeme.css';
+      document.head.appendChild(link);
+    }
+
+    if (!existScript) {
+      const script = document.createElement('script');
+      script.src = '/static/js/likeme.js';
+      script.onload = () => {
+        console.log('LikeMe 签到脚本加载完成');
+      };
+      script.onerror = () => {
+        console.error('LikeMe 脚本加载失败，请检查 /static/js/likeme.js 是否存在');
+      };
+      document.body.appendChild(script);
+    }
+
+    return () => {
+      document.querySelector('link[href="/static/css/likeme.css"]')?.remove();
+      document.querySelector('script[src="/static/js/likeme.js"]')?.remove();
+      likeMeInitFlag.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!likeMeContainerRef.current || likeMeInitFlag.current) return;
+
+    let timer: number | null = null;
+    const initLikeMe = () => {
+      if (window.likeMe) {
+        window.likeMe({
+          el: '#daily-checkin-likeme',
+          serverURL: 'https://like.rusin7.com',
+          color: '#ff4e6a'
+        });
+        likeMeInitFlag.current = true;
+        console.log('签到组件初始化成功');
+        return;
+      }
+      timer = setTimeout(initLikeMe, 300);
+    };
+
+    timer = setTimeout(initLikeMe, 1200);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     const now = new Date();
@@ -47,7 +113,6 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    // Get announcement from cached settings store
     const ann = getAnnouncement();
     if (ann) setAnnouncement(ann);
     fetchAll();
@@ -65,24 +130,13 @@ export default function Home() {
         api.getProblemLists({ page: 1, pageSize: 5 }),
         api.getDiscussions({ page: 1, pageSize: 5 }),
       ]);
-      if (problemsData.status === 'fulfilled') {
-        setRecentProblems(problemsData.value.problems);
-      }
-      if (contestsData.status === 'fulfilled') {
-        setRecentContests(contestsData.value.contests);
-      }
-      if (listsData.status === 'fulfilled') {
-        setRecentLists(listsData.value.lists);
-      }
-      if (discussionsData.status === 'fulfilled') {
-        setRecentDiscussions(discussionsData.value.discussions);
-      }
-      // 如果全部失败则显示错误
+      if (problemsData.status === 'fulfilled') setRecentProblems(problemsData.value.problems);
+      if (contestsData.status === 'fulfilled') setRecentContests(contestsData.value.contests);
+      if (listsData.status === 'fulfilled') setRecentLists(listsData.value.lists);
+      if (discussionsData.status === 'fulfilled') setRecentDiscussions(discussionsData.value.discussions);
       const allFailed = problemsData.status === 'rejected' && contestsData.status === 'rejected'
         && listsData.status === 'rejected' && discussionsData.status === 'rejected';
-      if (allFailed) {
-        setFetchError(true);
-      }
+      if (allFailed) setFetchError(true);
     } catch (e) {
       console.error('Failed to fetch home data:', e);
       setFetchError(true);
@@ -104,18 +158,14 @@ export default function Home() {
     try {
       const data = await api.getRecommendedProblems(6);
       setRecommendations(data.recommendations || []);
-    } catch (e) {
-      // ignore — recommendations are optional
-    }
+    } catch { }
   };
 
   const fetchTopUsers = async () => {
     try {
       const data = await api.getRankings(10);
       setTopUsers(data.rankings || []);
-    } catch {
-      // ignore
-    }
+    } catch { }
   };
 
   const getContestStatus = (contest: any) => {
@@ -170,6 +220,14 @@ export default function Home() {
               <ChevronRight size={14} className="stat-arrow" />
             </Link>
           </div>
+          <div className="home-card" style={{ marginTop: '12px', maxWidth: 220 }}>
+            <div className="home-card-header">
+              <h2>每日点赞</h2>
+            </div>
+            <div className="home-card-body" ref={likeMeContainerRef}>
+              <div id="daily-checkin-likeme" style={{ minHeight: 80 }}></div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -187,7 +245,7 @@ export default function Home() {
       {/* Ads */}
       <AdSlot position="home_top" />
 
-      {/* Hitokoto */}
+      {/* Hitokoto 一言 */}
       {hitokoto ? (
         <button className="home-hitokoto" onClick={fetchHitokoto} title={t('home.clickToRefresh')}>
           <Quote size={16} className="hitokoto-icon" aria-hidden="true" />
@@ -201,6 +259,16 @@ export default function Home() {
         </button>
       ) : null}
 
+      {/* 每日打卡签到模块 永久展示
+      <div className="home-card" style={{ margin: '16px auto', maxWidth: 400 }}>
+        <div className="home-card-header">
+          <h2>每日打卡签到</h2>
+        </div>
+        <div className="home-card-body" ref={likeMeContainerRef}>
+          <div id="daily-checkin-likeme" style={{ minHeight: 80 }}></div>
+        </div>
+      </div> */}
+
       {/* Content Grid */}
       {fetchError && (
         <div className="error-banner">
@@ -212,7 +280,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* Personalized Recommendations (logged-in users only) */}
+      {/* 个性化推荐题目 */}
       {user && (
         <div className="home-recommend-section">
           <div className="home-recommend-header">
@@ -236,21 +304,13 @@ export default function Home() {
                   <div className="recommend-card-header">
                     <span className="difficulty-dot" style={{ color: DIFFICULTY_COLORS[p.difficulty] || '#8b8fa3' }}>●</span>
                     <span className="recommend-card-difficulty">{p.difficulty}</span>
-                    {p.rating && (
-                      <span className="recommend-card-rating">{p.rating}</span>
-                    )}
+                    {p.rating && <span className="recommend-card-rating">{p.rating}</span>}
                   </div>
                   <div className="recommend-card-title">{p.title}</div>
-                  {p.reason && (
-                    <div className="recommend-card-reason">{p.reason}</div>
-                  )}
+                  {p.reason && <div className="recommend-card-reason">{p.reason}</div>}
                   {p.tags && (
                     <div className="recommend-card-tags">
-                      {(
-                        Array.isArray(p.tags)
-                          ? p.tags
-                          : (typeof p.tags === 'string' ? p.tags.split(',') : [])
-                      ).slice(0, 3).map((tag: string, i: number) => (
+                      {(Array.isArray(p.tags) ? p.tags : typeof p.tags === 'string' ? p.tags.split(',') : []).slice(0, 3).map((tag: string, i: number) => (
                         <span key={i} className="recommend-tag">#{tag}</span>
                       ))}
                     </div>
@@ -263,7 +323,7 @@ export default function Home() {
       )}
 
       <div className="home-content-grid">
-        {/* Recent Problems */}
+        {/* 最近题目 */}
         <div className="home-card">
           <div className="home-card-header">
             <h2><Target size={18} /> {t('home.recentProblems')}</h2>
@@ -286,7 +346,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Recent Contests */}
+        {/* 最近比赛 */}
         <div className="home-card">
           <div className="home-card-header">
             <h2><Swords size={18} /> {t('home.recentContests')}</h2>
@@ -301,9 +361,7 @@ export default function Home() {
                 return (
                   <Link key={c.id} to={`/contests/${c.id}`} className="home-item">
                     <span className="home-item-title">{c.title}</span>
-                    <span className={`home-item-status status-${status}`}>
-                      {getContestStatusLabel(status)}
-                    </span>
+                    <span className={`home-item-status status-${status}`}>{getContestStatusLabel(status)}</span>
                   </Link>
                 );
               })
@@ -311,7 +369,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Recent Lists */}
+        {/* 最近题单 */}
         <div className="home-card">
           <div className="home-card-header">
             <h2><BookOpen size={18} /> {t('home.recentLists')}</h2>
@@ -331,7 +389,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Recent Discussions */}
+        {/* 最近讨论 */}
         <div className="home-card">
           <div className="home-card-header">
             <h2><MessageSquare size={18} /> {t('home.recentDiscussions')}</h2>
@@ -351,7 +409,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Top Users */}
+        {/* 排行榜Top10 */}
         {topUsers.length > 0 && (
           <div className="home-card">
             <div className="home-card-header">
