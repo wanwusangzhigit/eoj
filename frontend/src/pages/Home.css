@@ -30,6 +30,13 @@
   gap: 6px;
 }
 
+.home-hero-right {
+  display: flex;
+  flex-direction: row; /* 水平左右排列 */
+  align-items: center;
+  gap: 12px; /* 按钮网格和签到卡片之间的间距 */
+}
+
 .home-title {
   font-size: 22px;
   font-weight: 700;
@@ -74,6 +81,7 @@
   grid-template-columns: 1fr 1fr;
   gap: 8px;
   min-width: 320px;
+  max-width: 340px;
 }
 
 /* Default & Hydro: no min-width on stats grid */
@@ -574,6 +582,16 @@
   .hitokoto-from {
     display: none;
   }
+
+  .home-hero-right {
+    flex-direction: column;
+    width: 100%;
+  }
+  .home-stats-grid {
+    width: 100%;
+    min-width: 0;
+    max-width: unset;
+  }
 }
 
 /* Default & Hydro: centered hero on mobile */
@@ -593,5 +611,18 @@
   [data-theme-style="default"] .home-stats-grid,
   [data-theme-style="hydro"] .home-stats-grid {
     width: 100%;
+  }
+}
+
+/* Hero内签到卡片专属样式 方案1专用 */
+.likeme-hero-card {
+  max-width: 240px;
+  width: 100%;
+}
+
+/* 适配移动端：Hero垂直排列后，签到卡片铺满宽度 */
+@media (max-width: 768px) {
+  .likeme-hero-card {
+    max-width: 100%;
   }
 }

@@ -9,7 +9,11 @@ site:
 footer:
   enabled: true
   text: ""
-  links: []
+  links: 
+    - name: "GitHub"
+      url: "https://github.com/ruying-suixing"
+    - name: "主站"
+      url: "https://www.rusin7.com"
 
 login:
   hero_title: ""
