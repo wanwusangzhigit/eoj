@@ -82,7 +82,7 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!likeMeContainerRef.current || likeMeInitFlag.current) return;
+    if (!user || !likeMeContainerRef.current || likeMeInitFlag.current) return;
 
     let timer: number | null = null;
     const initLikeMe = () => {
