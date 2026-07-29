@@ -6,9 +6,65 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { t } from '../../i18n';
 import {
   Users, FileText, Send, CheckCircle, Swords, BookOpen, Ticket,
-  Clock, Activity, BarChart3,
+  Clock, Activity, BarChart3, TrendingUp, Code2,
 } from 'lucide-react';
 import '../Admin.css';
+
+function DailyTrendChart({ data }: { data: { day: string; count: number; accepted: number }[] }) {
+  if (!data || data.length === 0) return null;
+  const maxVal = Math.max(...data.map(d => d.count), 1);
+  return (
+    <div className="chart-section">
+      <h2 className="admin-section-title">
+        <TrendingUp size={18} />
+        近7日提交趋势
+      </h2>
+      <div className="bar-chart">
+        {data.map((d) => {
+          const totalH = (d.count / maxVal) * 100;
+          const acH = (d.accepted / maxVal) * 100;
+          const label = d.day.slice(5); // MM-DD
+          return (
+            <div key={d.day} className="bar-column">
+              <div className="bar-value">{d.count}</div>
+              <div className="bar-stack">
+                <div className="bar-fill bar-accepted" style={{ height: `${Math.max(acH, 1)}%` }} title={`AC: ${d.accepted}`} />
+                <div className="bar-fill bar-total" style={{ height: `${Math.max(totalH - acH, 0)}%` }} title={`Total: ${d.count}`} />
+              </div>
+              <div className="bar-label">{label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LangDistChart({ data }: { data: { language: string; count: number }[] }) {
+  if (!data || data.length === 0) return null;
+  const total = data.reduce((s, d) => s + d.count, 0) || 1;
+  const COLORS = ['#6366f1', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
+  return (
+    <div className="chart-section">
+      <h2 className="admin-section-title">
+        <Code2 size={18} />
+        语言分布
+      </h2>
+      <div className="lang-dist">
+        {data.map((d, i) => (
+          <div key={d.language} className="lang-row">
+            <span className="lang-name">{d.language}</span>
+            <div className="lang-bar-track">
+              <div className="lang-bar-fill" style={{ width: `${(d.count / total) * 100}%`, background: COLORS[i % COLORS.length] }} />
+            </div>
+            <span className="lang-count">{d.count}</span>
+            <span className="lang-pct">{Math.round((d.count / total) * 100)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminDashboard() {
   const { user } = useAuthStore();
@@ -129,6 +185,12 @@ export default function AdminDashboard() {
             <div className="stat-label">{t('admin.openTickets')}</div>
           </div>
         </div>
+      </div>
+
+      {/* Charts row */}
+      <div className="dashboard-charts">
+        <DailyTrendChart data={stats?.daily_trend || []} />
+        <LangDistChart data={stats?.language_distribution || []} />
       </div>
 
       {stats?.recent_submissions && stats.recent_submissions.length > 0 && (

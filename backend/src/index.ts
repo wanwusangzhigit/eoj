@@ -63,6 +63,21 @@ app.use('/api/*', async (c, next) => {
   return corsMiddleware(c, next);
 });
 
+// Security headers on ALL responses — use c.header() instead of c.res.headers.set()
+// to avoid "Can't modify immutable headers" errors in Hono v4
+app.use('*', async (c, next) => {
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('X-Frame-Options', 'SAMEORIGIN');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  c.header('X-XSS-Protection', '0');
+  // Strict-Transport-Security only on HTTPS origins
+  const url = new URL(c.req.url);
+  if (url.protocol === 'https:' || c.req.header('x-forwarded-proto') === 'https') {
+    c.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+  }
+  await next();
+});
+
 // Ban check + audit logging for all API routes
 app.use('/api/*', banCheckMiddleware);
 app.use('/api/*', auditMiddleware);

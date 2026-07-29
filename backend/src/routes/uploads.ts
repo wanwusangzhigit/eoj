@@ -5,6 +5,36 @@ import { authMiddleware } from '../middleware/auth';
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
+const SAFE_FILENAME_RE = /[^a-zA-Z0-9._-]/g;
+
+/**
+ * Sanitize a filename to prevent path traversal and header injection.
+ * Keeps only safe characters and limits length.
+ */
+function sanitizeFilename(name: string): string {
+  // Remove path separators and control characters
+  let safe = name.replace(/[/\\:*?"<>|]/g, '_').replace(/\0/g, '');
+  // Remove any remaining unsafe characters
+  safe = safe.replace(SAFE_FILENAME_RE, '_');
+  // Limit length to prevent abuse
+  if (safe.length > 200) {
+    const ext = safe.lastIndexOf('.');
+    if (ext > 0) {
+      safe = safe.substring(0, 100) + safe.substring(ext);
+    } else {
+      safe = safe.substring(0, 200);
+    }
+  }
+  return safe || 'unnamed';
+}
+
+/**
+ * Escape a filename for use in Content-Disposition header value (quoted string).
+ */
+function escapeContentDispositionFilename(name: string): string {
+  // RFC 5987: remove characters that cannot appear in a quoted string
+  return name.replace(/["\\\r\n]/g, ' ').trim();
+}
 
 // Base64 encode that handles large buffers without stack overflow
 function encodeBase64(buffer: ArrayBuffer): string {
@@ -51,9 +81,9 @@ uploads.post('/image', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Image too large (max 5MB)', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const timestamp = Date.now();
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const ext = file.name.split('.').pop() || 'png';
-  const filename = `${timestamp}_${file.name}`;
+  const filename = `${dateStr}_${user.userId}.${ext}`;
   const githubPath = `uploads/image/${user.userId}/${filename}`;
 
   // Upload to GitHub
@@ -133,8 +163,9 @@ uploads.post('/file', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'File too large (max 20MB)', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const timestamp = Date.now();
-  const filename = `${timestamp}_${file.name}`;
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const ext = file.name.split('.').pop() || 'bin';
+  const filename = `${dateStr}_${user.userId}.${ext}`;
   const githubPath = `uploads/file/${user.userId}/${filename}`;
 
   // Upload to GitHub
@@ -272,7 +303,7 @@ uploads.get('/download/:id', async (c) => {
     const data = await response.arrayBuffer();
     c.header('Content-Type', upload.mime_type || 'application/octet-stream');
     c.header('Cache-Control', 'public, max-age=86400');
-    c.header('Content-Disposition', `inline; filename="${upload.original_name}"`);
+    c.header('Content-Disposition', `inline; filename="${escapeContentDispositionFilename(upload.original_name)}"`);
     return c.body(data);
   } catch (e) {
     console.error('GitHub download failed:', e);
@@ -359,8 +390,9 @@ uploads.post('/avatar', authMiddleware, async (c) => {
 
   const buffer = await file.arrayBuffer();
   const base64 = encodeBase64(buffer);
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const ext = file.name.split('.').pop() || 'png';
-  const filename = `avatars/${user.userId}_${Date.now()}.${ext}`;
+  const filename = `avatars/${dateStr}_${user.userId}.${ext}`;
 
   // Save to GitHub (same as image upload)
   try {

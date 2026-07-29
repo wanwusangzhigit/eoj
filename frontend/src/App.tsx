@@ -77,6 +77,9 @@ const Contact = lazy(() => import('./pages/Contact'));
 const UserSettings = lazy(() => import('./pages/UserSettings'));
 const SubmissionCompare = lazy(() => import('./pages/SubmissionCompare'));
 const Collections = lazy(() => import('./pages/Collections'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const Templates = lazy(() => import('./pages/Templates'));
 
 function App() {
   const { fetchUser, token } = useAuthStore();
@@ -166,9 +169,12 @@ function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/settings" element={<UserSettings />} />
             <Route path="/collections" element={<Collections />} />
             <Route path="/collections/:id" element={<Collections />} />
+            <Route path="/templates" element={<Templates />} />
             <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>

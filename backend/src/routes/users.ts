@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, superAdminMiddleware } from '../middleware/auth';
+import { escapeLikeWildcard } from '../utils/helpers';
 import * as bcrypt from 'bcryptjs';
 
 const users = new Hono<AppType>();
@@ -20,8 +21,8 @@ users.get('/list', authMiddleware, adminMiddleware, async (c) => {
   if (search) {
     countQuery += ' WHERE username LIKE ?';
     dataQuery += ' WHERE username LIKE ?';
-    binds.push(`%${search}%`);
-    countBinds.push(`%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`);
+    countBinds.push(`%${escapeLikeWildcard(search)}%`);
   }
 
   dataQuery += ' ORDER BY id ASC LIMIT ? OFFSET ?';

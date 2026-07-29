@@ -3,6 +3,7 @@ import { AppType } from '../types';
 import { authMiddleware } from '../middleware/auth';
 import { sendNotification, NotificationType } from '../utils/notify';
 import { captchaMiddleware } from '../middleware/captcha';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const blogs = new Hono<AppType>();
 
@@ -24,8 +25,8 @@ blogs.get('/', async (c) => {
   if (tag) {
     query += ' AND b.tags LIKE ?';
     countQuery += ' AND tags LIKE ?';
-    binds.push(`%${tag}%`);
-    countBinds.push(`%${tag}%`);
+    binds.push(`%${escapeLikeWildcard(tag)}%`);
+    countBinds.push(`%${escapeLikeWildcard(tag)}%`);
   }
 
   const sortClauses: Record<string, string> = {

@@ -589,3 +589,48 @@ input, textarea, select {
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ── Responsive improvements ── */
+@media (max-width: 768px) {
+  .dashboard-charts { grid-template-columns: 1fr !important; }
+  .admin-sidebar {
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .admin-sidebar.open { transform: translateX(0); }
+}
+
+@media (max-width: 480px) {
+  .filter-bar { flex-direction: column; align-items: stretch !important; }
+  .filter-bar .form-input,
+  .filter-bar .search-input-wrapper { width: 100% !important; }
+  .dashboard-stats { grid-template-columns: 1fr 1fr !important; }
+}
+
+/* ── Smooth theme transitions ── */
+[data-theme] { transition: background 0.2s ease, color 0.2s ease; }
+
+/* ── Page transition animation ── */
+.page-transition {
+  animation: pageFadeIn 0.3s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Button press feedback ── */
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ── Search result highlighting ── */
+mark.search-highlight {
+  background: var(--accent-light);
+  color: var(--accent);
+  padding: 0 2px;
+  border-radius: 2px;
+  font-weight: 600;
+}

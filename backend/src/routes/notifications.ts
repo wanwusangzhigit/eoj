@@ -39,6 +39,71 @@ notifications.get('/', authMiddleware, async (c) => {
   });
 });
 
+// ── SSE (Server-Sent Events) stream for real-time notifications ──
+// GET /notifications/stream?token=xxx — uses query param for auth (EventSource can't set headers)
+notifications.get('/stream', async (c) => {
+  const token = c.req.query('token');
+  if (!token) {
+    return c.json({ success: false, error: { message: 'Token required', code: 'UNAUTHORIZED' } }, 401);
+  }
+
+  const { verifyJWT } = await import('../utils/jwt');
+  const payload = await verifyJWT(token, c.env.JWT_SECRET);
+  if (!payload) {
+    return c.json({ success: false, error: { message: 'Invalid token', code: 'UNAUTHORIZED' } }, 401);
+  }
+
+  const userId = payload.userId;
+
+  // Create a stream using TransformStream (avoids c.stream() typing issues)
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+
+  const sse = (event: string, data: string) => {
+    return writer.write(enc.encode(`event: ${event}\ndata: ${data}\n\n`));
+  };
+
+  sse('connected', JSON.stringify({ status: 'ok', userId }));
+
+  let lastCheck = Date.now();
+
+  const pollTimer = setInterval(async () => {
+    try {
+      const result: any = await c.env.DB.prepare(
+        "SELECT COUNT(*) as cnt FROM notifications WHERE user_id = ? AND is_read = 0 AND strftime('%s', created_at) * 1000 > ?"
+      ).bind(userId, lastCheck).first();
+
+      if (result && result.cnt > 0) {
+        const newNotifs: any = await c.env.DB.prepare(
+          "SELECT id, type, title, content, link, created_at FROM notifications WHERE user_id = ? AND is_read = 0 AND strftime('%s', created_at) * 1000 > ? ORDER BY created_at DESC LIMIT 5"
+        ).bind(userId, lastCheck).all();
+        sse('notification', JSON.stringify({ count: result.cnt, notifications: newNotifs.results || [] }));
+      }
+
+      if (Date.now() - lastCheck > 15000) {
+        sse('heartbeat', JSON.stringify({ time: Date.now() }));
+      }
+
+      lastCheck = Date.now();
+    } catch { /* ignore */ }
+  }, 3000);
+
+  c.req.raw.signal.addEventListener('abort', () => {
+    clearInterval(pollTimer);
+    writer.close().catch(() => {});
+  });
+
+  return new Response(readable, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+});
+
 // GET /notifications/unread-count — 未读通知数（用于 Header 气泡）
 notifications.get('/unread-count', authMiddleware, async (c) => {
   const user = c.get('user');

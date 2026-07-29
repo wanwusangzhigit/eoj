@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { recordAuditLog } from '../middleware/audit';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const audit = new Hono<AppType>();
 
@@ -24,7 +25,7 @@ audit.get('/logs', authMiddleware, adminMiddleware, async (c) => {
   if (search) {
     countQuery += ' AND (username LIKE ? OR ip LIKE ? OR device_fingerprint LIKE ? OR action LIKE ?)';
     dataQuery += ' AND (username LIKE ? OR ip LIKE ? OR device_fingerprint LIKE ? OR action LIKE ?)';
-    const like = `%${search}%`;
+    const like = `%${escapeLikeWildcard(search)}%`;
     binds.push(like, like, like, like);
     countBinds.push(like, like, like, like);
   }
@@ -32,8 +33,8 @@ audit.get('/logs', authMiddleware, adminMiddleware, async (c) => {
   if (action) {
     countQuery += ' AND action LIKE ?';
     dataQuery += ' AND action LIKE ?';
-    binds.push(`%${action}%`);
-    countBinds.push(`%${action}%`);
+    binds.push(`%${escapeLikeWildcard(action)}%`);
+    countBinds.push(`%${escapeLikeWildcard(action)}%`);
   }
 
   if (ipFilter) {

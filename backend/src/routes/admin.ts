@@ -3,6 +3,7 @@ import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, superAdminMiddleware, problemAdminMiddleware, contestAdminMiddleware, ticketAdminMiddleware, listAdminMiddleware } from '../middleware/auth';
 import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
 import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const admin = new Hono<AppType>();
 
@@ -33,6 +34,24 @@ admin.get('/stats', authMiddleware, adminMiddleware, async (c) => {
     LIMIT 8
   `).all();
 
+  // Daily submission trend (last 7 days)
+  const dailyTrend = await c.env.DB.prepare(`
+    SELECT date(created_at) as day, COUNT(*) as count,
+           SUM(CASE WHEN status = 'accepted' THEN 1 ELSE 0 END) as accepted
+    FROM submissions
+    WHERE created_at >= date('now', '-7 days')
+    GROUP BY date(created_at)
+    ORDER BY day ASC
+  `).all();
+
+  // Language distribution
+  const langDist = await c.env.DB.prepare(`
+    SELECT language, COUNT(*) as count
+    FROM submissions
+    GROUP BY language
+    ORDER BY count DESC
+  `).all();
+
   return c.json({
     success: true,
     data: {
@@ -46,6 +65,8 @@ admin.get('/stats', authMiddleware, adminMiddleware, async (c) => {
       tickets: (ticketCount as any)?.count || 0,
       open_tickets: (openTicketCount as any)?.count || 0,
       recent_submissions: recentSubmissions.results,
+      daily_trend: dailyTrend.results,
+      language_distribution: langDist.results,
     },
   });
 });
@@ -64,7 +85,7 @@ admin.get('/problems', authMiddleware, problemAdminMiddleware, async (c) => {
   if (search) {
     countQuery += ' WHERE title LIKE ? OR slug LIKE ?';
     dataQuery += ' WHERE title LIKE ? OR slug LIKE ?';
-    binds.push(`%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
   dataQuery += ' ORDER BY id DESC LIMIT ? OFFSET ?';
@@ -628,7 +649,7 @@ admin.get('/blogs', authMiddleware, adminMiddleware, async (c) => {
   const binds: any[] = [];
   if (search) {
     whereClauses.push('(b.title LIKE ? OR b.tags LIKE ?)');
-    binds.push(`%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
   if (status) {
     whereClauses.push('b.status = ?');
@@ -712,7 +733,7 @@ admin.get('/teams', authMiddleware, adminMiddleware, async (c) => {
   const binds: any[] = [];
   if (search) {
     whereClauses.push('(t.name LIKE ? OR t.slug LIKE ? OR t.description LIKE ?)');
-    binds.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
   const where = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
 
@@ -775,7 +796,7 @@ admin.get('/messages/conversations', authMiddleware, adminMiddleware, async (c) 
   if (search) {
     where = `WHERE u1.username LIKE ? OR u2.username LIKE ?
       OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ?)`;
-    binds.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
   const countResult = await c.env.DB.prepare(

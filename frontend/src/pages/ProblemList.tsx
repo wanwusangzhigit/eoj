@@ -1,22 +1,26 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { Search, Tag, Clock, MemoryStick, Filter, CheckCircle, AlertCircle } from 'lucide-react';
 import { DIFFICULTY_COLORS, DIFFICULTIES } from '../constants';
 import RatingBadge from '../components/RatingBadge';
+import { SkeletonTable } from '../components/Skeleton';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { highlightText } from '../utils/highlight';
 import './ProblemList.css';
 
 export default function ProblemList() {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
+  const [searchParams] = useSearchParams();
   const [problems, setProblems] = useState<any[]>([]);
   const [pagination, setPagination] = useState<any>({});
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const initialSearch = searchParams.get('search') || '';
+  const [search, setSearch] = useState(initialSearch);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [selectedTag, setSelectedTag] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('');
@@ -149,7 +153,7 @@ export default function ProblemList() {
           >
             <option value="">{t('problemList.allDifficulty')}</option>
             {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>{d}</option>
+              <option key={d} value={d} style={{ color: DIFFICULTY_COLORS[d] || undefined }}>{d}</option>
             ))}
           </select>
         </div>
@@ -210,10 +214,7 @@ export default function ProblemList() {
       )}
 
       {loading ? (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>{t('problemList.loadingProblems')}</p>
-        </div>
+        <SkeletonTable rows={10} />
       ) : error ? null : problems.length === 0 ? (
         <div className="empty">{t('problemList.noProblemsFound')}</div>
       ) : (
@@ -247,7 +248,7 @@ export default function ProblemList() {
                   {status === 'attempted' && <AlertCircle size={16} className="status-icon attempted" />}
                 </span>
                 <span className="col-id">{displayId}</span>
-                <span className="col-title">{problem.title}</span>
+                <span className="col-title">{highlightText(problem.title, debouncedSearch)}</span>
                 <span className="col-difficulty">
                   {problem.rating && problem.rating >= 800 ? (
                     <RatingBadge rating={problem.rating} size="sm" />

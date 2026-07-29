@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, isAdmin } from '../middleware/auth';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const training = new Hono<AppType>();
 
@@ -22,8 +23,8 @@ training.get('/', async (c) => {
   if (search) {
     query += ' AND tp.title LIKE ?';
     countQuery += ' AND title LIKE ?';
-    binds.push(`%${search}%`);
-    countBinds.push(`%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`);
+    countBinds.push(`%${escapeLikeWildcard(search)}%`);
   }
   if (category) {
     query += ' AND tp.category = ?';

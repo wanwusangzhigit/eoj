@@ -296,7 +296,13 @@ export default function Login() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder={t('login.passwordPlaceholder')}
                 required
+                minLength={8}
               />
+              {mode === 'register' && (
+                <span className="form-hint" style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: 4 }}>
+                  至少 8 个字符，需包含大小写字母和数字
+                </span>
+              )}
             </div>
 
             {mode === 'register' && (
@@ -372,6 +378,14 @@ export default function Login() {
               {loading ? (mode === 'register' ? t('login.registering') : t('login.loggingIn')) : (mode === 'register' ? t('login.registerButton') : t('login.loginButton'))}
             </button>
           </form>
+
+          <div className="login-footer">
+            {mode === 'login' && (
+              <Link to="/forgot-password" className="login-footer-link" style={{ fontSize: '13px' }}>
+                忘记密码？
+              </Link>
+            )}
+          </div>
 
           {!registrationOpen && (
             <p style={{fontSize:'13px',color:'var(--text-secondary)',textAlign:'center',marginTop:'8px'}}>

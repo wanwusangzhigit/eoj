@@ -96,12 +96,12 @@ export default function Layout({ children }: { children: ReactNode }) {
               onClick={() => setSidebarOpen(false)}
             />
           )}
-          <main className="main-content">
+          <main className="main-content page-transition">
             {children}
           </main>
         </div>
       ) : (
-        <main className="main-content">
+        <main className="main-content page-transition">
           {children}
         </main>
       )}

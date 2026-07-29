@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
-import { Trophy, Medal, Award, Crown, Target, TrendingUp, AlertCircle, Star } from 'lucide-react';
+import { Trophy, Medal, Award, Crown, Target, TrendingUp, AlertCircle, Star, Search } from 'lucide-react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import RatingBadge from '../components/RatingBadge';
 import { getRatingColor } from '../utils/rating';
@@ -17,7 +17,14 @@ export default function Rankings() {
   const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState<'all' | 'week' | 'month'>('all');
   const [mode, setMode] = useState<Mode>('solved');
+  const [searchQuery, setSearchQuery] = useState('');
   useDocumentTitle(t('rankings.title'));
+
+  const filteredRankings = rankings.filter(u => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (u.username?.toLowerCase().includes(q));
+  });
 
   useEffect(() => {
     fetchRankings();
@@ -113,10 +120,21 @@ export default function Rankings() {
               ))}
             </div>
           )}
+
+          <div className="rankings-search">
+            <Search size={14} />
+            <input
+              type="text"
+              className="rankings-search-input"
+              placeholder="搜索用户名..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
         </div>
       </div>
 
-      {rankings.length === 0 ? (
+      {filteredRankings.length === 0 ? (
         <div className="empty-state">
           <Target size={48} className="empty-icon" />
           <h3>{mode === 'rating' ? t('rankings.noRatingsYet') : t('rankings.noSubmissionsYet')}</h3>
@@ -130,7 +148,7 @@ export default function Rankings() {
             {mode === 'solved' && <span className="header-score">{t('rankings.solved')}</span>}
             {mode === 'rating' && <span className="header-rating">{t('rankings.rating')}</span>}
           </div>
-          {rankings.map((user) => {
+          {filteredRankings.map((user) => {
             const rank = mode === 'rating' ? user.rank : user.rank;
             return (
               <Link
