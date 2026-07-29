@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@cf-wasm/resvg": "^0.3.5",
     "@fontsource/inter": "^5.3.0",
     "@resvg/resvg-wasm": "^2.6.2",
     "bcryptjs": "^2.4.3",
