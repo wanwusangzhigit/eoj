@@ -4,7 +4,7 @@ import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { t } from '../../i18n';
 import {
-  Search, Shield, User, ChevronLeft, ChevronRight,
+  Search, Shield, User, ChevronLeft, ChevronRight, CheckSquare, Square,
 } from 'lucide-react';
 import '../Admin.css';
 
@@ -20,6 +20,7 @@ export default function AdminUsers() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [userPage, setUserPage] = useState(1);
   const [userPagination, setUserPagination] = useState<any>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const [editingPermissions, setEditingPermissions] = useState<number | null>(null);
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
@@ -96,6 +97,53 @@ export default function AdminUsers() {
     }
   };
 
+  // ── Batch operations ──
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === userList.filter((u: any) => u.id !== 1).length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(userList.filter((u: any) => u.id !== 1).map((u: any) => u.id)));
+    }
+  };
+
+  const batchBan = async (ban: boolean) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { addToast('error', '请先选择用户'); return; }
+    let done = 0;
+    for (const id of ids) {
+      try {
+        await api.setUserBanned(id, ban);
+        done++;
+      } catch { /* skip failed */ }
+    }
+    addToast('success', `已${ban ? '封禁' : '解封'} ${done}/${ids.length} 个用户`);
+    setSelectedIds(new Set());
+    refresh();
+  };
+
+  const batchSetRole = async (role: string) => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { addToast('error', '请先选择用户'); return; }
+    let done = 0;
+    for (const id of ids) {
+      try {
+        await api.updateUserRole(id, role);
+        done++;
+      } catch { /* skip failed */ }
+    }
+    addToast('success', `已设置 ${done}/${ids.length} 个用户为 ${role}`);
+    setSelectedIds(new Set());
+    refresh();
+  };
+
   return (
     <div className="admin-form">
       <h2>{t('admin.userManagement')}</h2>
@@ -113,9 +161,42 @@ export default function AdminUsers() {
           }}
         />
       </div>
+
+      {userList.length > 0 && (
+        <div className="batch-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+          <button className="btn btn-ghost btn-sm" onClick={toggleSelectAll} title="全选/取消">
+            {selectedIds.size === userList.filter((u: any) => u.id !== 1).length ? <CheckSquare size={16} /> : <Square size={16} />}
+            {selectedIds.size > 0 ? `已选 ${selectedIds.size}` : '全选'}
+          </button>
+          {selectedIds.size > 0 && (
+            <>
+              <button className="btn btn-danger btn-sm" onClick={() => batchBan(true)}>
+                批量封禁
+              </button>
+              <button className="btn btn-secondary btn-sm" onClick={() => batchBan(false)}>
+                批量解封
+              </button>
+              <select
+                className="form-input"
+                style={{ width: 140, height: 32, fontSize: 13 }}
+                onChange={(e) => { if (e.target.value) batchSetRole(e.target.value); }}
+                defaultValue=""
+              >
+                <option value="">设为角色...</option>
+                <option value="admin">管理员</option>
+                <option value="user">普通用户</option>
+              </select>
+            </>
+          )}
+        </div>
+      )}
+
       <div className="user-list">
         {userList.map((u) => (
           <div key={u.id} className={`user-item${u.banned ? ' user-banned' : ''}`}>
+            <div className="user-checkbox" onClick={() => u.id !== 1 && toggleSelect(u.id)} style={{ cursor: u.id !== 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', paddingRight: 8 }}>
+              {u.id === 1 ? null : selectedIds.has(u.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+            </div>
             <div className="user-info">
               <span className="user-name">
                 {u.username}

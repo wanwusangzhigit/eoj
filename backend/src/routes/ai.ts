@@ -3,6 +3,7 @@ import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { fetchTestcases } from '../utils/github-testcases';
 import { DEFAULT_AI_SYSTEM_PROMPT } from '../ai-default-prompt';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const ai = new Hono<AppType>();
 
@@ -239,7 +240,7 @@ async function toolListProblems(env: any, search?: string, difficulty?: string, 
   const binds: any[] = [];
   if (search) {
     sql += ' AND title LIKE ?';
-    binds.push(`%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`);
   }
   if (difficulty) {
     sql += ' AND difficulty = ?';

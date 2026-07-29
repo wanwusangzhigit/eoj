@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, listAdminMiddleware } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rateLimit';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const problemLists = new Hono<AppType>();
 
@@ -22,8 +23,8 @@ problemLists.get('/', async (c) => {
   if (search) {
     query += ' AND pl.title LIKE ?';
     countQuery += ' AND title LIKE ?';
-    binds.push(`%${search}%`);
-    countBinds.push(`%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`);
+    countBinds.push(`%${escapeLikeWildcard(search)}%`);
   }
 
   query += ' ORDER BY pl.created_at DESC LIMIT ? OFFSET ?';

@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, isAdmin } from '../middleware/auth';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const teams = new Hono<AppType>();
 
@@ -45,8 +46,8 @@ teams.get('/', async (c) => {
   if (search) {
     query += ' AND (t.name LIKE ? OR t.description LIKE ?)';
     countQuery += ' AND (name LIKE ? OR description LIKE ?)';
-    binds.push(`%${search}%`, `%${search}%`);
-    countBinds.push(`%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
+    countBinds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
   query += ' ORDER BY t.created_at DESC LIMIT ? OFFSET ?';

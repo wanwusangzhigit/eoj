@@ -85,6 +85,7 @@ const zh = {
     errorBoundary: '页面出现错误',
     refreshPage: '刷新页面',
     backToHome: '返回首页',
+    refresh: '刷新',
     copyMarkdown: '复制 Markdown',
     copied: '已复制',
     passwordTooShort: '密码至少需要8个字符',

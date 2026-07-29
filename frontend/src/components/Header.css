@@ -1,4 +1,145 @@
 /* ═══════════════════════════════════════════════════
+   Search Suggestions Dropdown
+   ═══════════════════════════════════════════════════ */
+.header-search-wrapper {
+  position: relative;
+}
+
+.search-suggestions {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 280px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+  z-index: 200;
+  overflow: hidden;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.search-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border);
+}
+
+.search-suggestion-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.search-suggestion-item .suggestion-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--accent-light);
+  color: var(--accent);
+}
+
+.search-suggestion-item .suggestion-title {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-suggestion-item .suggestion-subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.search-suggestion-item .suggestion-go {
+  flex-shrink: 0;
+  color: var(--text-tertiary);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.search-suggestion-item:hover .suggestion-go {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.search-suggestion-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+  font-weight: 500;
+  transition: background var(--transition-fast);
+}
+
+.search-suggestion-more:hover {
+  background: var(--bg-tertiary);
+}
+
+/* ── Default theme search input adjustments ── */
+[data-theme-style="default"] .header-default .header-search-wrapper {
+  position: relative;
+  width: 240px;
+}
+
+[data-theme-style="default"] .header-default .header-search-input {
+  width: 100%;
+  padding: 8px 14px 8px 34px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: all var(--transition);
+}
+
+[data-theme-style="default"] .header-default .header-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-light);
+}
+
+[data-theme-style="default"] .header-default .header-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+/* ── Luogu theme suggestion dropdown positioning ── */
+[data-theme-style="luogu"] .header-luogu .header-search-wrapper {
+  flex: 1;
+  max-width: 400px;
+}
+
+[data-theme-style="luogu"] .header-luogu .search-suggestions {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+}
+
+/* ═══════════════════════════════════════════════════
    Default Theme  — 主分支默认风格
    ═══════════════════════════════════════════════════ */
 [data-theme-style="default"] .header.header-default {

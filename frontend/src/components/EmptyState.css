@@ -3,15 +3,27 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 200px;
-  gap: 12px;
+  min-height: 240px;
+  gap: 16px;
   text-align: center;
-  padding: 40px 20px;
+  padding: 60px 20px;
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .empty-state-icon {
   color: var(--text-muted);
-  opacity: 0.5;
+  opacity: 0.4;
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 
 .empty-state-title {
@@ -24,6 +36,7 @@
   font-size: 14px;
   color: var(--text-muted);
   max-width: 400px;
+  line-height: 1.6;
 }
 
 .empty-state-action {

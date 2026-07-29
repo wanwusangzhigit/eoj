@@ -54,41 +54,59 @@ class ApiClient {
       }
     } catch { /* ignore */ }
 
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        ...options,
-        headers,
-      });
-    } catch {
-      throw new Error('Network error. Please check your connection and try again.');
-    }
+    // Retry logic: retry up to 2 times on network errors or 5xx
+    const MAX_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(`${this.baseUrl}${path}`, {
+          ...options,
+          headers,
+        });
 
-    // Auto-logout on 401
-    if (response.status === 401 && token) {
-      localStorage.removeItem('token');
-      window.dispatchEvent(new Event('auth:expired'));
-      throw new Error('Session expired. Please login again.');
-    }
+        // Auto-logout on 401
+        if (response.status === 401 && token) {
+          localStorage.removeItem('token');
+          window.dispatchEvent(new Event('auth:expired'));
+          throw new Error('Session expired. Please login again.');
+        }
 
-    const result: ApiResponse<T> = await response.json().catch(() => ({
-      success: false,
-      error: {
-        message: 'Failed to parse response',
-        code: 'PARSE_ERROR'
+        // Retry on server errors (5xx) that aren't 504 timeouts
+        if (response.status >= 500 && response.status < 600 && attempt < MAX_RETRIES) {
+          // Wait with exponential backoff: 1s, 2s
+          await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+          continue;
+        }
+
+        const result: ApiResponse<T> = await response.json().catch(() => ({
+          success: false,
+          error: {
+            message: 'Failed to parse response',
+            code: 'PARSE_ERROR'
+          }
+        }));
+
+        if (!result.success || !response.ok) {
+          const message = result.error?.message || `HTTP ${response.status}`;
+          throw new Error(message);
+        }
+
+        if (result.data === undefined) {
+          throw new Error('No data in response');
+        }
+
+        return result.data;
+      } catch (e: any) {
+        // Network errors: retry
+        if (e.message?.includes('Network error') && attempt < MAX_RETRIES) {
+          await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+          continue;
+        }
+        // Non-retryable errors: rethrow immediately
+        throw e;
       }
-    }));
-
-    if (!result.success || !response.ok) {
-      const message = result.error?.message || `HTTP ${response.status}`;
-      throw new Error(message);
     }
 
-    if (result.data === undefined) {
-      throw new Error('No data in response');
-    }
-
-    return result.data;
+    throw new Error('Network error. Please check your connection and try again.');
   }
 
   async getProblems(params?: { page?: number; pageSize?: number; search?: string; tag?: string; difficulty?: string }) {
@@ -1552,6 +1570,26 @@ class ApiClient {
 
   async saveUserSettings(settings: Record<string, string>) {
     return this.request<{ message: string }>(`/user/settings`, { method: 'PUT', body: JSON.stringify({ settings }) });
+  }
+
+  // ── Search ──
+  async searchSuggestions(q: string) {
+    return this.request<{ suggestions: any[] }>(`/search/suggestions?q=${encodeURIComponent(q)}`);
+  }
+
+  // ── Auth: Password Reset ──
+  async forgotPassword(email: string) {
+    return this.request<{ message: string; resetUrl?: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  async resetPassword(token: string, password: string) {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
   }
 }
 

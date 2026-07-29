@@ -303,7 +303,19 @@ auth.post('/register', captchaMiddleware('register'), createRateLimiter('registe
   }
 
   if (password.length < 8) {
-    return c.json({ success: false, error: { message: 'Password too short', code: 'BAD_REQUEST' } }, 400);
+    return c.json({ success: false, error: { message: 'Password too short (min 8 characters)', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (!/[A-Z]/.test(password)) {
+    return c.json({ success: false, error: { message: 'Password must include at least one uppercase letter', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (!/[a-z]/.test(password)) {
+    return c.json({ success: false, error: { message: 'Password must include at least one lowercase letter', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (!/[0-9]/.test(password)) {
+    return c.json({ success: false, error: { message: 'Password must include at least one digit', code: 'BAD_REQUEST' } }, 400);
   }
 
   // Check registration open flag from settings table or env
@@ -514,6 +526,121 @@ auth.post('/send-verification-code', createRateLimiter('sendVerificationCode', 3
   }
 
   return c.json({ success: true, data: { message: 'Verification code sent' } });
+});
+
+// ── Password Reset Flow ──
+
+// POST /auth/forgot-password — send password reset email with token
+auth.post('/forgot-password', createRateLimiter('forgotPassword', 3, 300_000), async (c) => {
+  const body: any = await c.req.json();
+  const email = (body.email || '').trim().toLowerCase();
+
+  if (!email) {
+    return c.json({ success: false, error: { message: 'Email is required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const emailError = validateEmail(email);
+  if (emailError) {
+    return c.json({ success: false, error: { message: 'Invalid email format', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // Check if user exists with this email and has a password set
+  const user: any = await c.env.DB.prepare('SELECT id, username, password_hash FROM users WHERE email = ?').bind(email).first();
+  if (!user || !user.password_hash) {
+    // Return success even if email not found (to prevent email enumeration)
+    return c.json({ success: true, data: { message: 'If this email is registered, a reset link has been sent.' } });
+  }
+
+  // Delete old tokens for this email
+  await c.env.DB.prepare('DELETE FROM password_reset_tokens WHERE email = ?').bind(email).run();
+
+  // Generate a secure random token
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  const token = Array.from(tokenBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1 hour
+
+  // Store the token
+  await c.env.DB.prepare(
+    'INSERT INTO password_reset_tokens (email, token, expires_at) VALUES (?, ?, ?)'
+  ).bind(email, token, expiresAt).run();
+
+  const resetUrl = `${c.env.FRONTEND_URL}/reset-password?token=${token}`;
+
+  // Send email via Cloudflare Email Binding
+  const sendEmail = (c.env as any).SEND_EMAIL;
+  if (!sendEmail || typeof sendEmail.send !== 'function') {
+    console.log('SEND_EMAIL binding not available (dev mode), reset URL:', resetUrl);
+    return c.json({ success: true, data: { message: 'If this email is registered, a reset link has been sent.', resetUrl } });
+  }
+
+  try {
+    await sendEmail.send({
+      from: c.env.DEFAULT_FROM_EMAIL || 'noreply@oj-system.com',
+      to: [{ email }],
+      subject: 'Password Reset Request',
+      html: `<p>Hello ${user.username},</p>
+<p>We received a request to reset your password. Click the link below to set a new password:</p>
+<p><a href="${resetUrl}">${resetUrl}</a></p>
+<p>This link will expire in 1 hour.</p>
+<p>If you did not request this, please ignore this email.</p>`,
+    });
+  } catch (e) {
+    console.error('Failed to send reset email:', e);
+    return c.json({ success: false, error: { message: 'Failed to send email', code: 'EMAIL_SEND_FAILED' } }, 500);
+  }
+
+  return c.json({ success: true, data: { message: 'If this email is registered, a reset link has been sent.' } });
+});
+
+// POST /auth/reset-password — verify token and set new password
+auth.post('/reset-password', createRateLimiter('resetPassword', 5, 300_000), async (c) => {
+  const body: any = await c.req.json();
+  const { token, password } = body;
+
+  if (!token || !password) {
+    return c.json({ success: false, error: { message: 'Token and password are required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  if (password.length < 8) {
+    return c.json({ success: false, error: { message: 'Password too short (min 8 characters)', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const record: any = await c.env.DB.prepare(
+    'SELECT id, email, used, expires_at FROM password_reset_tokens WHERE token = ?'
+  ).bind(token).first();
+
+  if (!record) {
+    return c.json({ success: false, error: { message: 'Invalid or expired reset token', code: 'INVALID_TOKEN' } }, 400);
+  }
+
+  if (record.used === 1) {
+    return c.json({ success: false, error: { message: 'Reset token has already been used', code: 'TOKEN_USED' } }, 400);
+  }
+
+  if (new Date(record.expires_at) < new Date()) {
+    return c.json({ success: false, error: { message: 'Reset token has expired', code: 'TOKEN_EXPIRED' } }, 400);
+  }
+
+  // Hash the new password
+  const passwordHash = await bcrypt.hashSync(password, 10);
+
+  // Update user's password
+  const result = await c.env.DB.prepare(
+    'UPDATE users SET password_hash = ? WHERE email = ?'
+  ).bind(passwordHash, record.email).run();
+
+  if (result.meta.changes === 0) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  // Mark token as used
+  await c.env.DB.prepare('UPDATE password_reset_tokens SET used = 1 WHERE id = ?').bind(record.id).run();
+
+  // Revoke all other tokens for this email
+  await c.env.DB.prepare('UPDATE password_reset_tokens SET used = 1 WHERE email = ? AND id != ?').bind(record.email, record.id).run();
+
+  return c.json({ success: true, data: { message: 'Password has been reset successfully' } });
 });
 
 auth.get('/me', async (c) => {

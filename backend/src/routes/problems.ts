@@ -5,6 +5,7 @@ import { validateSlug } from '../utils/validator';
 import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
 import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
 import { sendNotification, NotificationType } from '../utils/notify';
+import { escapeLikeWildcard } from '../utils/helpers';
 
 const VALID_SPJ_LANGUAGES = ['python', 'cpp', 'java', 'javascript', 'c', 'go', 'rust'];
 
@@ -51,13 +52,13 @@ problems.get('/', async (c) => {
   if (search) {
     countQuery += ' AND (title LIKE ? OR slug LIKE ?)';
     dataQuery += ' AND (p.title LIKE ? OR p.slug LIKE ?)';
-    binds.push(`%${search}%`, `%${search}%`);
+    binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
   if (tag) {
     countQuery += ' AND tags LIKE ?';
     dataQuery += ' AND p.tags LIKE ?';
-    binds.push(`%"${tag}"%`);
+    binds.push(`%"${escapeLikeWildcard(tag)}"%`);
   }
 
   if (difficulty) {
@@ -442,7 +443,7 @@ problems.get('/:slug/related', async (c) => {
        ${tags.map(() => "CASE WHEN tags LIKE ? THEN 1 ELSE 0 END").join(' + ')}
      ) DESC
      LIMIT ?`
-  ).bind(problem.id, ...tags.map(t => `%"${t}"%`), ...tags.map(() => 1), limit).all();
+  ).bind(problem.id, ...tags.map(t => `%"${escapeLikeWildcard(t)}"%`), ...tags.map(() => 1), limit).all();
 
   return c.json({ success: true, data: { problems: related.results } });
 });

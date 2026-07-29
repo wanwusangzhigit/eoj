@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono';
-import { AppType } from '../types';
+import { AppType, AuditLogRow } from '../types';
 
 /**
  * Extract client IP from request headers (Cloudflare provides CF-Connecting-IP)

@@ -115,3 +115,58 @@ export interface PaginatedResult<T> {
     totalPages: number;
   };
 }
+
+// ── Generic API response shape (matching Hono json responses) ──
+
+export interface ApiResponse<T = unknown> {
+  success: true;
+  data: T;
+}
+
+export interface ApiError {
+  success: false;
+  error: {
+    message: string;
+    code?: string;
+    detail?: string;
+  };
+}
+
+// ── Common D1 query result helpers ──
+
+/** Shape returned by SELECT COUNT(*) as count queries */
+export interface CountResult {
+  count: number;
+}
+
+/** Shape returned by SELECT COUNT(*) as total queries */
+export interface TotalResult {
+  total: number;
+}
+
+/** A single row from the settings table */
+export interface SettingRow {
+  key: string;
+  value: string;
+}
+
+/** A single row from the rate_limits table */
+export interface RateLimitRow {
+  key: string;
+  created_at: number;
+}
+
+/** A single row from the audit_logs table */
+export interface AuditLogRow {
+  id: number;
+  user_id: number | null;
+  username: string | null;
+  ip: string;
+  device_fingerprint: string;
+  page: string;
+  action: string;
+  method: string;
+  path: string;
+  user_agent: string;
+  created_at: string;
+}

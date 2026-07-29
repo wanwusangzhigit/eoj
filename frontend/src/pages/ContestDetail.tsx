@@ -3,8 +3,8 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
-import LoadingSpinner from '../components/LoadingSpinner';
 import RatingBadge from '../components/RatingBadge';
+import { SkeletonTable } from '../components/Skeleton';
 import { getRatingColor } from '../utils/rating';
 import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown } from 'lucide-react';
 import { t } from '../i18n';
@@ -284,7 +284,7 @@ export default function ContestDetail() {
   };
 
   if (loading) {
-    return <LoadingSpinner />;
+    return <div className="loading-container"><SkeletonTable rows={8} /></div>;
   }
 
   if (loadError || !contest) {
@@ -523,6 +523,11 @@ export default function ContestDetail() {
               <div className="empty-tab">{t('contests.noRankings')}</div>
             ) : (
               <div className="rankings-table-enhanced">
+                {rankingsMeta.board_frozen && (
+                  <div className="freeze-banner">
+                    <AlertCircle size={16} /> 排行榜已冻结 — 最后 {contest.freeze_minutes || 60} 分钟的结果暂时隐藏
+                  </div>
+                )}
                 <div className="rankings-table-header">
                   <span className="col-rank">#</span>
                   <span className="col-user">{t('contests.user')}</span>

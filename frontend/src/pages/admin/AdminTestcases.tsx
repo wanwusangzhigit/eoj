@@ -6,7 +6,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { DIFFICULTY_COLORS } from '../../constants';
 import { t } from '../../i18n';
 import {
-  Plus, Save, Trash2, X, ChevronUp, ChevronDown, Upload,
+  Plus, Save, Trash2, X, ChevronUp, ChevronDown, Upload, Download,
 } from 'lucide-react';
 import '../Admin.css';
 
@@ -129,6 +129,27 @@ export default function AdminTestcases() {
     }
   };
 
+  const handleBatchExport = () => {
+    if (!existingTestcases || existingTestcases.length === 0) {
+      addToast('error', '没有可导出的测试用例');
+      return;
+    }
+    const exportData = existingTestcases.map((tc: any) => ({
+      input: tc.input,
+      expected_output: tc.expected_output,
+      is_sample: !!tc.is_sample,
+      score: tc.score || 10,
+    }));
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${selectedTestcaseProblem?.slug || 'testcases'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    addToast('success', `已导出 ${exportData.length} 个测试用例`);
+  };
+
   const toggleTestcaseExpand = (index: number) => {
     setExpandedTestcases(prev => {
       const next = new Set(prev);
@@ -222,6 +243,9 @@ export default function AdminTestcases() {
                   <span>{t('admin.sampleCount').replace('{0}', String(existingTestcases.filter((tc: any) => tc.is_sample).length))}</span>
                   <span>{t('admin.hiddenCount').replace('{0}', String(existingTestcases.filter((tc: any) => !tc.is_sample).length))}</span>
                   <span>{t('admin.totalScore').replace('{0}', String(existingTestcases.reduce((sum: number, tc: any) => sum + (tc.score || 0), 0)))}</span>
+                  <button className="btn btn-secondary btn-sm" onClick={handleBatchExport} style={{ marginLeft: 'auto' }}>
+                    <Download size={14} /> 批量导出
+                  </button>
                 </div>
                 <div className="testcase-list">
                   {existingTestcases.map((tc: any, idx: number) => (

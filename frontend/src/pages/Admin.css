@@ -9,6 +9,152 @@
   font-weight: 700;
 }
 
+/* ══════════════════════════════════════
+   Dashboard Charts
+   ══════════════════════════════════════ */
+.dashboard-charts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.chart-section {
+  background: var(--bg-card, var(--bg-secondary));
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+.chart-section .admin-section-title {
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary);
+}
+
+/* Bar chart */
+.bar-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 160px;
+  padding-bottom: 24px;
+  position: relative;
+}
+
+.bar-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.bar-value {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.bar-stack {
+  width: 100%;
+  max-width: 40px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  border-radius: 4px 4px 0 0;
+  overflow: hidden;
+}
+
+.bar-fill {
+  width: 100%;
+  border-radius: 2px;
+  min-height: 2px;
+  transition: height 0.4s ease;
+}
+
+.bar-accepted {
+  background: linear-gradient(180deg, #22c55e, #16a34a);
+}
+
+.bar-total {
+  background: linear-gradient(180deg, var(--accent), #6366f1);
+  opacity: 0.6;
+}
+
+.bar-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  position: absolute;
+  bottom: 0;
+}
+
+/* Language distribution */
+.lang-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.lang-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lang-name {
+  width: 80px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.lang-bar-track {
+  flex: 1;
+  height: 20px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.lang-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease;
+  min-width: 4px;
+}
+
+.lang-count {
+  width: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.lang-pct {
+  width: 36px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  text-align: right;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .dashboard-charts {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-tabs {
   display: flex;
   gap: 4px;

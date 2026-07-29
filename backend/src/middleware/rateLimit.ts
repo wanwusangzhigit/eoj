@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono';
-import { AppType } from '../types';
+import { AppType, CountResult } from '../types';
 
 export async function rateLimitMiddleware(c: Context<AppType>, next: Next) {
   const user = c.get('user');
@@ -44,9 +44,15 @@ export async function rateLimitMiddleware(c: Context<AppType>, next: Next) {
 
     await next();
   } catch (e) {
-    // If rate limiting fails (e.g., table doesn't exist), fail open
+    // On rate limiter failure, fail CLOSED to prevent bypass attacks
     console.error('Rate limit error:', e);
-    await next();
+    return c.json({
+      success: false,
+      error: {
+        message: 'Rate limit check unavailable. Please try again later.',
+        code: 'RATE_LIMIT_UNAVAILABLE'
+      }
+    }, 503);
   }
 }
 
@@ -67,8 +73,12 @@ export function createRateLimiter(prefix: string, maxRequests: number, windowMs:
       await c.env.DB.prepare("INSERT INTO rate_limits (key, created_at) VALUES (?, ?)").bind(key, now).run();
       await next();
     } catch (e) {
+      // Fail CLOSED on error to prevent bypassing rate limits
       console.error('Rate limit error:', e);
-      await next();
+      return c.json({
+        success: false,
+        error: { message: 'Rate limit check unavailable. Please try again later.', code: 'RATE_LIMIT_UNAVAILABLE' }
+      }, 503);
     }
   };
 }

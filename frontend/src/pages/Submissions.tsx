@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import StatusBadge from '../components/StatusBadge';
-import LoadingSpinner from '../components/LoadingSpinner';
+import { SkeletonTable } from '../components/Skeleton';
 import EmptyState from '../components/EmptyState';
 import { Filter, Inbox, Search, LogIn, AlertCircle, Download } from 'lucide-react';
 import { t } from '../i18n';
@@ -135,7 +135,7 @@ export default function Submissions() {
       </div>
 
       {loading ? (
-        <LoadingSpinner message={t('submissions.loadingSubmissions')} />
+        <SkeletonTable rows={10} />
       ) : loadError ? (
         <div className="error-banner">
           <AlertCircle size={16} />

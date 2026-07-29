@@ -29,6 +29,10 @@ export function paginate(page: number, pageSize: number, total: number) {
 /**
  * Parse page/pageSize from query params with sensible defaults and bounds.
  */
+export function escapeLikeWildcard(input: string): string {
+  return input.replace(/[%_]/g, '\\$&');
+}
+
 export function parsePagination(
   query: { page?: string; pageSize?: string },
   defaultPageSize = 20,

@@ -6,6 +6,10 @@ const settings = new Hono<AppType>();
 
 // GET /settings - Get all public settings (no auth required)
 settings.get('/', async (c) => {
+  // Check if we have a cached response
+  const cacheKey = 'settings:all';
+  const cached = await c.env.DB.prepare('SELECT value FROM settings WHERE key = ?').bind(cacheKey).first().catch(() => null);
+  
   const results = await c.env.DB.prepare('SELECT key, value FROM settings').all();
   const data: Record<string, string> = {};
   for (const row of results.results as any[]) {
@@ -13,6 +17,9 @@ settings.get('/', async (c) => {
     if (row.key === 'ai_api_key') continue;
     data[row.key] = row.value;
   }
+
+  // Cache settings in the response for a short time (s-maxage for CDN, max-age for browser)
+  c.header('Cache-Control', 'public, max-age=60, s-maxage=120');
   return c.json({ success: true, data });
 });
 

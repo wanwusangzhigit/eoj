@@ -3,7 +3,7 @@ import { api } from '../../api/client';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useToastStore } from '../../store/toast';
 import { t } from '../../i18n';
-import { Search, FileText, ChevronLeft, ChevronRight, Shield } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Search, FileText, Shield, RefreshCw } from 'lucide-react';
 import '../Admin.css';
 
 export default function AdminAuditLogs() {
@@ -15,6 +15,7 @@ export default function AdminAuditLogs() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [ipFilter, setIpFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -26,7 +27,7 @@ export default function AdminAuditLogs() {
 
   useEffect(() => {
     fetchLogs();
-  }, [page, debouncedSearch, ipFilter]);
+  }, [page, debouncedSearch, ipFilter, actionFilter]);
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -36,6 +37,7 @@ export default function AdminAuditLogs() {
         pageSize: 20,
         search: debouncedSearch || undefined,
         ip: ipFilter || undefined,
+        action: actionFilter || undefined,
       });
       setLogs(data.logs);
       setTotalPages(data.pagination.totalPages);
@@ -99,6 +101,20 @@ export default function AdminAuditLogs() {
             autoComplete="off"
           />
         </div>
+        <select
+          className="form-input"
+          value={actionFilter}
+          onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+          style={{ width: 140 }}
+        >
+          <option value="">{t('admin.allActions') || '全部操作'}</option>
+          <option value="POST">POST</option>
+          <option value="PUT">PUT</option>
+          <option value="DELETE">DELETE</option>
+          <option value="ban_ip">封禁 IP</option>
+          <option value="unban_ip">解封 IP</option>
+          <option value="ban_device">封禁设备</option>
+        </select>
         <input
           type="text"
           className="form-input"
@@ -109,6 +125,10 @@ export default function AdminAuditLogs() {
           name="ip_filter"
           autoComplete="off"
         />
+        <button className="btn btn-secondary btn-sm" onClick={() => fetchLogs()} title="刷新" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <RefreshCw size={14} className={loading ? 'spin' : ''} />
+          刷新
+        </button>
       </div>
 
       {loading ? (
