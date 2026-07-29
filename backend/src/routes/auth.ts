@@ -544,9 +544,9 @@ auth.post('/forgot-password', createRateLimiter('forgotPassword', 3, 300_000), a
     return c.json({ success: false, error: { message: 'Invalid email format', code: 'BAD_REQUEST' } }, 400);
   }
 
-  // Check if user exists with this email
-  const user: any = await c.env.DB.prepare('SELECT id, username FROM users WHERE email = ?').bind(email).first();
-  if (!user) {
+  // Check if user exists with this email and has a password set
+  const user: any = await c.env.DB.prepare('SELECT id, username, password_hash FROM users WHERE email = ?').bind(email).first();
+  if (!user || !user.password_hash) {
     // Return success even if email not found (to prevent email enumeration)
     return c.json({ success: true, data: { message: 'If this email is registered, a reset link has been sent.' } });
   }
