@@ -10,11 +10,7 @@ footer:
   enabled: true
   text: ""
   links: 
-<<<<<<< HEAD
     - name: "GitHub"
-=======
-    - name: "GitHub1"
->>>>>>> 2874e0aa9e9c9edda1022b41b6f1a7b69821c97a
       url: "https://github.com/ruying-suixing"
     - name: "主站"
       url: "https://www.rusin7.com"
