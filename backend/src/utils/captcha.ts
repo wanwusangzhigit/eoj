@@ -10,33 +10,17 @@
 // ── resvg-wasm: lazy singleton for SVG→PNG ──
 
 // Direct import of the .wasm binary — wrangler/esbuild bundles it as WebAssembly.Module
-import resvgWasmModule from '@resvg/resvg-wasm/index_bg.wasm';
+// ── resvg-wasm: lazy singleton for SVG→PNG ──
+
+// ── resvg-wasm: lazy singleton for SVG→PNG ──
+
+// ── resvg-wasm: 直接使用 @cf-wasm/resvg ──
+
+import { Resvg } from '@cf-wasm/resvg';   // 仅导入 Resvg，没有 initWasm
 import { getInterFontBuffer } from '../fonts/inter';
 
-let resvgInitPromise: Promise<void> | null = null;
-
-/**
- * Initialize the resvg WASM module exactly once.
- * Safe to call multiple times — subsequent calls return the existing promise.
- */
-function ensureResvg(): Promise<void> {
-  if (!resvgInitPromise) {
-    resvgInitPromise = (async () => {
-      const { initWasm } = await import('@resvg/resvg-wasm');
-      await initWasm(resvgWasmModule);
-    })();
-  }
-  return resvgInitPromise;
-}
-
-/**
- * Render an SVG string to PNG bytes using resvg-wasm.
- * @param svg - The SVG string to render.
- * @returns PNG as Uint8Array.
- */
 export async function svgToPng(svg: string): Promise<Uint8Array> {
-  await ensureResvg();
-  const { Resvg } = await import('@resvg/resvg-wasm');
+  // 直接创建实例，包内部已自动加载 WASM
   const resvg = new Resvg(svg, {
     background: '#ffffff',
     fitTo: { mode: 'original' },
