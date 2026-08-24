@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware, problemAdminMiddleware } from '../middleware/auth';
 
 const tags = new Hono<AppType>();
 
@@ -232,8 +232,10 @@ tags.delete('/:id', authMiddleware, adminMiddleware, async (c) => {
   return c.json({ success: true, data: { message: 'Tag deleted' } });
 });
 
-// POST /problems/:id/tags — 设置题目标签（需 adminMiddleware，替换式）
-tags.post('/problems/:id/tags', authMiddleware, adminMiddleware, async (c) => {
+// POST /problems/:id/tags — 设置题目标签（替换式）。
+// 使用 problemAdminMiddleware,使仅拥有题目管理权限的用户也能在编辑题目时保存标签
+// (与创建/编辑题目的权限判定一致),防止「能建题却不能编辑」。
+tags.post('/problems/:id/tags', authMiddleware, problemAdminMiddleware, async (c) => {
   const problemId = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
   const { tag_ids } = body;

@@ -38,6 +38,7 @@ export default function AdminSettings() {
   const [settingsAIAllowedModels, setSettingsAIAllowedModels] = useState('');
   const [settingsOAuthProtocol, setSettingsOAuthProtocol] = useState('');
   const [settingsOAuthCallbackUrl, setSettingsOAuthCallbackUrl] = useState('');
+  const [settingsOAuthCorsOrigins, setSettingsOAuthCorsOrigins] = useState('');
   const [settingsCaptchaEnabled, setSettingsCaptchaEnabled] = useState(true);
   const [settingsCaptchaStrength, setSettingsCaptchaStrength] = useState('medium');
   const [settingsCaptchaType, setSettingsCaptchaType] = useState('text');
@@ -83,6 +84,7 @@ export default function AdminSettings() {
       setSettingsAIAllowedModels(data.ai_allowed_models || '');
       setSettingsOAuthProtocol(data.oauth_protocol || '');
       setSettingsOAuthCallbackUrl(data.oauth_callback_url || '');
+      setSettingsOAuthCorsOrigins(data.cors_origins || '');
       setSettingsCaptchaEnabled(data.captcha_enabled !== 'false');
       setSettingsCaptchaStrength(data.captcha_strength || 'medium');
       setSettingsCaptchaType(data.captcha_type || 'text');
@@ -136,6 +138,7 @@ export default function AdminSettings() {
         ai_allowed_models: settingsAIAllowedModels,
         oauth_protocol: settingsOAuthProtocol,
         oauth_callback_url: settingsOAuthCallbackUrl,
+        cors_origins: settingsOAuthCorsOrigins.trim(),
         captcha_enabled: String(settingsCaptchaEnabled),
         captcha_strength: settingsCaptchaStrength,
         captcha_type: settingsCaptchaType,
@@ -588,6 +591,19 @@ export default function AdminSettings() {
           />
           <p style={{fontSize:'13px',color:'var(--text-secondary)',marginTop:'4px'}}>
             {t('admin.oauthCallbackUrlHint')}
+          </p>
+        </div>
+
+        <div className="form-group">
+          <label>{t('admin.oauthCorsOrigins')}</label>
+          <input
+            type="text"
+            value={settingsOAuthCorsOrigins}
+            onChange={(e) => setSettingsOAuthCorsOrigins(e.target.value)}
+            placeholder="https://other-domain.com, https://another.com"
+          />
+          <p style={{fontSize:'13px',color:'var(--text-secondary)',marginTop:'4px'}}>
+            {t('admin.oauthCorsOriginsHint')}
           </p>
         </div>
       </div>

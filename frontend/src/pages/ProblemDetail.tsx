@@ -453,14 +453,19 @@ export default function ProblemDetail() {
     return t('discussions.general');
   };
 
-  // ── Restore draft from localStorage (Bug 6 fix) ──
-
+  // ── 初始加载:恢复默认语言(python)的草稿或默认代码(Bug 6 fix) ──
+  // 注意:这里只应在问题/草稿键变化时恢复一次,不能依赖 language——
+  // 否则每次切换语言都会用该语言的草稿/默认代码覆盖编辑器,违背
+  // 「若用户已修改代码则切换语言时不更换代码」的需求。
+  const initialLanguageRef = useRef<string | null>(null);
   useEffect(() => {
     if (!draftKey) return;
+    if (initialLanguageRef.current === draftKey) return;
+    initialLanguageRef.current = draftKey;
     const savedDraft = localStorage.getItem(DRAFT_KEY(draftKey, language));
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setSourceCode(savedDraft || LANGUAGE_TEMPLATES[language] || '');
-  }, [draftKey, language]);
+  }, [draftKey]);
 
   // ── Auto-save draft to localStorage (Bug 6 fix) ──
 
@@ -534,9 +539,12 @@ export default function ProblemDetail() {
   };
 
   const handleLanguageChange = async (lang: string) => {
-    const isTemplate = Object.values(LANGUAGE_TEMPLATES).some(tmpl => tmpl === sourceCode);
-    if (isTemplate) {
-      // Try to load user's saved template
+    // 判断用户是否改过当前语言的默认代码:与当前语言的默认(姿势)模板完全一致则视为「未修改」
+    const currentDefault = LANGUAGE_TEMPLATES[language] || '';
+    const unmodified = sourceCode === currentDefault;
+
+    if (unmodified) {
+      // 未修改默认代码:切换语言时更换为对应语言的默认代码(优先用户保存的模板)
       try {
         const data = await api.getTemplate(lang);
         if (data.template?.content) {
@@ -548,6 +556,7 @@ export default function ProblemDetail() {
         setSourceCode(LANGUAGE_TEMPLATES[lang] || '');
       }
     }
+    // 已修改(上面 unmodified 为 false):保留输入框中的代码,仅切换语言
     setLanguage(lang);
   };
 

@@ -59,8 +59,20 @@ app.use('/api/*', async (c, next) => {
 });
 
 app.use('/api/*', async (c, next) => {
+  // 允许的跨域来源:站点主域 + 站点设置里通过 cors_origins(逗号分隔)配置的
+  // 第三方域名(跨域社交登录时,来源域名 B 需要能调用 /auth/exchange 换取 token)。
+  const origins = [c.env.FRONTEND_URL || 'http://localhost:5173'];
+  try {
+    const row: any = await c.env.DB.prepare("SELECT value FROM settings WHERE key = 'cors_origins'").first();
+    if (row && row.value) {
+      for (const o of row.value.split(',').map((s: string) => s.trim()).filter(Boolean)) {
+        if (origins.indexOf(o) === -1) origins.push(o);
+      }
+    }
+  } catch { /* DB 不可用时忽略 */ }
+
   const corsMiddleware = cors({
-    origin: [c.env.FRONTEND_URL || 'http://localhost:5173'],
+    origin: origins,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowHeaders: ['Content-Type', 'Authorization', 'X-Device-Fingerprint'],
     credentials: true,

@@ -951,7 +951,7 @@ class ApiClient {
   }
 
   async createProblem(data: Record<string, unknown>) {
-    return this.request<{ id: number; message: string }>('/problems', {
+    return this.request<{ id: number; slug: string; message: string }>('/problems', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -1126,6 +1126,15 @@ class ApiClient {
     return this.request<{ token: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ username, password, captcha_uuid, captcha_answer }),
+    });
+  }
+
+  // OAuth 一次性 exchange code -> JWT。用于跨域社交登录:回调页可能落在第三方
+  // 域名 B 上,因此必须通过本客户端指向的 API 服务端(A)兑换,不能写死相对路径。
+  async exchangeOAuthCode(code: string) {
+    return this.request<{ token: string }>('/auth/exchange', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
     });
   }
 

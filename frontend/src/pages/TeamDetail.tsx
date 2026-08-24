@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -17,6 +17,7 @@ import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { useSettingsStore } from '../store/settings';
 import { formatContestTime } from '../utils/contestTime';
+import { distributeScores } from '../utils/testcaseScore';
 import './Teams.css';
 
 type Tab = 'overview' | 'announcements' | 'discussions' | 'problemSets' | 'contests' | 'members' | 'rankings' | 'settings' | 'problems' | 'groups';
@@ -497,13 +498,13 @@ function ProblemsTab({ teamId, isMember }: { teamId: number; isMember: boolean }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.slug || !form.description) {
+    if (!form.title || !form.description) {
       addToast('error', t('admin.titleRequired'));
       return;
     }
     try {
       await api.createTeamProblem(teamId, {
-        title: form.title, slug: form.slug, description: form.description,
+        title: form.title, slug: form.slug.trim(), description: form.description,
         input_format: form.input_format, output_format: form.output_format,
         time_limit: form.time_limit, memory_limit: form.memory_limit,
         tags: form.tags ? form.tags.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
@@ -562,6 +563,7 @@ function ProblemsTab({ teamId, isMember }: { teamId: number; isMember: boolean }
 
   // ── 拖拽上传状态 ──
   const [dragActive, setDragActive] = useState(false);
+  const dropzoneFileInputRef = useRef<HTMLInputElement | null>(null);
   // ── 导入预览确认 ──
   const [importPreview, setImportPreview] = useState<{ fileName: string; parsed: any[] } | null>(null);
 
@@ -570,7 +572,8 @@ function ProblemsTab({ teamId, isMember }: { teamId: number; isMember: boolean }
       addToast('error', t('admin.atLeastOneTestcase'));
       return;
     }
-    setImportPreview({ fileName, parsed });
+    // 上传数据时按 100 分总分均匀分配(样例为 0 分)
+    setImportPreview({ fileName, parsed: distributeScores(parsed) });
   };
 
   const confirmImportPreview = () => {
@@ -610,8 +613,9 @@ function ProblemsTab({ teamId, isMember }: { teamId: number; isMember: boolean }
       );
       const parsed: any[] = [];
       for (const [name, entry] of inEntries) {
-        const outName = name.replace(/\.in$/i, '.out');
-        const outEntry = zip.files[outName];
+        const base = name.replace(/\.in$/i, '');
+        // 允许导入 .out / .ans 任一扩展名的输出文件
+        const outEntry = zip.files[`${base}.out`] || zip.files[`${base}.ans`];
         if (!outEntry || outEntry.dir) continue;
         const input = await entry.async('string');
         const output = await outEntry.async('string');
@@ -1074,12 +1078,27 @@ function ProblemsTab({ teamId, isMember }: { teamId: number; isMember: boolean }
           <h3><Upload size={16} style={{ color: 'var(--primary)' }} /> {t('admin.addNewTestcases')}</h3>
           <div
             className={`testcase-dropzone${dragActive ? ' active' : ''}`}
+            onClick={() => dropzoneFileInputRef.current?.click()}
             onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
             onDragLeave={() => setDragActive(false)}
             onDrop={handleDrop}
           >
             <Upload size={22} />
             <span>{t('teams.testcaseDropHint')}</span>
+            <input
+              ref={dropzoneFileInputRef}
+              type="file"
+              accept=".json,.zip"
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  if (/\.(json)$/i.test(file.name)) importJsonFile(file);
+                  else if (/\.(zip)$/i.test(file.name)) importZipFile(file);
+                }
+                e.target.value = '';
+              }}
+            />
           </div>
           {importPreview && (
             <div className="testcase-import-preview">

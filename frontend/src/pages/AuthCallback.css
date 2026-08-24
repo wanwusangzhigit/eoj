@@ -33,6 +33,11 @@
   max-width: 400px;
 }
 
+.auth-callback-actions {
+  display: flex;
+  gap: 10px;
+}
+
 .auth-callback-spinner {
   width: 36px;
   height: 36px;

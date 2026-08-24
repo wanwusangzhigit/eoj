@@ -58,7 +58,13 @@ export function renderMarkdown(text: string): string {
       return `${prefix}${placeholder}`;
     });
 
-  const html = marked.parse(preprocessed) as string;
+  // 修复"带空格的加粗标记":CommonMark 规范要求 **内容** 内不能有首尾空白,
+  // 因此 ** 解释 ** 会被 marked 原样输出而非加粗。但 OJ 题目模板/人工输入
+  // 常写成带空格形式,这里在交给 marked 之前把 `** 内容 **` 归一律化为 `**内容**`,
+  // 使其正常渲染为加粗。此时数学公式已被替换为不含 `*` 的占位符,正则不会误伤公式。
+  const normalized = preprocessed.replace(/\*{2}\s+([^*\n][^*\n]*?)\s+\*{2}/g, '**$1**');
+
+  const html = marked.parse(normalized) as string;
   // 整体净化一次:此时占位符仍是纯文本,DOMPurify 不会破坏它们
   const sanitizedHtml = DOMPurify.sanitize(html, {
     ALLOWED_TAGS: [

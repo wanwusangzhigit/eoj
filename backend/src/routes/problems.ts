@@ -719,15 +719,19 @@ problems.get('/:id/status', authMiddleware, async (c) => {
 
 problems.post('/', authMiddleware, problemAdminMiddleware, async (c) => {
   const body = await c.req.json();
-  const { title, slug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, is_public, testcases, judge_type, spj_language, spj_code } = body;
+  const { title, slug: rawSlug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, is_public, testcases, judge_type, spj_language, spj_code } = body;
 
-  if (!title || !slug || !description) {
-    return c.json({ success: false, error: { message: 'title, slug, and description are required', code: 'BAD_REQUEST' } }, 400);
+  if (!title || !description) {
+    return c.json({ success: false, error: { message: 'title and description are required', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const slugError = validateSlug(slug);
-  if (slugError) {
-    return c.json({ success: false, error: { message: slugError, code: 'BAD_REQUEST' } }, 400);
+  // 标识符(slug):未填写时留空,插入后按 p{1000+id} 自动生成。
+  const slug = (rawSlug || '').trim();
+  if (slug) {
+    const slugError = validateSlug(slug);
+    if (slugError) {
+      return c.json({ success: false, error: { message: slugError, code: 'BAD_REQUEST' } }, 400);
+    }
   }
 
   // Validate SPJ fields
@@ -742,13 +746,20 @@ problems.post('/', authMiddleware, problemAdminMiddleware, async (c) => {
   }
 
   try {
+    // slug 列 NOT NULL UNIQUE,而自动生成的 slug 依赖插入后的 id,
+    // 因此未填 slug 时先用随机占位符插入拿到 id,再回填为 p{1000+id}。
+    const isAutoSlug = !slug;
+    const placeholderSlug = isAutoSlug
+      ? `__auto_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+      : slug;
+
     const result = await c.env.DB.prepare(
       `INSERT INTO problems (title, slug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, is_public, judge_type, spj_language)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         title,
-        slug,
+        placeholderSlug,
         description,
         input_format || null,
         output_format || null,
@@ -762,17 +773,27 @@ problems.post('/', authMiddleware, problemAdminMiddleware, async (c) => {
       )
       .run();
 
+    const newId = result.meta.last_row_id;
+    const finalSlug = isAutoSlug ? `p${1000 + newId}` : slug;
+
+    // 自动生成 slug 时回填最终标识符
+    if (isAutoSlug) {
+      await c.env.DB.prepare('UPDATE problems SET slug = ? WHERE id = ?')
+        .bind(finalSlug, newId)
+        .run();
+    }
+
     // Save testcases to GitHub if provided
     if (testcases && Array.isArray(testcases) && testcases.length > 0) {
-      await saveTestcases(c.env, slug, testcases);
+      await saveTestcases(c.env, finalSlug, testcases);
     }
 
     // Save SPJ code to GitHub if provided
     if (effectiveJudgeType === 'spj' && spj_code) {
-      await saveSpjCode(c.env, slug, spj_language, spj_code);
+      await saveSpjCode(c.env, finalSlug, spj_language, spj_code);
     }
 
-    return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Problem created' } }, 201);
+    return c.json({ success: true, data: { id: newId, slug: finalSlug, message: 'Problem created' } }, 201);
   } catch (e: any) {
     if (e.message?.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: { message: 'Slug already exists', code: 'CONFLICT' } }, 409);
