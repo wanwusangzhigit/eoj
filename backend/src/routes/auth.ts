@@ -232,7 +232,14 @@ auth.get('/cpoauth/callback', async (c) => {
 
     tokenData = (await tokenResponse.json()) as { access_token?: string; error?: string; error_description?: string; statusMessage?: string; message?: string };
     if (!tokenData.access_token) {
-      console.error('CP OAuth token error (redirect_uri used):', redirectUri, 'body sent:', JSON.stringify(tokenBody), 'server response:', JSON.stringify(tokenData));
+      const sanitizedTokenBody = {
+        ...tokenBody,
+        client_id: '[REDACTED]',
+        client_secret: '[REDACTED]',
+        code: tokenBody.code ? '[REDACTED]' : undefined,
+        code_verifier: tokenBody.code_verifier ? '[REDACTED]' : undefined,
+      };
+      console.error('CP OAuth token error (redirect_uri used):', redirectUri, 'body sent:', JSON.stringify(sanitizedTokenBody), 'server response:', JSON.stringify(tokenData));
       const detail = tokenData.message || tokenData.error_description || tokenData.statusMessage || String(tokenData.error || 'unknown');
       return c.redirect(`${returnOrigin}/auth/callback?error=token_failed&detail=${encodeURIComponent(detail)}`);
     }
