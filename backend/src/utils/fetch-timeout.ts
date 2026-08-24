@@ -10,8 +10,13 @@ export const GITHUB_TIMEOUT_MS = 30_000;
 
 function pickTimeout(url: string | URL | Request, timeoutMs?: number): number {
   if (timeoutMs !== undefined) return timeoutMs;
-  const u = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url;
-  return u.includes('api.github.com') ? GITHUB_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  try {
+    const parsed =
+      typeof url === 'string' ? new URL(url) : url instanceof URL ? url : new URL(url.url);
+    return parsed.hostname === 'api.github.com' ? GITHUB_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  } catch {
+    return DEFAULT_TIMEOUT_MS;
+  }
 }
 
 export async function fetchWithTimeout(
