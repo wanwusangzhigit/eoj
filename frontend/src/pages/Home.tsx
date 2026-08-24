@@ -185,7 +185,7 @@ export default function Home() {
               <span className="stat-label">{t('nav.lists')}</span>
               <ChevronRight size={14} className="stat-arrow" />
             </Link>
-            <Link to="/discussions/all" className="home-stat-card">
+            <Link to="/discussions" className="home-stat-card">
               <MessageSquare size={20} />
               <span className="stat-label">{t('nav.discussions')}</span>
               <ChevronRight size={14} className="stat-arrow" />
@@ -397,7 +397,7 @@ export default function Home() {
         <div className="home-card">
           <div className="home-card-header">
             <h2><MessageSquare size={18} /> {t('home.recentDiscussions')}</h2>
-            <Link to="/discussions/all" className="home-card-more">{t('home.viewAll')} <ChevronRight size={14} /></Link>
+            <Link to="/discussions" className="home-card-more">{t('home.viewAll')} <ChevronRight size={14} /></Link>
           </div>
           <div className="home-card-body">
             {recentDiscussions.length === 0 ? (

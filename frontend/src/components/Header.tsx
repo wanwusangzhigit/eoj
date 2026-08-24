@@ -325,7 +325,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
             <NavLink to="/training" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               <GraduationCap size={16} />{t('nav.training')}
             </NavLink>
-            <NavLink to="/discussions/all" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
+            <NavLink to="/discussions" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
               <MessageSquare size={16} />{t('nav.discussions')}
             </NavLink>
             <NavLink to="/blogs" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'}>
@@ -456,7 +456,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
             <NavLink to="/training" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} onClick={() => setMobileMenuOpen(false)}>
               <GraduationCap size={16} /> {t('nav.training')}
             </NavLink>
-            <NavLink to="/discussions/all" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} onClick={() => setMobileMenuOpen(false)}>
+            <NavLink to="/discussions" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} onClick={() => setMobileMenuOpen(false)}>
               <MessageSquare size={16} /> {t('nav.discussions')}
             </NavLink>
             <NavLink to="/blogs" className={({ isActive }) => isActive ? 'nav-link active' : 'nav-link'} onClick={() => setMobileMenuOpen(false)}>

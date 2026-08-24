@@ -34,7 +34,7 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
     { to: '/rankings', icon: Trophy, label: t('nav.rankings') },
     { to: '/lists', icon: BookOpen, label: t('nav.lists') },
     { to: '/training', icon: GraduationCap, label: t('nav.training') },
-    { to: '/discussions/all', icon: MessageSquare, label: t('nav.discussions') },
+    { to: '/discussions', icon: MessageSquare, label: t('nav.discussions') },
     { to: '/blogs', icon: PenSquare, label: t('nav.blogs') },
     { to: '/announcements', icon: Megaphone, label: t('nav.announcements') },
   ];
