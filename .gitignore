@@ -12,3 +12,4 @@ __pycache__/
 .vscode
 .idea
 backend/.wrangler
+*.tsbuildinfo
