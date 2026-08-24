@@ -33,6 +33,7 @@ async function getAISettings(c: any): Promise<Record<string, string>> {
     'ai_system_prompt',
     'ai_max_tokens',
     'ai_temperature',
+    'ai_daily_limit_per_user',
   ];
   const placeholders = keys.map(() => '?').join(',');
   const results = await c.env.DB.prepare(
@@ -241,7 +242,7 @@ async function toolListProblems(env: any, search?: string, difficulty?: string, 
   let sql = 'SELECT id, title, slug, tags, difficulty, time_limit, memory_limit FROM problems WHERE is_public = 1';
   const binds: any[] = [];
   if (search) {
-    sql += ' AND title LIKE ?';
+    sql += " AND title LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(search)}%`);
   }
   if (difficulty) {
@@ -283,11 +284,12 @@ async function toolGetSubmissionDetail(env: any, user: any, submissionId: number
   let sql = `SELECT s.id, s.user_id, s.problem_id, s.language, s.source_code, s.status, s.score,
              s.time_used, s.memory_used, s.details, s.created_at,
              p.title as problem_title, p.slug as problem_slug, p.description as problem_description,
-             p.time_limit, p.memory_limit, p.input_format, p.output_format
+             p.time_limit, p.memory_limit, p.input_format, p.output_format, p.is_public as problem_is_public
              FROM submissions s JOIN problems p ON s.problem_id = p.id WHERE s.id = ?`;
   const binds: any[] = [submissionId];
-  // Non-admins can only view their own submissions
-  if (user.role !== 'admin' && user.userId !== 1) {
+  // 非管理员(supoer_admin/admin)只能查看自己的提交;同时拒绝访问团队私有题目相关的提交
+  const isAdminUser = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1);
+  if (!isAdminUser) {
     sql += ' AND s.user_id = ?';
     binds.push(user.userId);
   }
@@ -644,7 +646,8 @@ async function extractResponse(
 }
 
 // POST /ai/chat - AI chat with tool-calling (agentic loop, streaming SSE)
-// 限流:按用户 10 次 / 10 分钟,防止 AI 配额被滥用耗尽(chat 含多轮工具调用,成本高)
+// 限流:按用户 10 次 / 10 分钟,防止 AI 配额被滥用耗尽(chat 含多轮工具调用,成本高)。
+// 同时叠加按用户每日上限(默认 200 次):计费成本由站点承担,需防止脚本刷量。
 ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async (c) => {
   const user = c.get('user');
   const settings = await getAISettings(c);
@@ -654,6 +657,36 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
       success: false,
       error: { message: 'AI feature is not available', code: 'FORBIDDEN' },
     }, 403);
+  }
+
+  // 按用户每日上限(可由管理员通过 settings 配置,默认 200 次/天)
+  // AI 接口由站点统一支付 API 费用,需要按用户做配额,否则会被脚本刷爆。
+  const dailyLimit = parseInt(settings.ai_daily_limit_per_user || '200', 10) || 200;
+  if (dailyLimit > 0 && !(user.role === 'admin' || user.role === 'super_admin' || user.userId === 1)) {
+    try {
+      const dayStart = new Date();
+      dayStart.setHours(0, 0, 0, 0);
+      const dayStartMs = dayStart.getTime();
+      const cntRow: any = await c.env.DB.prepare(
+        "SELECT COUNT(*) as count FROM rate_limits WHERE key = ? AND created_at >= ?"
+      ).bind(`aiChatDaily:${user.userId}`, dayStartMs).first();
+      if ((cntRow?.count || 0) >= dailyLimit) {
+        return c.json({
+          success: false,
+          error: { message: `Daily AI chat limit (${dailyLimit}) reached. Please try again tomorrow.`, code: 'RATE_LIMITED' },
+        }, 429);
+      }
+      await c.env.DB.prepare(
+        "INSERT INTO rate_limits (key, created_at) VALUES (?, ?)"
+      ).bind(`aiChatDaily:${user.userId}`, Date.now()).run();
+    } catch (e) {
+      // DB 异常时 fail-closed 以防绕过配额
+      console.error('AI daily limit check failed:', e);
+      return c.json({
+        success: false,
+        error: { message: 'Rate limit check unavailable. Please try again later.', code: 'RATE_LIMIT_UNAVAILABLE' },
+      }, 503);
+    }
   }
 
   if (settings.ai_chat_enabled === 'false') {
@@ -812,11 +845,15 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
           }));
 
           // Send tool_call events & execute
+          // 注意:工具结果只执行一次并缓存,下方更新 conversation 时复用同一结果,
+          // 避免同一轮中被执行两次产生的副作用、成本翻倍与潜在竞态。
+          const toolResultsCache: { id: string; resultStr: string; summary: string }[] = [];
           for (const tc of toolCalls) {
             send('tool_call', { name: tc.name, arguments: tc.arguments });
             const resultStr = await executeTool(tc.name, tc.arguments, user, c.env);
             const summary = summarizeToolResult(tc.name, resultStr);
             toolCallTrace.push({ name: tc.name, arguments: tc.arguments, result_summary: summary });
+            toolResultsCache.push({ id: tc.id, resultStr, summary });
             send('tool_result', { name: tc.name, result_summary: summary });
           }
 
@@ -830,8 +867,8 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
             conversationMessages.push({ role: 'assistant', content: assistantContent });
             const toolResults: any[] = [];
             for (const tc of toolCalls) {
-              const resultStr = await executeTool(tc.name, tc.arguments, user, c.env);
-              toolResults.push({ type: 'tool_result', tool_use_id: tc.id, content: resultStr });
+              const cached = toolResultsCache.find((r) => r.id === tc.id)!;
+              toolResults.push({ type: 'tool_result', tool_use_id: tc.id, content: cached.resultStr });
             }
             conversationMessages.push({ role: 'user', content: toolResults });
           } else {
@@ -844,8 +881,8 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
               })),
             });
             for (const tc of toolCalls) {
-              const resultStr = await executeTool(tc.name, tc.arguments, user, c.env);
-              conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: resultStr });
+              const cached = toolResultsCache.find((r) => r.id === tc.id)!;
+              conversationMessages.push({ role: 'tool', tool_call_id: tc.id, content: cached.resultStr });
             }
           }
         }

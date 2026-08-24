@@ -67,6 +67,9 @@ export default function AdminLayout() {
       if (link.to === 'users') return perms.hasAllPermissions;
       return true;
     }
+    // SQL 编辑器属于高风险功能(可直接读写 D1),仅超级管理员本人可见,
+    // 不允许普通 admin 通过菜单访问。后端 superAdminMiddleware 已做二次拦截。
+    if (link.to === 'sql') return perms.isSuperAdmin;
     if (link.permission === 'super_admin') return perms.hasAllPermissions;
     if (link.permission === 'contest_admin') return perms.canManageContests;
     if (link.permission === 'problem_admin') return perms.canManageProblems;

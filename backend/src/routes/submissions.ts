@@ -5,7 +5,7 @@ import { rateLimitMiddleware } from '../middleware/rateLimit';
 import { getLanguageExt } from '../utils/helpers';
 import { validateSourceCode, validateLanguage } from '../utils/validator';
 import { captchaMiddleware } from '../middleware/captcha';
-import { parseContestTimeToMs, effectiveContestStatus } from '../utils/contest-time';
+import { parseContestTimeToMs, effectiveContestStatus, isContestAdmin } from '../utils/contest-time';
 import { fetchWithTimeout } from '../utils/fetch-timeout';
 
 const submissions = new Hono<AppType>();
@@ -27,9 +27,8 @@ async function getHiddenOIContestIds(db: D1Database, ids: number[]): Promise<Set
 }
 
 function canViewOIResult(user: any): boolean {
-  if (!user) return false;
-  return user.userId === 1 || user.role === 'admin' || user.role === 'super_admin'
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  // 与 isContestAdmin 同语义(OI 赛时仅主办方/admin 可见评测结果)
+  return isContestAdmin(user);
 }
 
 function hideSubmissionResult(sub: any): void {
@@ -109,7 +108,12 @@ submissions.post('/', authMiddleware, captchaMiddleware('submit'), rateLimitMidd
         return c.json({ success: false, error: { message: 'Invalid virtual start time', code: 'BAD_REQUEST' } }, 400);
       }
       const vDuration = parseInt((contest as any).duration_minutes) || 0;
-      const vEnd = vDuration > 0 ? vStart + vDuration * 60000 : Number.POSITIVE_INFINITY;
+      // 双重保险(M7):即便绕过 virtual-register 直接提交,只要时长缺失也拒绝接收,
+      // 避免老数据或被绕过的报名记录造成无窗口限制的提交。
+      if (vDuration <= 0) {
+        return c.json({ success: false, error: { message: 'Virtual participation is disabled for this contest', code: 'FORBIDDEN' } }, 403);
+      }
+      const vEnd = vStart + vDuration * 60000;
       if (!(nowMs >= vStart && nowMs < vEnd)) {
         return c.json({ success: false, error: { message: 'Virtual contest time has ended', code: 'FORBIDDEN' } }, 403);
       }
@@ -228,8 +232,7 @@ submissions.get('/', authMiddleware, async (c) => {
   const language = c.req.query('language');
   const offset = (page - 1) * pageSize;
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   let query = 'SELECT s.id, s.user_id, s.problem_id, s.language, s.status, s.score, s.time_used, s.memory_used, s.created_at, s.contest_id, p.title as problem_title, p.slug as problem_slug, u.username FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id WHERE 1=1';
   let countQuery = 'SELECT COUNT(*) as total FROM submissions WHERE 1=1';
@@ -306,8 +309,7 @@ submissions.get('/', authMiddleware, async (c) => {
 submissions.get('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   let query = `SELECT s.*, p.title as problem_title, p.slug as problem_slug, u.username
      FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id
@@ -352,8 +354,7 @@ submissions.get('/:id', authMiddleware, async (c) => {
 submissions.get('/:id/history', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   const sub: any = await c.env.DB.prepare('SELECT id, user_id, problem_id FROM submissions WHERE id = ?')
     .bind(id).first();
@@ -376,8 +377,7 @@ submissions.get('/:id/history', authMiddleware, async (c) => {
 submissions.get('/:id/testcases', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   // Verify the submission belongs to the user (or user is admin)
   const submission = await c.env.DB.prepare('SELECT id, user_id, contest_id FROM submissions WHERE id = ?')
@@ -413,8 +413,7 @@ submissions.get('/:id/testcases', authMiddleware, async (c) => {
 submissions.get('/:id/logs', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   // Verify the submission belongs to the user (or user is admin)
   const submission = await c.env.DB.prepare('SELECT id, user_id FROM submissions WHERE id = ?')
@@ -443,8 +442,7 @@ submissions.get('/compare/:id1/:id2', authMiddleware, async (c) => {
   const user = c.get('user');
   const id1 = parseInt(c.req.param('id1') || '0');
   const id2 = parseInt(c.req.param('id2') || '0');
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
 
   const [s1, s2] = await Promise.all([
     c.env.DB.prepare(

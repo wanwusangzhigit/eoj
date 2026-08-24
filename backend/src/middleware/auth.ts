@@ -14,16 +14,30 @@ export async function authMiddleware(c: Context<AppType>, next: Next) {
     return c.json({ success: false, error: { message: 'Invalid or expired token', code: 'UNAUTHORIZED' } }, 401);
   }
 
-  // Check if user is banned (DB lookup, super admin id=1 is exempt)
-  if (payload.userId !== 1) {
-    try {
-      const row: any = await c.env.DB.prepare('SELECT banned FROM users WHERE id = ?').bind(payload.userId).first();
-      if (row && row.banned === 1) {
-        return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
-      }
-    } catch {
-      // If DB lookup fails (e.g. column missing during migration), continue gracefully
+  // 服务端实时校验:从 DB 读取最新的 banned / role / permissions,
+  // 防止用户被降级、封禁或权限变更后旧 token 仍长期生效。
+  // 失败时 fail-closed(拒绝请求)以保证安全状态优先。
+  try {
+    const row: any = await c.env.DB.prepare(
+      'SELECT banned, role, permissions FROM users WHERE id = ?'
+    ).bind(payload.userId).first();
+    if (!row) {
+      return c.json({ success: false, error: { message: 'Invalid or expired token', code: 'UNAUTHORIZED' } }, 401);
     }
+    if (row.banned === 1) {
+      return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
+    }
+    // 用 DB 中的最新值覆盖 token 内的权限声明
+    payload.role = row.role || payload.role;
+    let dbPermissions: string[] = payload.permissions || [];
+    try {
+      const parsed = row.permissions ? JSON.parse(row.permissions) : [];
+      if (Array.isArray(parsed)) dbPermissions = parsed;
+    } catch { /* 保留 token 内的 permissions */ }
+    payload.permissions = dbPermissions;
+  } catch (e) {
+    // DB 异常时拒绝请求,防止通过制造 DB 故障绕过封禁
+    return c.json({ success: false, error: { message: 'Authentication service unavailable', code: 'AUTH_UNAVAILABLE' } }, 503);
   }
 
   c.set('user', payload);
@@ -39,7 +53,24 @@ export async function optionalAuthMiddleware(c: Context<AppType>, next: Next) {
     const { verifyJWT } = await import('../utils/jwt');
     const payload = await verifyJWT(token, c.env.JWT_SECRET, (c.env as any).JWT_SECRET_PREVIOUS);
     if (payload) {
-      c.set('user', payload);
+      // 同步数据库中的最新状态(role/permissions/banned),保证可选鉴权场景下的权限一致
+      try {
+        const row: any = await c.env.DB.prepare(
+          'SELECT banned, role, permissions FROM users WHERE id = ?'
+        ).bind(payload.userId).first();
+        if (row && row.banned === 1) {
+          // 已封禁账号在可选鉴权下视为未登录,避免污染公开接口
+        } else if (row) {
+          payload.role = row.role || payload.role;
+          let dbPermissions: string[] = payload.permissions || [];
+          try {
+            const parsed = row.permissions ? JSON.parse(row.permissions) : [];
+            if (Array.isArray(parsed)) dbPermissions = parsed;
+          } catch { /* ignore */ }
+          payload.permissions = dbPermissions;
+          c.set('user', payload);
+        }
+      } catch { /* DB 异常时使用 token 内声明,公开接口继续可访问 */ }
     }
   }
   await next();

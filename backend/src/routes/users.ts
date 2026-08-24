@@ -20,8 +20,8 @@ users.get('/list', authMiddleware, adminMiddleware, async (c) => {
   const countBinds: any[] = [];
 
   if (search) {
-    countQuery += ' WHERE username LIKE ?';
-    dataQuery += ' WHERE username LIKE ?';
+    countQuery += " WHERE username LIKE ? ESCAPE '\\'";
+    dataQuery += " WHERE username LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(search)}%`);
     countBinds.push(`%${escapeLikeWildcard(search)}%`);
   }
@@ -48,18 +48,42 @@ users.get('/list', authMiddleware, adminMiddleware, async (c) => {
 });
 
 // Admin only: Update user role
+// 安全约束(H5):
+//  - 不可修改超级管理员(userId===1)的角色
+//  - 普通管理员只能在被授予的 admin/user 两个角色之间切换
+//  - 授予 super_admin 角色必须由超级管理员本人(superAdminMiddleware)操作,
+//    否则任意 admin 都能"造一个 super_admin 出来"绕过 superAdminOnly 接口限制
 users.put('/:id/role', authMiddleware, adminMiddleware, async (c) => {
   const userId = parseInt(c.req.param('id') || '0');
   const body: any = await c.req.json();
   const { role } = body;
+  const currentUser = c.get('user');
 
   // Check if trying to change super admin (user id=1)
   if (userId === 1) {
     return c.json({ success: false, error: { message: 'Cannot modify super admin role', code: 'FORBIDDEN' } }, 403);
   }
 
-  if (!['user', 'admin', 'super_admin'].includes(role)) {
+  const isSuperAdmin = currentUser.userId === 1 || currentUser.role === 'super_admin';
+
+  // 普通管理员禁止授予/撤销 super_admin 角色
+  if (role === 'super_admin' && !isSuperAdmin) {
+    return c.json({ success: false, error: { message: 'Only super admin can grant super_admin role', code: 'FORBIDDEN' } }, 403);
+  }
+
+  // 允许的角色白名单
+  const allowedRoles = isSuperAdmin ? ['user', 'admin', 'super_admin'] : ['user', 'admin'];
+  if (!allowedRoles.includes(role)) {
     return c.json({ success: false, error: { message: 'Invalid role', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // 防止目标已是 super_admin 时被普通 admin 降级(避免绕道降权再 ban)
+  const target: any = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
+  if (!target) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+  if (target.role === 'super_admin' && !isSuperAdmin) {
+    return c.json({ success: false, error: { message: 'Cannot modify super admin role', code: 'FORBIDDEN' } }, 403);
   }
 
   await c.env.DB.prepare('UPDATE users SET role = ? WHERE id = ?')
@@ -110,6 +134,22 @@ users.put('/:id/ban', authMiddleware, adminMiddleware, async (c) => {
 
   if (typeof banned !== 'boolean') {
     return c.json({ success: false, error: { message: 'banned field must be boolean', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // (M6)防止管理员互相封禁造成管理混乱:
+  //  - 普通管理员不能封禁/解封超级管理员或其他管理员
+  //  - 只有超级管理员本人(userId===1)或 super_admin 角色才能封禁其他管理员
+  // 解封(unban)操作允许普通 admin 执行(降低运维门槛)
+  if (banned) {
+    const target: any = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
+    if (!target) {
+      return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+    }
+    const targetIsAdmin = target.role === 'admin' || target.role === 'super_admin';
+    const callerIsSuperAdmin = currentUser.userId === 1 || currentUser.role === 'super_admin';
+    if (targetIsAdmin && !callerIsSuperAdmin) {
+      return c.json({ success: false, error: { message: 'Only super admin can ban other admins', code: 'FORBIDDEN' } }, 403);
+    }
   }
 
   await c.env.DB.prepare('UPDATE users SET banned = ? WHERE id = ?')

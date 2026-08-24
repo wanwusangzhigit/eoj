@@ -20,7 +20,7 @@ search.get('/suggestions', async (c) => {
   // Top problems
   const problems = await c.env.DB.prepare(
     `SELECT id, title, slug, difficulty, tags, 'problem' as type
-     FROM problems WHERE is_public = 1 AND (title LIKE ? OR slug LIKE ?)
+     FROM problems WHERE is_public = 1 AND (title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\')
      LIMIT ?`
   ).bind(like, like, limit).all();
   for (const p of problems.results as any[]) {
@@ -36,7 +36,7 @@ search.get('/suggestions', async (c) => {
   // Top users
   const users = await c.env.DB.prepare(
     `SELECT id, username, avatar_url, 'user' as type
-     FROM users WHERE username LIKE ? LIMIT ?`
+     FROM users WHERE username LIKE ? ESCAPE '\\' LIMIT ?`
   ).bind(like, limit).all();
   for (const u of users.results as any[]) {
     suggestions.push({
@@ -53,7 +53,7 @@ search.get('/suggestions', async (c) => {
   const blogs = await c.env.DB.prepare(
     `SELECT b.id, b.title, 'blog' as type, u.username
      FROM blogs b JOIN users u ON b.user_id = u.id
-     WHERE b.status = 'published' AND b.title LIKE ? LIMIT ?`
+     WHERE b.status = 'published' AND b.title LIKE ? ESCAPE '\\' LIMIT ?`
   ).bind(like, limit).all();
   for (const b of blogs.results as any[]) {
     suggestions.push({
@@ -69,7 +69,7 @@ search.get('/suggestions', async (c) => {
   const discussions = await c.env.DB.prepare(
     `SELECT d.id, d.title, 'discussion' as type, u.username
      FROM discussions d JOIN users u ON d.user_id = u.id
-     WHERE d.title LIKE ? LIMIT ?`
+     WHERE d.title LIKE ? ESCAPE '\\' LIMIT ?`
   ).bind(like, limit).all();
   for (const d of discussions.results as any[]) {
     suggestions.push({
@@ -112,7 +112,7 @@ search.get('/', async (c) => {
     const problems = await c.env.DB.prepare(
       `SELECT id, title, slug, difficulty, tags, 'problem' as type,
               (SELECT COUNT(*) FROM submissions WHERE problem_id = problems.id AND status = 'accepted') as accepted_count
-       FROM problems WHERE is_public = 1 AND (title LIKE ? OR slug LIKE ?)
+       FROM problems WHERE is_public = 1 AND (title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
     ).bind(like, like, pageSize, offset).all();
     for (const p of problems.results as any[]) {
@@ -129,7 +129,7 @@ search.get('/', async (c) => {
     }
     if (type === 'problems') {
       const cnt = await c.env.DB.prepare(
-        'SELECT COUNT(*) as total FROM problems WHERE is_public = 1 AND (title LIKE ? OR slug LIKE ?)'
+        "SELECT COUNT(*) as total FROM problems WHERE is_public = 1 AND (title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\')"
       ).bind(like, like).first();
       total = (cnt as any)?.total || 0;
     }
@@ -139,8 +139,8 @@ search.get('/', async (c) => {
   if (type === 'all' || type === 'users') {
     const users = await c.env.DB.prepare(
       `SELECT id, username, avatar_url, 'user' as type
-       FROM users WHERE username LIKE ?
-       LIMIT ? OFFSET ?`
+     FROM users WHERE username LIKE ? ESCAPE '\\'
+     LIMIT ? OFFSET ?`
     ).bind(like, pageSize, offset).all();
     for (const u of users.results as any[]) {
       results.push({
@@ -153,7 +153,7 @@ search.get('/', async (c) => {
       });
     }
     if (type === 'users') {
-      const cnt = await c.env.DB.prepare('SELECT COUNT(*) as total FROM users WHERE username LIKE ?').bind(like).first();
+      const cnt = await c.env.DB.prepare("SELECT COUNT(*) as total FROM users WHERE username LIKE ? ESCAPE '\\'").bind(like).first();
       total = (cnt as any)?.total || 0;
     }
   }
@@ -164,7 +164,7 @@ search.get('/', async (c) => {
       `SELECT b.id, b.title, b.tags, b.status, b.created_at, 'blog' as type,
               u.username
        FROM blogs b JOIN users u ON b.user_id = u.id
-       WHERE b.status = 'published' AND (b.title LIKE ? OR b.content LIKE ?)
+       WHERE b.status = 'published' AND (b.title LIKE ? ESCAPE '\\' OR b.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
     ).bind(like, like, pageSize, offset).all();
     for (const b of blogs.results as any[]) {
@@ -179,7 +179,7 @@ search.get('/', async (c) => {
     }
     if (type === 'blogs') {
       const cnt = await c.env.DB.prepare(
-        "SELECT COUNT(*) as total FROM blogs WHERE status = 'published' AND (title LIKE ? OR content LIKE ?)"
+        "SELECT COUNT(*) as total FROM blogs WHERE status = 'published' AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')"
       ).bind(like, like).first();
       total = (cnt as any)?.total || 0;
     }
@@ -191,7 +191,7 @@ search.get('/', async (c) => {
       `SELECT d.id, d.title, d.reply_count, d.created_at, 'discussion' as type,
               u.username
        FROM discussions d JOIN users u ON d.user_id = u.id
-       WHERE (d.title LIKE ? OR d.content LIKE ?)
+       WHERE (d.title LIKE ? ESCAPE '\\' OR d.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
     ).bind(like, like, pageSize, offset).all();
     for (const d of discussions.results as any[]) {
@@ -207,7 +207,7 @@ search.get('/', async (c) => {
     }
     if (type === 'discussions') {
       const cnt = await c.env.DB.prepare(
-        'SELECT COUNT(*) as total FROM discussions WHERE (title LIKE ? OR content LIKE ?)'
+        "SELECT COUNT(*) as total FROM discussions WHERE (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')"
       ).bind(like, like).first();
       total = (cnt as any)?.total || 0;
     }
@@ -219,7 +219,7 @@ search.get('/', async (c) => {
       `SELECT s.id, s.title, s.language, s.created_at, 'solution' as type,
               u.username, p.title as problem_title, p.slug as problem_slug
        FROM solutions s JOIN users u ON s.user_id = u.id JOIN problems p ON s.problem_id = p.id
-       WHERE s.review_status = 'approved' AND (s.title LIKE ? OR s.content LIKE ?)
+       WHERE s.review_status = 'approved' AND (s.title LIKE ? ESCAPE '\\' OR s.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
     ).bind(like, like, pageSize, offset).all();
     for (const s of solutions.results as any[]) {
@@ -237,7 +237,7 @@ search.get('/', async (c) => {
     }
     if (type === 'solutions') {
       const cnt = await c.env.DB.prepare(
-        "SELECT COUNT(*) as total FROM solutions WHERE review_status = 'approved' AND (title LIKE ? OR content LIKE ?)"
+        "SELECT COUNT(*) as total FROM solutions WHERE review_status = 'approved' AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')"
       ).bind(like, like).first();
       total = (cnt as any)?.total || 0;
     }
@@ -250,11 +250,11 @@ search.get('/', async (c) => {
   // For 'all' queries, compute aggregate total across all searched types
   if (type === 'all') {
     const [p, u, b, d, s] = await Promise.all([
-      c.env.DB.prepare('SELECT COUNT(*) as total FROM problems WHERE is_public = 1 AND (title LIKE ? OR slug LIKE ?)').bind(like, like).first(),
-      c.env.DB.prepare('SELECT COUNT(*) as total FROM users WHERE username LIKE ?').bind(like).first(),
-      c.env.DB.prepare("SELECT COUNT(*) as total FROM blogs WHERE status = 'published' AND (title LIKE ? OR content LIKE ?)").bind(like, like).first(),
-      c.env.DB.prepare('SELECT COUNT(*) as total FROM discussions WHERE (title LIKE ? OR content LIKE ?)').bind(like, like).first(),
-      c.env.DB.prepare("SELECT COUNT(*) as total FROM solutions WHERE review_status = 'approved' AND (title LIKE ? OR content LIKE ?)").bind(like, like).first(),
+      c.env.DB.prepare("SELECT COUNT(*) as total FROM problems WHERE is_public = 1 AND (title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\')").bind(like, like).first(),
+      c.env.DB.prepare("SELECT COUNT(*) as total FROM users WHERE username LIKE ? ESCAPE '\\'").bind(like).first(),
+      c.env.DB.prepare("SELECT COUNT(*) as total FROM blogs WHERE status = 'published' AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')").bind(like, like).first(),
+      c.env.DB.prepare("SELECT COUNT(*) as total FROM discussions WHERE (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')").bind(like, like).first(),
+      c.env.DB.prepare("SELECT COUNT(*) as total FROM solutions WHERE review_status = 'approved' AND (title LIKE ? ESCAPE '\\' OR content LIKE ? ESCAPE '\\')").bind(like, like).first(),
     ]);
     total = ((p as any)?.total || 0) + ((u as any)?.total || 0) + ((b as any)?.total || 0) + ((d as any)?.total || 0) + ((s as any)?.total || 0);
   }

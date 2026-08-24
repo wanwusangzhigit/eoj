@@ -53,14 +53,14 @@ problems.get('/', async (c) => {
   const binds: any[] = [];
 
   if (search) {
-    countQuery += ' AND (title LIKE ? OR slug LIKE ?)';
-    dataQuery += ' AND (p.title LIKE ? OR p.slug LIKE ?)';
+    countQuery += " AND (title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\')";
+    dataQuery += " AND (p.title LIKE ? ESCAPE '\\' OR p.slug LIKE ? ESCAPE '\\')";
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
   if (tag) {
-    countQuery += ' AND tags LIKE ?';
-    dataQuery += ' AND p.tags LIKE ?';
+    countQuery += " AND tags LIKE ? ESCAPE '\\'";
+    dataQuery += " AND p.tags LIKE ? ESCAPE '\\'";
     binds.push(`%"${escapeLikeWildcard(tag)}"%`);
   }
 
@@ -129,7 +129,7 @@ problems.get('/random', async (c) => {
     binds.push(difficulty);
   }
   if (tag) {
-    query += ' AND tags LIKE ?';
+    query += " AND tags LIKE ? ESCAPE '\\'";
     binds.push(`%"${escapeLikeWildcard(tag)}"%`);
   }
   if (tagId > 0) {
@@ -174,7 +174,7 @@ problems.get('/daily', async (c) => {
     binds.push(difficulty);
   }
   if (tag) {
-    query += ' AND tags LIKE ?';
+    query += " AND tags LIKE ? ESCAPE '\\'";
     binds.push(`%"${escapeLikeWildcard(tag)}"%`);
   }
   query += ' ORDER BY id ASC';
@@ -679,10 +679,10 @@ problems.get('/:slug/related', async (c) => {
             (SELECT COUNT(*) FROM submissions WHERE problem_id = problems.id AND status = 'accepted') as accepted_count
      FROM problems
      WHERE is_public = 1 AND id != ? AND (
-       ${tags.map(() => "tags LIKE ?").join(' OR ')}
-     )
-     ORDER BY (
-       ${tags.map(() => "CASE WHEN tags LIKE ? THEN 1 ELSE 0 END").join(' + ')}
+       ${tags.map(() => "tags LIKE ? ESCAPE '\\'", ).join(' OR ')}
+      )
+      ORDER BY (
+        ${tags.map(() => "CASE WHEN tags LIKE ? ESCAPE '\\' THEN 1 ELSE 0 END").join(' + ')}
      ) DESC
      LIMIT ?`
   ).bind(problem.id, ...tags.map(t => `%"${escapeLikeWildcard(t)}"%`), ...tags.map(() => 1), limit).all();

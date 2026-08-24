@@ -284,6 +284,7 @@ const en: Translations = {
     tokenFailed: 'Failed to obtain token, please try again',
     userinfoFailed: 'Failed to get user info, please try again',
     accessDenied: 'You denied the authorization request',
+    usernameConflict: 'This username is already taken by another account. Please log in to the original account first and then bind the third-party login.',
   },
   rankings: {
     title: 'Leaderboard',

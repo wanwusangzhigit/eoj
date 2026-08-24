@@ -36,6 +36,34 @@ internal.post('/callback', async (c) => {
     return c.json({ success: false, error: { message: 'submission_id and status are required', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 类型与长度上限校验,防止持有 CALLBACK_SECRET 的恶意调用方塞入超大 payload
+  // 导致 D1 行/字段超过 SQLite 限制(默认 1GB 但实际由 wrangler 限制)。
+  if (typeof submission_id !== 'number' || !Number.isFinite(submission_id)) {
+    return c.json({ success: false, error: { message: 'submission_id must be a number', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (typeof status !== 'string' || status.length > 64) {
+    return c.json({ success: false, error: { message: 'Invalid status', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (score !== undefined && score !== null && (typeof score !== 'number' || !Number.isFinite(score) || Math.abs(score) > 1e9)) {
+    return c.json({ success: false, error: { message: 'Invalid score', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (time_used !== undefined && time_used !== null && (typeof time_used !== 'number' || !Number.isFinite(time_used) || time_used < 0 || time_used > 86400000)) {
+    return c.json({ success: false, error: { message: 'Invalid time_used', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (memory_used !== undefined && memory_used !== null && (typeof memory_used !== 'number' || !Number.isFinite(memory_used) || memory_used < 0 || memory_used > 1073741824)) {
+    return c.json({ success: false, error: { message: 'Invalid memory_used', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (github_run_id !== undefined && github_run_id !== null && (typeof github_run_id !== 'string' || github_run_id.length > 64)) {
+    return c.json({ success: false, error: { message: 'Invalid github_run_id', code: 'BAD_REQUEST' } }, 400);
+  }
+  const MAX_DETAILS_BYTES = 2 * 1024 * 1024; // 2MB 上限,足够容纳数百个 testcase 详情
+  if (details !== undefined && details !== null) {
+    const detailsStr = typeof details === 'string' ? details : JSON.stringify(details);
+    if (detailsStr.length > MAX_DETAILS_BYTES) {
+      return c.json({ success: false, error: { message: 'details too large', code: 'BAD_REQUEST' } }, 400);
+    }
+  }
+
   const validStatuses = [
     'accepted', 'wrong_answer', 'time_limit_exceeded',
     'memory_limit_exceeded', 'runtime_error', 'compile_error', 'system_error',

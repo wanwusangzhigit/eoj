@@ -159,7 +159,7 @@ notifications.post('/read-all', authMiddleware, async (c) => {
 notifications.get('/preferences', authMiddleware, async (c) => {
   const user = c.get('user');
   const results = await c.env.DB.prepare(
-    'SELECT setting_key, setting_value FROM user_settings WHERE user_id = ? AND setting_key LIKE ?'
+    "SELECT setting_key, setting_value FROM user_settings WHERE user_id = ? AND setting_key LIKE ? ESCAPE '\\'"
   ).bind(user.userId, 'notify_%').all();
 
   const prefs: Record<string, string> = {};

@@ -81,17 +81,40 @@ solutions.get('/', async (c) => {
 });
 
 // Get solution detail
+// 安全约束(H2/H3):
+//  - 公开访问只能看到 review_status='approved' 的题解
+//  - 作者本人可看到自己任意状态的题解(包括 pending/rejected)
+//  - 管理员可看到任意状态(用于审核)
+// 否则攻击者通过枚举 id 即可读取处于 pending/rejected 的题解全文与作者元信息,
+// 完全绕过审核机制(列表接口已过滤,详情接口此前未对齐)。
 solutions.get('/:id', async (c) => {
   const id = parseInt(c.req.param('id') || '0');
+
+  // 先解析当前用户(可选鉴权),用于判断作者本人/管理员
+  const currentUser = await getCurrentUser(c);
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'super_admin' || currentUser?.userId === 1;
+
+  // SQL 层做硬过滤:管理员放行;作者本人放行;其余仅 approved
+  let whereClause = 's.id = ?';
+  const binds: any[] = [id];
+  if (!isAdmin) {
+    if (currentUser) {
+      whereClause += " AND (s.review_status = 'approved' OR s.user_id = ?)";
+      binds.push(currentUser.userId);
+    } else {
+      whereClause += " AND s.review_status = 'approved'";
+    }
+  }
 
   const solution = await c.env.DB.prepare(
     `SELECT s.*, u.username
      FROM solutions s
      JOIN users u ON s.user_id = u.id
-     WHERE s.id = ?`
-  ).bind(id).first();
+     WHERE ${whereClause}`
+  ).bind(...binds).first();
 
   if (!solution) {
+    // 404 而非 403,避免通过状态码差异枚举未审核题解是否存在
     return c.json({ success: false, error: { message: 'Solution not found', code: 'NOT_FOUND' } }, 404);
   }
 

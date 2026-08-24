@@ -16,7 +16,7 @@ announcements.get('/', async (c) => {
   const binds: any[] = [];
   const countBinds: any[] = [];
   if (search) {
-    where += ' AND (a.title LIKE ? OR a.content LIKE ?)';
+    where += " AND (a.title LIKE ? ESCAPE '\\' OR a.content LIKE ? ESCAPE '\\')";
     const like = `%${escapeLikeWildcard(search)}%`;
     binds.push(like, like);
     countBinds.push(like, like);

@@ -361,6 +361,7 @@ uploads.get('/download/:id', optionalAuthMiddleware, async (c) => {
 
   // 私有文件鉴权:非公开(is_public=0)的文件/图片仅上传者本人或 upload_admin 可下载
   // 兼容旧数据:历史文件 is_public 可能为 NULL(视为公开);历史图片始终视为公开
+  // 鉴权失败时返回 404(而非 403),避免攻击者通过状态码差异枚举文件 ID
   const isPrivate = upload.is_public !== undefined && upload.is_public !== null && upload.is_public !== 1;
   const isLegacyImage = upload.file_type === 'image' && (upload.is_public === undefined || upload.is_public === null);
   if (isPrivate && !isLegacyImage) {
@@ -368,7 +369,7 @@ uploads.get('/download/:id', optionalAuthMiddleware, async (c) => {
     const isUploadAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
       || (Array.isArray(user?.permissions) && user.permissions.includes('upload_admin')));
     if (!user || (upload.user_id !== user.userId && !isUploadAdmin)) {
-      return c.json({ success: false, error: { message: 'Forbidden: file is private', code: 'FORBIDDEN' } }, 403);
+      return c.json({ success: false, error: { message: 'File not found', code: 'NOT_FOUND' } }, 404);
     }
   }
 
@@ -461,9 +462,9 @@ uploads.delete('/:id', authMiddleware, async (c) => {
   return c.json({ success: true, data: { message: 'File deleted' } });
 });
 
-export default uploads;
-
 // Avatar upload endpoint (reuses image upload logic)
+// 注意(H1/M11):路由必须定义在 export default 之前,虽然 ES 模块顶层执行允许后续代码继续注册,
+// 但这是反模式,容易被代码阅读者误判为死代码,且静态分析工具可能误报。
 uploads.post('/avatar', authMiddleware, async (c) => {
   const user = c.get('user');
   const formData = await c.req.formData();
@@ -528,3 +529,5 @@ uploads.post('/avatar', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Failed to upload avatar', code: 'INTERNAL_ERROR' } }, 500);
   }
 });
+
+export default uploads;

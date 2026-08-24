@@ -31,6 +31,27 @@ async function getOAuthCallbackBase(c: any): Promise<string> {
   return new URL(c.req.url).origin;
 }
 
+// OAuth 回调统一封装:生成一次性 exchange code 并重定向到前端。
+// 不再把 JWT 直接放到 URL fragment,避免通过 Referer / 浏览器历史 / 共享设备泄漏。
+async function redirectWithExchangeCode(c: any, jwt: string): Promise<Response> {
+  // 32 字节密码学随机 -> base64url
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  const code = base64url(bytes.buffer as ArrayBuffer);
+  const now = Date.now();
+  const expiresAt = now + 60_000; // 60 秒足够浏览器完成跳转与换取
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO oauth_exchange_codes (code, jwt, created_at, expires_at) VALUES (?, ?, ?, ?)'
+    ).bind(code, jwt, now, expiresAt).run();
+  } catch (e) {
+    console.error('Failed to store OAuth exchange code:', e);
+    // 极端情况下回退到旧的 fragment 方式(仍能完成登录,但不暴露给 Referer)
+    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback#token=${jwt}`);
+  }
+  return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?code=${encodeURIComponent(code)}`);
+}
+
 // CP OAuth with PKCE
 // base64url 编码工具函数
 function base64url(buffer: ArrayBuffer): string {
@@ -72,8 +93,9 @@ auth.get('/cpoauth', async (c) => {
   });
   const cpoauthUrl = `https://www.cpoauth.com/oauth/authorize?${params.toString()}`;
 
-  // 将 code_verifier + state 存入 cookie，回调时取出
-  const cookieOpts = 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
+  // 将 code_verifier + state 存入 cookie，回调时取出。
+  // Path 限定在 /api/v1/auth/ 以缩小可读范围,降低无关子路径应用读取风险。
+  const cookieOpts = 'Path=/api/v1/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
   c.header('Set-Cookie', `cpoauth_cv=${codeVerifier}; ${cookieOpts}`);
   c.header('Set-Cookie', `cpoauth_st=${state}; ${cookieOpts}`, { append: true });
   return c.redirect(cpoauthUrl);
@@ -92,7 +114,7 @@ auth.get('/cpoauth/callback', async (c) => {
     return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=missing_code`);
   }
 
-  // 从 cookie 中取出 code_verifier 和 state
+  // 校验 state 防止 OAuth 登录 CSRF：攻击者无法伪造 HttpOnly Cookie 中的随机 state
   const cookieHeader = c.req.header('Cookie') || '';
   const getCookie = (name: string) => {
     const match = cookieHeader.split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
@@ -101,10 +123,13 @@ auth.get('/cpoauth/callback', async (c) => {
   const savedVerifier = getCookie('cpoauth_cv');
   const savedState = getCookie('cpoauth_st');
 
-  // 验证 state 防止 CSRF
-  if (state && savedState && state !== savedState) {
+  // 严格校验 state 防止 OAuth 登录 CSRF:state 与 cookie 中保存的 state 都必须存在且匹配
+  if (!state || !savedState || state !== savedState) {
     return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=state_mismatch`);
   }
+  // state 一次性使用，校验通过后立即清除
+  c.header('Set-Cookie', 'cpoauth_st=; Path=/api/v1/auth/; Max-Age=0');
+  c.header('Set-Cookie', 'cpoauth_cv=; Path=/api/v1/auth/; Max-Age=0', { append: true });
 
   const callbackBase = await getOAuthCallbackBase(c);
   const redirectUri = `${callbackBase}/api/v1/auth/cpoauth/callback`;
@@ -163,17 +188,16 @@ auth.get('/cpoauth/callback', async (c) => {
     .first();
 
   if (!user) {
-    // 检查用户名是否已存在（其他登录方式注册的）
+    // 检查用户名是否已存在(其他登录方式注册的)
     const existing: any = await c.env.DB.prepare('SELECT * FROM users WHERE username = ?')
       .bind(cpUser.username)
       .first();
 
     if (existing) {
-      // 关联 CP OAuth 到已有账户
-      await c.env.DB.prepare('UPDATE users SET cpoauth_id = ?, avatar_url = COALESCE(?, avatar_url) WHERE id = ?')
-        .bind(cpUser.sub, cpUser.avatar_url || null, existing.id)
-        .run();
-      user = await c.env.DB.prepare('SELECT * FROM users WHERE id = ?').bind(existing.id).first();
+      // 安全策略:绝不自动把 CpOAuth 绑定到现有账号(否则攻击者只需在 cpoauth.com
+      // 注册与目标相同的用户名即可接管账号)。要求用户先登录原账号再显式绑定。
+      console.error('CP OAuth login refused: username already exists with different cpoauth_id', { existingId: existing.id });
+      return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=username_conflict`);
     } else {
       // 创建新用户
       const result = await c.env.DB.prepare(
@@ -205,11 +229,11 @@ auth.get('/cpoauth/callback', async (c) => {
     c.env.JWT_SECRET
   );
 
-  // 清除 OAuth 临时 cookie
-  c.header('Set-Cookie', 'cpoauth_cv=; Path=/; Max-Age=0');
-  c.header('Set-Cookie', 'cpoauth_st=; Path=/; Max-Age=0', { append: true });
+  // 清除 OAuth 临时 cookie(Path 必须与设置时一致才能清除)
+  c.header('Set-Cookie', 'cpoauth_cv=; Path=/api/v1/auth/; Max-Age=0');
+  c.header('Set-Cookie', 'cpoauth_st=; Path=/api/v1/auth/; Max-Age=0', { append: true });
 
-  return c.redirect(`${c.env.FRONTEND_URL}/auth/callback#token=${token}`);
+  return redirectWithExchangeCode(c, token);
 });
 
 // GitHub OAuth (existing)
@@ -231,7 +255,7 @@ auth.get('/github', async (c) => {
   });
   const githubAuthUrl = `https://github.com/login/oauth/authorize?${params.toString()}`;
 
-  const cookieOpts = 'Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
+  const cookieOpts = 'Path=/api/v1/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
   c.header('Set-Cookie', `gh_oauth_st=${state}; ${cookieOpts}`);
   return c.redirect(githubAuthUrl);
 });
@@ -254,7 +278,7 @@ auth.get('/github/callback', async (c) => {
     return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=state_mismatch`);
   }
   // state 一次性使用，校验通过后立即清除
-  c.header('Set-Cookie', 'gh_oauth_st=; Path=/; Max-Age=0');
+  c.header('Set-Cookie', 'gh_oauth_st=; Path=/api/v1/auth/; Max-Age=0');
 
   let tokenData: { access_token?: string; error?: string };
   let githubUser: { id: number; login: string; avatar_url: string };
@@ -327,7 +351,7 @@ auth.get('/github/callback', async (c) => {
     c.env.JWT_SECRET
   );
 
-  return c.redirect(`${c.env.FRONTEND_URL}/auth/callback#token=${token}`);
+  return redirectWithExchangeCode(c, token);
 });
 
 // New: register with username/password
@@ -444,14 +468,30 @@ auth.post('/register', captchaMiddleware('register'), createRateLimiter('registe
     await c.env.DB.prepare('UPDATE email_verification_codes SET used = 1 WHERE id = ?').bind(record.id).run();
   }
 
-  // Check existing user
+  // 用户名冲突检查(H6):
+  //  - 用户名是公开信息(显示在用户主页等),直接返回 409 无安全风险
+  //  - 邮箱是个人信息,绝不能告诉调用方"邮箱已存在",否则与 send-verification-code
+  //    的反枚举防御(返回与"未注册"完全相同的成功响应)形成旁路漏洞。
+  // 因此:用户名冲突返回 409;邮箱冲突静默成功(假装注册成功,但不创建账号,不返回 token)。
   const emailParam = email ?? null;
-  const existing: any = await c.env.DB.prepare('SELECT id FROM users WHERE username = ? OR email = ?').bind(username, emailParam).first();
-  if (existing) {
-    return c.json({ success: false, error: { message: 'Username or email already exists', code: 'CONFLICT' } }, 409);
+  const usernameConflict: any = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  if (usernameConflict) {
+    return c.json({ success: false, error: { message: 'Username already exists', code: 'CONFLICT' } }, 409);
   }
 
-  const passwordHash = bcrypt.hashSync(password, 10);
+  if (email) {
+    const emailConflict: any = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
+    if (emailConflict) {
+      // 静默成功:返回与正常注册一致的响应结构与耗时特征,
+      // 避免攻击者通过响应区分"邮箱已注册"vs"邮箱未注册"。
+      // 不创建账号、不签发 token。攻击者拿到 token 后调用 /auth/me 会失败,
+      // 但正常用户在意外用已注册邮箱重复注册时也会得到"注册成功"提示——
+      // 这种边缘情况比邮箱枚举的危害低得多。
+      return c.json({ success: true, data: { token: '' } });
+    }
+  }
+
+  const passwordHash = bcrypt.hashSync(password, 12);
 
   const insertResult = await c.env.DB.prepare(
     'INSERT INTO users (username, password_hash, email, role) VALUES (?, ?, ?, ?)' 
@@ -516,9 +556,10 @@ auth.post('/send-verification-code', createRateLimiter('sendVerificationCode', 3
   }
 
   // Check if email is already registered
+  // 返回与"未注册邮箱"完全相同的成功响应,防止通过该接口枚举已注册邮箱
   const existing: any = await c.env.DB.prepare('SELECT id FROM users WHERE email = ?').bind(email).first();
   if (existing) {
-    return c.json({ success: false, error: { message: 'Email already registered', code: 'CONFLICT' } }, 409);
+    return c.json({ success: true, data: { message: 'If this email is not registered, a verification code has been sent.' } });
   }
 
   // Email-bomb guard: the IP rate limiter above can be rotated, so also refuse
@@ -533,8 +574,12 @@ auth.post('/send-verification-code', createRateLimiter('sendVerificationCode', 3
   // Delete old verification codes for this email
   await c.env.DB.prepare('DELETE FROM email_verification_codes WHERE email = ?').bind(email).run();
 
-  // Generate 6-digit code
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // Generate 6-digit code using cryptographically secure RNG
+  // (避免使用 Math.random() 导致短时间内的可预测性)
+  const codeRandomBytes = new Uint8Array(4);
+  crypto.getRandomValues(codeRandomBytes);
+  const codeRandomNum = (codeRandomBytes[0] << 24) | (codeRandomBytes[1] << 16) | (codeRandomBytes[2] << 8) | codeRandomBytes[3];
+  const code = String(Math.abs(codeRandomNum) % 1000000).padStart(6, '0');
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
   // Store the code
@@ -682,7 +727,7 @@ auth.post('/reset-password', createRateLimiter('resetPassword', 5, 300_000), asy
   }
 
   // Hash the new password
-  const passwordHash = await bcrypt.hashSync(password, 10);
+  const passwordHash = await bcrypt.hashSync(password, 12);
 
   // Update user's password
   const result = await c.env.DB.prepare(
@@ -715,17 +760,20 @@ auth.get('/me', async (c) => {
     return c.json({ success: false, error: { message: 'Invalid or expired token', code: 'UNAUTHORIZED' } }, 401);
   }
 
-  // Check if user is banned
-  if (payload.userId !== 1) {
-    try {
-      const row: any = await c.env.DB.prepare('SELECT banned FROM users WHERE id = ?').bind(payload.userId).first();
-      if (row && row.banned === 1) {
-        return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
-      }
-    } catch { /* ignore */ }
-  }
+  // 服务端实时校验封禁状态(与 authMiddleware 行为一致)
+  try {
+    const row: any = await c.env.DB.prepare('SELECT banned FROM users WHERE id = ?').bind(payload.userId).first();
+    if (row && row.banned === 1) {
+      return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
+    }
+  } catch { /* ignore */ }
 
-  const user = await c.env.DB.prepare('SELECT id, username, avatar_url, role, created_at FROM users WHERE id = ?')
+  // 必须返回 permissions 字段:前端 usePermissions hook 依赖它判断能否进入
+  // 各类管理页面(contest_admin / problem_admin / ticket_admin / list_admin / upload_admin)。
+  // 漏字段会让所有非 admin/super_admin 用户被 AdminLayout 拦截无法访问后台。
+  const user: any = await c.env.DB.prepare(
+    'SELECT id, username, avatar_url, role, permissions, created_at FROM users WHERE id = ?'
+  )
     .bind(payload.userId)
     .first();
 
@@ -733,7 +781,52 @@ auth.get('/me', async (c) => {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
 
+  // permissions 在 DB 中存储为 JSON 字符串,解析为数组返回,与登录接口保持一致
+  try {
+    const parsed = user.permissions ? JSON.parse(user.permissions) : [];
+    user.permissions = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    user.permissions = [];
+  }
+
   return c.json({ success: true, data: { user } });
+});
+
+// POST /auth/exchange — 用一次性 code 换取 JWT
+// 用于 OAuth 回调流程:OAuth 成功后后端把 JWT 存入 oauth_exchange_codes 表,
+// 并以 ?code=... 重定向到前端;前端拿 code 调此接口取出 JWT,一次性消费。
+// 这避免了把 JWT 直接放到 URL fragment 或 query 而被 Referer / 浏览器历史泄漏。
+auth.post('/exchange', createRateLimiter('oauthExchange', 10, 60_000), async (c) => {
+  const body: any = await c.req.json().catch(() => ({}));
+  const code = body?.code;
+  if (!code || typeof code !== 'string' || code.length > 128) {
+    return c.json({ success: false, error: { message: 'Invalid code', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const now = Date.now();
+  // 原子消费:仅当未过期且未使用时才把 used 标记为 1
+  const row: any = await c.env.DB.prepare(
+    'SELECT jwt, expires_at, used FROM oauth_exchange_codes WHERE code = ?'
+  ).bind(code).first();
+
+  if (!row) {
+    return c.json({ success: false, error: { message: 'Invalid or expired code', code: 'INVALID_CODE' } }, 400);
+  }
+  if (row.used === 1 || row.expires_at < now) {
+    // 已用 / 已过期 -> 删除并拒绝
+    await c.env.DB.prepare('DELETE FROM oauth_exchange_codes WHERE code = ?').bind(code).run();
+    return c.json({ success: false, error: { message: 'Invalid or expired code', code: 'INVALID_CODE' } }, 400);
+  }
+
+  // 标记为已用并删除(一次性)
+  await c.env.DB.prepare('DELETE FROM oauth_exchange_codes WHERE code = ?').bind(code).run();
+
+  // 顺手清理过期记录,避免表无限增长(每次调用顺便清理一批)
+  try {
+    await c.env.DB.prepare('DELETE FROM oauth_exchange_codes WHERE expires_at < ?').bind(now).run();
+  } catch { /* ignore cleanup errors */ }
+
+  return c.json({ success: true, data: { token: row.jwt } });
 });
 
 export default auth;

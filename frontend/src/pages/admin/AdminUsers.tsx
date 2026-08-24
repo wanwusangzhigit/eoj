@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { usePermissions } from '../../hooks/usePermissions';
 import { t } from '../../i18n';
 import {
   Search, Shield, User, ChevronLeft, ChevronRight, CheckSquare, Square,
@@ -11,6 +12,9 @@ import '../Admin.css';
 export default function AdminUsers() {
   useDocumentTitle(t('admin.userManagement'));
   const addToast = useToastStore((s) => s.addToast);
+  // 与后端权限对齐:编辑权限是 super admin 专属接口(superAdminMiddleware),
+  // 普通 admin 不应看到入口,避免点击后看到 403 困惑
+  const perms = usePermissions();
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
@@ -108,10 +112,11 @@ export default function AdminUsers() {
   };
 
   const toggleSelectAll = () => {
-    if (selectedIds.size === userList.filter((u: any) => u.id !== 1).length) {
+    const selectable = userList.filter((u: any) => u.id !== 1 && u.role !== 'super_admin');
+    if (selectedIds.size === selectable.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(userList.filter((u: any) => u.id !== 1).map((u: any) => u.id)));
+      setSelectedIds(new Set(selectable.map((u: any) => u.id)));
     }
   };
 
@@ -166,7 +171,7 @@ export default function AdminUsers() {
       {userList.length > 0 && (
         <div className="batch-actions" style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
           <button className="btn btn-ghost btn-sm" onClick={toggleSelectAll} title="全选/取消">
-            {selectedIds.size === userList.filter((u: any) => u.id !== 1).length ? <CheckSquare size={16} /> : <Square size={16} />}
+            {selectedIds.size === userList.filter((u: any) => u.id !== 1 && u.role !== 'super_admin').length ? <CheckSquare size={16} /> : <Square size={16} />}
             {selectedIds.size > 0 ? `已选 ${selectedIds.size}` : '全选'}
           </button>
           {selectedIds.size > 0 && (
@@ -195,8 +200,8 @@ export default function AdminUsers() {
       <div className="user-list">
         {userList.map((u) => (
           <div key={u.id} className={`user-item${u.banned ? ' user-banned' : ''}`}>
-            <div className="user-checkbox" onClick={() => u.id !== 1 && toggleSelect(u.id)} style={{ cursor: u.id !== 1 ? 'pointer' : 'default', display: 'flex', alignItems: 'center', paddingRight: 8 }}>
-              {u.id === 1 ? null : selectedIds.has(u.id) ? <CheckSquare size={16} /> : <Square size={16} />}
+            <div className="user-checkbox" onClick={() => (u.id !== 1 && u.role !== 'super_admin') && toggleSelect(u.id)} style={{ cursor: (u.id !== 1 && u.role !== 'super_admin') ? 'pointer' : 'default', display: 'flex', alignItems: 'center', paddingRight: 8 }}>
+              {(u.id === 1 || u.role === 'super_admin') ? null : selectedIds.has(u.id) ? <CheckSquare size={16} /> : <Square size={16} />}
             </div>
             <div className="user-info">
               <span className="user-name">
@@ -214,7 +219,9 @@ export default function AdminUsers() {
               )}
             </div>
             <div className="user-actions">
-              {u.id === 1 ? (
+              {u.id === 1 || u.role === 'super_admin' ? (
+                // 超级管理员(id=1 或 role='super_admin'):不显示任何"设为/撤销/封禁"按钮。
+                // 与后端校验对齐:H5 已禁止普通 admin 修改 super_admin 角色或 ban 超级管理员。
                 <span style={{fontSize:'12px',color:'var(--text-muted)'}}>{t('admin.superAdmin')}</span>
               ) : (
                 <>
@@ -239,7 +246,7 @@ export default function AdminUsers() {
                 </>
               )}
             </div>
-            {u.id !== 1 && (
+            {u.id !== 1 && u.role !== 'super_admin' && perms.isSuperAdmin && (
               <div className="user-permissions">
                 {editingPermissions === u.id ? (
                   <div className="permission-editor">
@@ -264,8 +271,8 @@ export default function AdminUsers() {
                   <div className="permission-tags">
                     {(() => {
                       try {
-                        const perms = u.permissions ? JSON.parse(u.permissions) : [];
-                        return perms.length > 0 ? perms.map((perm: string) => (
+                        const uPerms = u.permissions ? JSON.parse(u.permissions) : [];
+                        return uPerms.length > 0 ? uPerms.map((perm: string) => (
                           <span key={perm} className="perm-tag">{perm.replace('_admin', '')}</span>
                         )) : (
                           <span style={{fontSize:'12px',color:'var(--text-muted)'}}>{u.role === 'admin' ? t('admin.allPermissions') : t('admin.noPermissions')}</span>

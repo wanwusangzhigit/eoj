@@ -142,11 +142,25 @@ codeShares.get('/:token', async (c) => {
 codeShares.get('/:token/image', async (c) => {
   const token = c.req.param('token');
   const row: any = await c.env.DB.prepare(
-    'SELECT id, token, code, language, title, username FROM code_shares WHERE token = ?'
+    'SELECT id, token, code, language, title, username, password_hash, expires_at FROM code_shares WHERE token = ?'
   ).bind(token).first();
 
   if (!row) {
     return c.json({ success: false, error: { message: 'Share not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  // 过期检查
+  if (row.expires_at && new Date(row.expires_at) < new Date()) {
+    return c.json({ success: false, error: { message: 'Share has expired', code: 'GONE' } }, 410);
+  }
+
+  // 密码保护:与 GET 端点逻辑一致,必须校验通过后才返回内容(图片里包含完整代码)
+  if (row.password_hash) {
+    const provided = c.req.query('password') || '';
+    const ok = provided !== '' && bcrypt.compareSync(provided, row.password_hash);
+    if (!ok) {
+      return c.json({ success: false, error: { message: 'Password required', code: 'PASSWORD_REQUIRED' } }, 401);
+    }
   }
 
   // 简单语法高亮:仅高亮注释/字符串/关键字,不做完整分词(避免 SVG 注入)

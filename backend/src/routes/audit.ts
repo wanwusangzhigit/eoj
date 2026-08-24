@@ -23,16 +23,16 @@ audit.get('/logs', authMiddleware, adminMiddleware, async (c) => {
   const countBinds: any[] = [];
 
   if (search) {
-    countQuery += ' AND (username LIKE ? OR ip LIKE ? OR device_fingerprint LIKE ? OR action LIKE ?)';
-    dataQuery += ' AND (username LIKE ? OR ip LIKE ? OR device_fingerprint LIKE ? OR action LIKE ?)';
+    countQuery += " AND (username LIKE ? ESCAPE '\\' OR ip LIKE ? ESCAPE '\\' OR device_fingerprint LIKE ? ESCAPE '\\' OR action LIKE ? ESCAPE '\\')";
+    dataQuery += " AND (username LIKE ? ESCAPE '\\' OR ip LIKE ? ESCAPE '\\' OR device_fingerprint LIKE ? ESCAPE '\\' OR action LIKE ? ESCAPE '\\')";
     const like = `%${escapeLikeWildcard(search)}%`;
     binds.push(like, like, like, like);
     countBinds.push(like, like, like, like);
   }
 
   if (action) {
-    countQuery += ' AND action LIKE ?';
-    dataQuery += ' AND action LIKE ?';
+    countQuery += " AND action LIKE ? ESCAPE '\\'";
+    dataQuery += " AND action LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(action)}%`);
     countBinds.push(`%${escapeLikeWildcard(action)}%`);
   }
@@ -70,12 +70,12 @@ audit.get('/logs/export', authMiddleware, adminMiddleware, async (c) => {
   const binds: any[] = [];
 
   if (search) {
-    query += ' AND (username LIKE ? OR ip LIKE ? OR device_fingerprint LIKE ? OR action LIKE ?)';
+    query += " AND (username LIKE ? ESCAPE '\\' OR ip LIKE ? ESCAPE '\\' OR device_fingerprint LIKE ? ESCAPE '\\' OR action LIKE ? ESCAPE '\\')";
     const like = `%${escapeLikeWildcard(search)}%`;
     binds.push(like, like, like, like);
   }
   if (action) {
-    query += ' AND action LIKE ?';
+    query += " AND action LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(action)}%`);
   }
   if (ipFilter) {

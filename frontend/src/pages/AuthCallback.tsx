@@ -10,6 +10,7 @@ const errorKeyMap: Record<string, string> = {
   token_failed: 'authCallback.tokenFailed',
   userinfo_failed: 'authCallback.userinfoFailed',
   access_denied: 'authCallback.accessDenied',
+  username_conflict: 'authCallback.usernameConflict',
 };
 
 export default function AuthCallback() {
@@ -18,32 +19,45 @@ export default function AuthCallback() {
   const { setToken, fetchUser } = useAuthStore();
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
-  // token 通过 URL fragment(#token=)传递(后端重定向),避免 JWT 进入查询参数
-  // 而落入浏览器历史/代理日志;错误信息仍走查询参数
-  const hashToken = typeof window !== 'undefined'
-    ? new URLSearchParams(window.location.hash.replace(/^#/, '')).get('token')
-    : null;
-  const token = hashToken;
+  // OAuth 成功流程:后端把 JWT 存在服务端,只把一次性 exchange code 放在 ?code=
+  // 前端调用 POST /api/v1/auth/exchange 拿 JWT,避免 token 出现在 URL fragment
+  // 而被 Referer / 浏览器历史 / 共享设备泄漏。
+  const exchangeCode = searchParams.get('code');
   const oauthError = searchParams.get('error');
   const errorDesc = searchParams.get('error_description');
 
   // Derive error from URL params during render
   const urlError = oauthError
     ? (errorKeyMap[oauthError] ? t(errorKeyMap[oauthError]) : (errorDesc || oauthError))
-    : (!token ? t('authCallback.authFailed') : null);
+    : (!exchangeCode ? t('authCallback.authFailed') : null);
   const error = runtimeError || urlError;
 
   useEffect(() => {
-    if (!token || oauthError) return;
-    setToken(token);
-    fetchUser()
-      .then(() => {
+    if (!exchangeCode || oauthError) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/v1/auth/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: exchangeCode }),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!data?.success || !data?.data?.token) {
+          setRuntimeError(t('authCallback.authFailed'));
+          return;
+        }
+        setToken(data.data.token);
+        await fetchUser();
+        if (cancelled) return;
         navigate('/', { replace: true });
-      })
-      .catch(() => {
-        setRuntimeError(t('authCallback.authFailed'));
-      });
-  }, [token, oauthError, setToken, fetchUser, navigate]);
+      } catch {
+        if (!cancelled) setRuntimeError(t('authCallback.authFailed'));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exchangeCode, oauthError, setToken, fetchUser, navigate]);
 
   if (error) {
     return (

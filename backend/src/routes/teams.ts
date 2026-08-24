@@ -50,8 +50,8 @@ teams.get('/', async (c) => {
   const countBinds: any[] = [];
 
   if (search) {
-    query += ' AND (t.name LIKE ? OR t.description LIKE ?)';
-    countQuery += ' AND (name LIKE ? OR description LIKE ?)';
+    query += " AND (t.name LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\')";
+    countQuery += " AND (name LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\')";
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
     countBinds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
@@ -1747,7 +1747,7 @@ teams.get('/:id/problems', authMiddleware, async (c) => {
   let whereClause = 'WHERE tp.team_id = ?';
   const binds: any[] = [id];
   if (search) {
-    whereClause += ' AND (p.title LIKE ? OR p.slug LIKE ?)';
+    whereClause += " AND (p.title LIKE ? ESCAPE '\\' OR p.slug LIKE ? ESCAPE '\\')";
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 

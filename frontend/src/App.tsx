@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import { RequireSuperAdmin, RequirePermission } from './components/RequireSuperAdmin';
 import { t } from './i18n';
 import { useAuthStore } from './store/auth';
 import { useSettingsStore } from './store/settings';
@@ -157,33 +158,42 @@ function App() {
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<Navigate to="dashboard" replace />} />
+              {/* dashboard 对所有可进入后台的用户开放 */}
               <Route path="dashboard" element={<AdminDashboard />} />
-              <Route path="create-problem" element={<AdminCreateProblem />} />
-              <Route path="problems" element={<AdminProblems />} />
-              <Route path="testcases" element={<AdminTestcases />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="contests" element={<AdminContests />} />
-              <Route path="tickets" element={<AdminTickets />} />
-              <Route path="lists" element={<AdminLists />} />
-              <Route path="announcement" element={<AdminAnnouncement />} />
-              <Route path="announcements" element={<AdminAnnouncements />} />
-              <Route path="friend-links" element={<AdminFriendLinks />} />
-              <Route path="custom-pages" element={<AdminCustomPages />} />
-              <Route path="settings" element={<AdminSettings />} />
-              <Route path="models" element={<AdminModels />} />
-              <Route path="uploads" element={<AdminUploads />} />
-              <Route path="sql" element={<AdminSql />} />
-              <Route path="audit-logs" element={<AdminAuditLogs />} />
-              <Route path="bans" element={<AdminBans />} />
-              <Route path="training" element={<AdminTraining />} />
-              <Route path="plagiarism" element={<AdminPlagiarism />} />
-              <Route path="solution-review" element={<AdminSolutionReview />} />
-              <Route path="reports" element={<AdminReports />} />
-              <Route path="blogs" element={<AdminBlogs />} />
-              <Route path="teams" element={<AdminTeams />} />
-              <Route path="tags" element={<AdminTags />} />
-              <Route path="messages" element={<AdminMessages />} />
-              <Route path="ads" element={<AdminAds />} />
+              {/* 题目相关:problem_admin */}
+              <Route path="create-problem" element={<RequirePermission requirePermissions={['problem_admin']}><AdminCreateProblem /></RequirePermission>} />
+              <Route path="problems" element={<RequirePermission requirePermissions={['problem_admin']}><AdminProblems /></RequirePermission>} />
+              <Route path="testcases" element={<RequirePermission requirePermissions={['problem_admin']}><AdminTestcases /></RequirePermission>} />
+              <Route path="tags" element={<RequirePermission requirePermissions={['problem_admin']}><AdminTags /></RequirePermission>} />
+              <Route path="solution-review" element={<RequirePermission requirePermissions={['problem_admin']}><AdminSolutionReview /></RequirePermission>} />
+              <Route path="reports" element={<RequirePermission requirePermissions={['problem_admin']}><AdminReports /></RequirePermission>} />
+              {/* 用户管理:仅 admin/super_admin(沿用 hasAllPermissions,与菜单一致) */}
+              <Route path="users" element={<RequirePermission><AdminUsers /></RequirePermission>} />
+              {/* 比赛:contest_admin */}
+              <Route path="contests" element={<RequirePermission requirePermissions={['contest_admin']}><AdminContests /></RequirePermission>} />
+              <Route path="plagiarism" element={<RequirePermission requirePermissions={['contest_admin']}><AdminPlagiarism /></RequirePermission>} />
+              {/* 工单:ticket_admin */}
+              <Route path="tickets" element={<RequirePermission requirePermissions={['ticket_admin']}><AdminTickets /></RequirePermission>} />
+              {/* 题单/训练:list_admin */}
+              <Route path="lists" element={<RequirePermission requirePermissions={['list_admin']}><AdminLists /></RequirePermission>} />
+              <Route path="training" element={<RequirePermission requirePermissions={['list_admin']}><AdminTraining /></RequirePermission>} />
+              {/* 上传:upload_admin */}
+              <Route path="uploads" element={<RequirePermission requirePermissions={['upload_admin']}><AdminUploads /></RequirePermission>} />
+              {/* 仅 super admin(id=1 / role='super_admin')访问的高危功能 */}
+              <Route path="sql" element={<RequireSuperAdmin><AdminSql /></RequireSuperAdmin>} />
+              {/* 仅 admin/super_admin 可见的站点级管理功能(与 AdminLayout permission='super_admin' 一致) */}
+              <Route path="announcement" element={<RequirePermission><AdminAnnouncement /></RequirePermission>} />
+              <Route path="announcements" element={<RequirePermission><AdminAnnouncements /></RequirePermission>} />
+              <Route path="friend-links" element={<RequirePermission><AdminFriendLinks /></RequirePermission>} />
+              <Route path="custom-pages" element={<RequirePermission><AdminCustomPages /></RequirePermission>} />
+              <Route path="settings" element={<RequirePermission><AdminSettings /></RequirePermission>} />
+              <Route path="models" element={<RequirePermission><AdminModels /></RequirePermission>} />
+              <Route path="audit-logs" element={<RequirePermission><AdminAuditLogs /></RequirePermission>} />
+              <Route path="bans" element={<RequirePermission><AdminBans /></RequirePermission>} />
+              <Route path="blogs" element={<RequirePermission><AdminBlogs /></RequirePermission>} />
+              <Route path="teams" element={<RequirePermission><AdminTeams /></RequirePermission>} />
+              <Route path="messages" element={<RequirePermission><AdminMessages /></RequirePermission>} />
+              <Route path="ads" element={<RequirePermission><AdminAds /></RequirePermission>} />
             </Route>
             <Route path="/matches" element={<Contests />} />
             <Route path="/match/new" element={<CreateContest />} />

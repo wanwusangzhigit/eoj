@@ -289,6 +289,7 @@ const zh = {
     tokenFailed: '令牌获取失败，请重试',
     userinfoFailed: '用户信息获取失败，请重试',
     accessDenied: '您拒绝了授权请求',
+    usernameConflict: '该用户名已被其他账号占用,请先登录原账号后再绑定第三方登录',
   },
   // Rankings
   rankings: {

@@ -92,9 +92,23 @@ app.use('/api/*', async (c, next) => {
   await next();
   if (c.req.method === 'GET' && c.res.status === 200) {
     const path = c.req.path;
-    // Only cache public, non-admin endpoints
+    // 仅缓存公开、非 admin/internal/auth 接口;
+    // 进一步对个性化接口(/me、/users/:id、/notifications、/messages、/audit、
+    // /user/settings、/submissions?me=1 等)使用 private 指令,避免共享缓存(如
+    // CDN、代理)把 A 用户的个人信息返回给 B 用户。
     if (!path.includes('/admin/') && !path.includes('/internal/') && !path.includes('/auth/')) {
-      c.res.headers.set('Cache-Control', 'public, max-age=10, s-maxage=30');
+      const personalizedPatterns = [
+        '/me', '/notifications', '/messages', '/audit', '/user/settings',
+        '/collections/me', '/submissions/me',
+      ];
+      const isPersonalized = personalizedPatterns.some((p) => path.includes(p))
+        || path.startsWith('/api/v1/users/')      // 用户主页包含个人统计
+        || path.startsWith('/api/v1/templates')    // 代码模板按用户存储
+        || path.startsWith('/api/v1/notes');       // 笔记按用户存储
+      c.res.headers.set(
+        'Cache-Control',
+        isPersonalized ? 'private, max-age=10' : 'public, max-age=10, s-maxage=30'
+      );
     }
   }
 });
@@ -116,7 +130,11 @@ app.onError((err, c) => {
       ? crypto.randomUUID()
       : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
-  // 结构化日志:生产环境也可据此接入 Sentry 等监控,避免依赖堆栈文本
+  // 结构化日志:生产环境仅记录 trace_id 与消息概要,不写入完整堆栈,
+  // 避免内部实现细节泄漏到 Workers logs,同时降低日志噪声。
+  // 在本地开发环境(NODE_ENV !== 'production')保留堆栈便于调试。
+  const isProd = (c.env as any).NODE_ENV === 'production' ||
+    (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production');
   console.error(JSON.stringify({
     level: 'error',
     trace_id: traceId,
@@ -124,7 +142,7 @@ app.onError((err, c) => {
     method: c.req.method,
     path: c.req.path,
     message: err.message,
-    stack: err.stack,
+    ...(isProd ? {} : { stack: err.stack }),
   }));
 
   return c.json({

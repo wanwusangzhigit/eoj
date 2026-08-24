@@ -21,8 +21,8 @@ training.get('/', async (c) => {
   const countBinds: any[] = [];
 
   if (search) {
-    query += ' AND tp.title LIKE ?';
-    countQuery += ' AND title LIKE ?';
+    query += " AND tp.title LIKE ? ESCAPE '\\'";
+    countQuery += " AND title LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(search)}%`);
     countBinds.push(`%${escapeLikeWildcard(search)}%`);
   }

@@ -234,6 +234,11 @@ discussions.post('/:id/replies', authMiddleware, async (c) => {
   if (!content) {
     return c.json({ success: false, error: { message: 'content is required', code: 'BAD_REQUEST' } }, 400);
   }
+  // (M9)长度上限:回复比主帖(content 200000)更紧凑,50000 字符足够,
+  // 避免恶意发送超大回复撑爆 D1 行大小
+  if (typeof content !== 'string' || content.length > 50000) {
+    return c.json({ success: false, error: { message: 'content too long (max 50000 characters)', code: 'BAD_REQUEST' } }, 400);
+  }
 
   const discussion = await c.env.DB.prepare('SELECT * FROM discussions WHERE id = ?').bind(id).first();
   if (!discussion) {

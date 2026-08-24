@@ -5,7 +5,7 @@ import { createRateLimiter } from '../middleware/rateLimit';
 import { computeContestRatingChanges, RatingParticipant, INITIAL_RATING } from '../utils/rating';
 import { sendNotification, NotificationType } from '../utils/notify';
 import { recordAuditLog } from '../middleware/audit';
-import { parseContestTimeToMs, effectiveContestStatus } from '../utils/contest-time';
+import { parseContestTimeToMs, effectiveContestStatus, isContestAdmin, computeFreezeWindow } from '../utils/contest-time';
 
 const contests = new Hono<AppType>();
 
@@ -71,12 +71,15 @@ function buildContestRankings(input: RankingInput): any[] {
       bestSubs[key] = sub;
     }
     // OI: keep the latest submission (by created_at)
+    // 注意:created_at 来自 SQLite,可能是 "YYYY-MM-DD HH:MM:SS" 格式,
+    // 直接用 new Date() 在某些宿主(Node 本地开发)会按本地时区解析,导致跨午夜提交排序错乱。
+    // 统一通过 parseContestTimeToMs 走 UTC 解析(M5)。
     const prevLast = lastSubs[key];
-    if (!prevLast || new Date(sub.created_at) > new Date(prevLast.created_at)) {
+    if (!prevLast || parseContestTimeToMs(sub.created_at) > parseContestTimeToMs(prevLast.created_at)) {
       lastSubs[key] = sub;
     }
     if (sub.status === 'accepted') {
-      if (!firstAcceptedAt[key] || new Date(sub.created_at) < new Date(firstAcceptedAt[key])) {
+      if (!firstAcceptedAt[key] || parseContestTimeToMs(sub.created_at) < parseContestTimeToMs(firstAcceptedAt[key])) {
         firstAcceptedAt[key] = sub.created_at;
       }
     }
@@ -86,7 +89,7 @@ function buildContestRankings(input: RankingInput): any[] {
   const wrongBeforeAccepted: Record<string, number> = {};
   for (const sub of submissions) {
     const key = `${sub.user_id}:${sub.problem_id}`;
-    if (firstAcceptedAt[key] && new Date(sub.created_at) <= new Date(firstAcceptedAt[key])) {
+    if (firstAcceptedAt[key] && parseContestTimeToMs(sub.created_at) <= parseContestTimeToMs(firstAcceptedAt[key])) {
       if (sub.status !== 'accepted') {
         wrongBeforeAccepted[key] = (wrongBeforeAccepted[key] || 0) + 1;
       }
@@ -274,8 +277,7 @@ contests.get('/:id', optionalAuthMiddleware, async (c) => {
   }
 
   // 私有比赛(is_public=0)仅管理员或已报名参与者可见,避免按 ID 泄露
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin && !is_registered) {
     return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
   }
@@ -316,7 +318,15 @@ contests.post('/', authMiddleware, contestAdminMiddleware, contestCreateLimiter,
     return c.json({ success: false, error: { message: 'description must be at most 5000 characters', code: 'BAD_REQUEST' } }, 400);
   }
 
-  if (new Date(start_time) >= new Date(end_time)) {
+  // 时间校验统一通过 parseContestTimeToMs 走 UTC 解析(M6):
+  // 直接用 new Date(...) 解析带时间戳或空格分隔的字符串时行为依赖宿主时区,
+  // 与入库后读回使用的 parseContestTimeToMs 可能不一致,导致校验通过但实际时间错位。
+  const startMs = parseContestTimeToMs(start_time);
+  const endMs = parseContestTimeToMs(end_time);
+  if (!isFinite(startMs) || !isFinite(endMs)) {
+    return c.json({ success: false, error: { message: 'invalid start_time or end_time', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (startMs >= endMs) {
     return c.json({ success: false, error: { message: 'start_time must be before end_time', code: 'BAD_REQUEST' } }, 400);
   }
 
@@ -326,20 +336,21 @@ contests.post('/', authMiddleware, contestAdminMiddleware, contestCreateLimiter,
 
   const finalScoringType = normalizeScoringType(scoring_type);
 
-  const startTime = new Date(start_time);
-  const endTime = new Date(end_time);
-  const now = new Date();
+  // 规范化存储为 ISO 字符串,确保后续读回与 parseContestTimeToMs 解析一致
+  const startTimeIso = new Date(startMs).toISOString();
+  const endTimeIso = new Date(endMs).toISOString();
+  const now = Date.now();
   let status = 'upcoming';
-  if (now >= startTime && now < endTime) status = 'running';
-  if (now >= endTime) status = 'ended';
+  if (now >= startMs && now < endMs) status = 'running';
+  if (now >= endMs) status = 'ended';
 
   const result = await c.env.DB.prepare(
     'INSERT INTO contests (title, description, start_time, end_time, status, is_public, created_by, scoring_type, is_rated, allow_virtual, duration_minutes, freeze_minutes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
   ).bind(
     title,
     description || '',
-    start_time,
-    end_time,
+    startTimeIso,
+    endTimeIso,
     status,
     is_public ?? 1,
     user.userId,
@@ -448,8 +459,17 @@ contests.put('/:id', authMiddleware, contestAdminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'freeze_minutes must be a non-negative integer', code: 'BAD_REQUEST' } }, 400);
   }
 
-  // 与创建接口一致的校验:时间顺序 + 长度限制
-  if (start_time !== undefined && end_time !== undefined && new Date(start_time) >= new Date(end_time)) {
+  // 与创建接口一致的时间校验:统一通过 parseContestTimeToMs 走 UTC 解析(M6),
+  // 避免宿主时区差异导致校验与实际存储错位。
+  // 由于允许单独更新 start_time 或 end_time,需取最终值再比较。
+  const curStartMs = parseContestTimeToMs((contest as any).start_time);
+  const curEndMs = parseContestTimeToMs((contest as any).end_time);
+  const newStartMs = start_time !== undefined ? parseContestTimeToMs(start_time) : curStartMs;
+  const newEndMs = end_time !== undefined ? parseContestTimeToMs(end_time) : curEndMs;
+  if (!isFinite(newStartMs) || !isFinite(newEndMs)) {
+    return c.json({ success: false, error: { message: 'invalid start_time or end_time', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (newStartMs >= newEndMs) {
     return c.json({ success: false, error: { message: 'start_time must be before end_time', code: 'BAD_REQUEST' } }, 400);
   }
   if (title !== undefined && title.length > 200) {
@@ -467,8 +487,9 @@ contests.put('/:id', authMiddleware, contestAdminMiddleware, async (c) => {
 
   if (title !== undefined) { updates.push('title = ?'); binds.push(title); }
   if (description !== undefined) { updates.push('description = ?'); binds.push(description); }
-  if (start_time !== undefined) { updates.push('start_time = ?'); binds.push(start_time); }
-  if (end_time !== undefined) { updates.push('end_time = ?'); binds.push(end_time); }
+  // 规范化为 ISO 字符串后再入库,与创建接口一致,避免后续读回时解析不一致
+  if (start_time !== undefined) { updates.push('start_time = ?'); binds.push(new Date(newStartMs).toISOString()); }
+  if (end_time !== undefined) { updates.push('end_time = ?'); binds.push(new Date(newEndMs).toISOString()); }
   if (is_public !== undefined) { updates.push('is_public = ?'); binds.push(is_public); }
   if (status !== undefined) { updates.push('status = ?'); binds.push(status); }
   if (scoring_type !== undefined) { updates.push('scoring_type = ?'); binds.push(normalizeScoringType(scoring_type)); }
@@ -536,8 +557,7 @@ contests.get('/:id/problems', authMiddleware, async (c) => {
   }
 
   // Check if user is participant or admin
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
   const isParticipant = !!(await c.env.DB.prepare(
     'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
   ).bind(id, user.userId).first());
@@ -582,8 +602,7 @@ contests.get('/:id/problems/:slug', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
   const isParticipant = !!(await c.env.DB.prepare(
     'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
   ).bind(id, user.userId).first());
@@ -627,8 +646,7 @@ contests.post('/:id/register', authMiddleware, contestRegisterLimiter, async (c)
   }
 
   // 私有比赛(is_public=0)仅管理员可报名,避免通过 API 绕过前端入口参加私有比赛
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin) {
     return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
   }
@@ -657,8 +675,7 @@ contests.get('/:id/rankings', optionalAuthMiddleware, async (c) => {
 
   // 私有比赛(is_public=0)仅管理员或已报名参与者可见,避免按 ID 泄露
   const user = c.get('user');
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin) {
     const registered = user ? await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -698,12 +715,7 @@ contests.get('/:id/rankings', optionalAuthMiddleware, async (c) => {
 
   // 封榜:比赛进行中且已进入冻结期(freeze_minutes 内)时,排行榜只统计冻结前的提交,
   // 冻结后的评测结果对排行榜不可见(比赛结束后自动解禁)
-  const nowMs = Date.now();
-  const endMs = parseContestTimeToMs((contest as any).end_time);
-  const freezeMinutes = parseInt((contest as any).freeze_minutes) || 0;
-  const freezeStartMs = endMs - freezeMinutes * 60000;
-  const boardFrozen = effectiveContestStatus(contest) === 'running' && freezeMinutes > 0 && nowMs >= freezeStartMs;
-  const rankingEndTime = boardFrozen ? new Date(freezeStartMs).toISOString() : new Date(parseContestTimeToMs((contest as any).end_time)).toISOString();
+  const { boardFrozen, rankingEndIso: rankingEndTime } = computeFreezeWindow(contest as any);
 
   // 按参与者类型取提交窗口:
   // - 真实参赛者:使用比赛 [start_time, rankingEndTime](封榜时上限为冻结时间)
@@ -763,10 +775,12 @@ contests.get('/:id/rankings', optionalAuthMiddleware, async (c) => {
     virtualStartMap,
   });
 
-  // OI 赛制赛时:隐藏每题得分/状态,保留排名(比赛结束后自动解禁)
+  // OI 赛制赛时:隐藏每题得分/状态与排名(保留行但清空可比字段,避免通过 rank 顺序泄漏强弱)
+  // 比赛结束后自动解禁
   const oiRunning = scoringType === 'oi' && effectiveContestStatus(contest) === 'running';
   if (oiRunning) {
     for (const r of rankings) {
+      r.rank = null;
       r.total_score = null;
       r.accepted_count = null;
       r.total_penalty = null;
@@ -928,8 +942,7 @@ contests.get('/:id/rankings/export', optionalAuthMiddleware, async (c) => {
 
   // 私有比赛(is_public=0)仅管理员或已报名参与者可见,与 rankings 端点一致
   const user = c.get('user');
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin) {
     const registered = user ? await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -940,22 +953,18 @@ contests.get('/:id/rankings/export', optionalAuthMiddleware, async (c) => {
   }
 
   const scoringType = normalizeScoringType((contest as any).scoring_type);
-  const onlyVirtual = c.req.query('virtual') === '1';
 
+  // CSV 仅导出真实参赛者(与 rankings/image 端点一致);
+  // 虚拟参赛者提交发生在比赛结束后,会被时间窗过滤而显示 0 分,不应出现在榜单中
   const participants = await c.env.DB.prepare(
-    `SELECT cp.user_id, cp.is_virtual, cp.virtual_start_time, u.username FROM contest_participants cp JOIN users u ON cp.user_id = u.id WHERE cp.contest_id = ?`
+    `SELECT cp.user_id, cp.is_virtual, cp.virtual_start_time, u.username FROM contest_participants cp JOIN users u ON cp.user_id = u.id WHERE cp.contest_id = ? AND cp.is_virtual = 0`
   ).bind(id).all();
   const contestProblems = await c.env.DB.prepare(
     'SELECT cp.label, cp.problem_id, cp.score FROM contest_problems cp WHERE cp.contest_id = ? ORDER BY cp.label'
   ).bind(id).all();
 
-  // 封榜与时间窗口逻辑与 rankings 端点一致
-  const nowMs = Date.now();
-  const endMs = parseContestTimeToMs((contest as any).end_time);
-  const freezeMinutes = parseInt((contest as any).freeze_minutes) || 0;
-  const freezeStartMs = endMs - freezeMinutes * 60000;
-  const boardFrozen = effectiveContestStatus(contest) === 'running' && freezeMinutes > 0 && nowMs >= freezeStartMs;
-  const rankingEndTime = boardFrozen ? new Date(freezeStartMs).toISOString() : new Date(parseContestTimeToMs((contest as any).end_time)).toISOString();
+  // 封榜与时间窗口逻辑统一走 computeFreezeWindow,与 rankings 端点一致
+  const { boardFrozen, rankingEndIso } = computeFreezeWindow(contest as any);
 
   const userIds = participants.results.map((p: any) => p.user_id);
   const problemIds = contestProblems.results.map((p: any) => p.problem_id);
@@ -969,7 +978,7 @@ contests.get('/:id/rankings/export', optionalAuthMiddleware, async (c) => {
      AND status != 'pending' AND status != 'running'
      AND datetime(created_at) >= datetime(?) AND datetime(created_at) <= datetime(?)`;
   const allSubmissions = await c.env.DB.prepare(subQuery)
-    .bind(...userIds, ...problemIds, id, subLowerBound, rankingEndTime).all();
+    .bind(...userIds, ...problemIds, id, subLowerBound, rankingEndIso).all();
 
   const virtualStartMap: Record<number, number> = {};
   for (const p of participants.results as any[]) {
@@ -1023,8 +1032,7 @@ contests.get('/:id/rankings/image', optionalAuthMiddleware, async (c) => {
 
   // 私有比赛权限与 rankings 端点一致
   const user = c.get('user');
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin) {
     const registered = user ? await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -1047,13 +1055,16 @@ contests.get('/:id/rankings/image', optionalAuthMiddleware, async (c) => {
   const placeholders = userIds.map(() => '?').join(',');
   const problemPlaceholders = problemIds.map(() => '?').join(',');
 
+  // 封榜与时间窗口逻辑统一走 computeFreezeWindow,避免绕过封榜泄露最终成绩(H1)
+  const { rankingEndIso } = computeFreezeWindow(contest as any);
+
   const allSubmissions = await c.env.DB.prepare(
     `SELECT id, user_id, problem_id, status, score, time_used, created_at FROM submissions
      WHERE user_id IN (${placeholders}) AND problem_id IN (${problemPlaceholders})
      AND contest_id = ?
      AND status != 'pending' AND status != 'running'
      AND datetime(created_at) >= datetime(?) AND datetime(created_at) <= datetime(?)`
-  ).bind(...userIds, ...problemIds, id, (contest as any).start_time, (contest as any).end_time).all();
+  ).bind(...userIds, ...problemIds, id, (contest as any).start_time, rankingEndIso).all();
 
   const rankings = buildContestRankings({
     submissions: allSubmissions.results as any[],
@@ -1163,8 +1174,7 @@ contests.get('/:id/my-status', authMiddleware, async (c) => {
   }
 
   // 与 problems 接口一致:运行中仅报名者(或管理员)可查看个人状态,避免未报名用户枚举题目标签
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
   if (effectiveContestStatus(contest) === 'running' && !isAdmin) {
     const registered = await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -1264,9 +1274,16 @@ contests.post('/:id/virtual-register', authMiddleware, virtualRegisterLimiter, a
     return c.json({ success: false, error: { message: 'Virtual participation is disabled for this contest', code: 'FORBIDDEN' } }, 403);
   }
 
+  // 虚拟参赛必须有明确时长(M7):若 duration_minutes 缺失或为 0,
+  // 提交时间窗口将退化为无上限(见 submissions.ts),虚拟参赛者可在比赛结束后任意时间内继续提交,
+  // 与"虚拟参赛 = 等效时长内重跑比赛"的语义相悖,也会污染虚拟排行榜。
+  const virtualDurationMinutes = parseInt((contest as any).duration_minutes) || 0;
+  if (virtualDurationMinutes <= 0) {
+    return c.json({ success: false, error: { message: 'Virtual participation is disabled for this contest', code: 'FORBIDDEN' } }, 403);
+  }
+
   // 私有比赛(is_public=0)仅管理员可虚拟参赛,避免通过 API 绕过前端入口
-  const isAdmin = user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isAdmin = isContestAdmin(user);
   if ((contest as any).is_public !== 1 && !isAdmin) {
     return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
   }
@@ -1368,9 +1385,27 @@ contests.post('/:id/finalize', authMiddleware, adminMiddleware, async (c) => {
 
   // 只保留有提交的参与者(未提交代码的不计入 Rating 结算)
   const submittedUserIds = new Set((allSubmissions.results as any[]).map((s: any) => s.user_id));
-  const ranked: { user_id: number; rank: number }[] = finalizeRankings
-    .filter((r: any) => submittedUserIds.has(r.user_id))
-    .map((r: any) => ({ user_id: r.user_id, rank: r.rank }));
+  // 关键修正(H3):过滤掉零提交者后必须重新分配 rank。
+  // 否则弃赛选手占用前排名次,真实参赛者的名次会被抬高,导致 Rating delta 被错误拉低。
+  // finalizeRankings 已按 (total_score DESC, total_penalty ASC) 排序,过滤后相对次序保留,
+  // 故只需在过滤后的子集上重走标准的并列排名算法即可。
+  const rankedFinalists = finalizeRankings.filter((r: any) => submittedUserIds.has(r.user_id));
+  let prevScore: number | null = null;
+  let prevPenalty: number | null = null;
+  let prevRank = 0;
+  for (let i = 0; i < rankedFinalists.length; i++) {
+    const r = rankedFinalists[i];
+    if (prevScore === null || r.total_score !== prevScore || r.total_penalty !== prevPenalty) {
+      prevRank = i + 1;
+    }
+    r.rank = prevRank;
+    prevScore = r.total_score;
+    prevPenalty = r.total_penalty;
+  }
+  const ranked: { user_id: number; rank: number }[] = rankedFinalists.map((r: any) => ({
+    user_id: r.user_id,
+    rank: r.rank,
+  }));
 
   if (ranked.length === 0) {
     return c.json({ success: false, error: { message: 'No participants with submissions to rate', code: 'BAD_REQUEST' } }, 400);
@@ -1494,8 +1529,7 @@ contests.get('/:id/rating-changes', optionalAuthMiddleware, async (c) => {
 
   // 私有比赛(is_public=0)仅管理员或已报名参与者可见,避免按 ID 泄露 Rating 历史
   const user = c.get('user');
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if (contest.is_public !== 1 && !isAdmin) {
     const registered = user ? await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -1542,8 +1576,7 @@ contests.get('/:id/announcements', optionalAuthMiddleware, async (c) => {
 
   // 私有比赛(is_public=0)仅管理员或已报名参与者可见,避免按 ID 泄露
   const user = c.get('user');
-  const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin' || user.userId === 1
-    || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin')));
+  const isAdmin = isContestAdmin(user);
   if (contest.is_public !== 1 && !isAdmin) {
     const registered = user ? await c.env.DB.prepare(
       'SELECT id FROM contest_participants WHERE contest_id = ? AND user_id = ?'
@@ -1646,8 +1679,7 @@ contests.get('/:id/clarifications', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const isHost = user.userId === 1 || user.role === 'admin' || user.role === 'super_admin'
-    || (Array.isArray(user.permissions) && user.permissions.includes('contest_admin'));
+  const isHost = isContestAdmin(user);
 
   let query = `SELECT cl.id, cl.contest_id, cl.user_id, cl.question, cl.answer, cl.status,
                       cl.created_at, cl.answered_at, u.username
@@ -1685,8 +1717,11 @@ contests.post('/:id/clarifications', authMiddleware, async (c) => {
   }
   // 按当前时间动态判定:必须查询 start_time/end_time 才能正确计算状态,
   // 否则 effectiveContestStatus 会因字段缺失恒返回 'upcoming'(比赛开始后仍误报"未开始")
-  if (effectiveContestStatus(contest) === 'upcoming') {
-    return c.json({ success: false, error: { message: 'Contest has not started yet', code: 'FORBIDDEN' } }, 403);
+  // 同时(L8):答疑仅在比赛进行中开放,与"赛时私密答疑"的设计语义一致;
+  // 比赛结束前的 upcoming 阶段与结束后的 ended 阶段均不接受新提问。
+  const contestStatus = effectiveContestStatus(contest);
+  if (contestStatus !== 'running') {
+    return c.json({ success: false, error: { message: contestStatus === 'upcoming' ? 'Contest has not started yet' : 'Contest has ended', code: 'FORBIDDEN' } }, 403);
   }
 
   // 仅已报名(参赛)选手可提问
@@ -1720,6 +1755,12 @@ contests.put('/:id/clarifications/:clarificationId', authMiddleware, contestAdmi
   ).bind(clarificationId, id).first();
   if (!clarification) {
     return c.json({ success: false, error: { message: 'Clarification not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  // (L9)幂等保护:已答疑问不允许再次回答/修改,避免被覆盖且无审计痕迹。
+  // 如需纠正回答,应通过额外的"撤回"流程将 status 改回 pending,而非直接覆盖。
+  if (clarification.status === 'answered') {
+    return c.json({ success: false, error: { message: 'Clarification has already been answered', code: 'BAD_REQUEST' } }, 400);
   }
 
   await c.env.DB.prepare(

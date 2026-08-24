@@ -67,13 +67,18 @@ messages.get('/conversations/:id', authMiddleware, async (c) => {
 });
 
 // POST /messages/conversations — 创建会话或追加消息
-messages.post('/conversations', authMiddleware, async (c) => {
+// 安全约束(M10):内容长度上限避免单条消息撑爆 D1 行
+messages.post('/conversations', authMiddleware, createRateLimiter('user_msg', 30, 60_000), async (c) => {
   const user = c.get('user');
   const body = await c.req.json();
   const { target_user_id, content } = body;
 
   if (!target_user_id || !content || !content.trim()) {
     return c.json({ success: false, error: { message: 'target_user_id and content are required', code: 'BAD_REQUEST' } }, 400);
+  }
+  // 内容长度上限:私信单条 5000 字符足够日常使用,且防 D1 行大小爆炸
+  if (typeof content !== 'string' || content.length > 5000) {
+    return c.json({ success: false, error: { message: 'content too long (max 5000 characters)', code: 'BAD_REQUEST' } }, 400);
   }
 
   if (parseInt(target_user_id) === user.userId) {
@@ -128,13 +133,21 @@ messages.post('/conversations', authMiddleware, async (c) => {
 });
 
 // POST /messages/admin/send — 管理员定向/群发站内信(admin)
-messages.post('/admin/send', authMiddleware, adminMiddleware, createRateLimiter('admin_msg', 20, 60_000), async (c) => {
+// 安全约束(H4):
+//  - 群发影响面大,加严限流(2次/分钟,而非 20次/分钟),避免大量 INSERT 打挂 D1
+//  - 群发强制设置最大收件人上限,防御未来用户量爆炸后的意外 DoS
+//  - content 统一截断到 2000 字符(此前定向模式截断、群发模式未截断,不一致)
+messages.post('/admin/send', authMiddleware, adminMiddleware, createRateLimiter('admin_msg', 2, 60_000), async (c) => {
   const admin = c.get('user');
   const body = await c.req.json();
   const { target_user_id, content } = body;
 
   if (!content || !content.trim()) {
     return c.json({ success: false, error: { message: 'content is required', code: 'BAD_REQUEST' } }, 400);
+  }
+  // 类型校验 + 统一长度截断(原代码仅 target 模式截断,群发模式无截断)
+  if (typeof content !== 'string' || content.length > 10000) {
+    return c.json({ success: false, error: { message: 'content too long (max 10000 characters)', code: 'BAD_REQUEST' } }, 400);
   }
   const trimmed = content.trim().substring(0, 2000);
 
@@ -177,8 +190,10 @@ messages.post('/admin/send', authMiddleware, adminMiddleware, createRateLimiter(
     return c.json({ success: true, data: { sent: 1, conversation_id: conversationId, message: 'Message sent' } }, 201);
   }
 
-  // 群发:发给所有用户(逐用户创建/复用会话,管理员限量)
-  const users = await c.env.DB.prepare('SELECT id FROM users WHERE id != ?').bind(admin.userId).all();
+  // 群发:发给所有用户(逐用户创建/复用会话)
+  // 安全约束(H4):强制设置收件人总数上限,即便站点用户量增长也不会单次广播炸 D1
+  const MAX_BROADCAST_RECIPIENTS = 5000;
+  const users = await c.env.DB.prepare('SELECT id FROM users WHERE id != ? LIMIT ?').bind(admin.userId, MAX_BROADCAST_RECIPIENTS).all();
   let sent = 0;
   for (const u of (users.results as any[])) {
     let conversationId: number;

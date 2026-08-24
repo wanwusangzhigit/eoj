@@ -48,8 +48,8 @@ blogs.get('/', async (c) => {
   }
 
   if (tag && !mine) {
-    query += ' AND b.tags LIKE ?';
-    countQuery += ' AND tags LIKE ?';
+    query += " AND b.tags LIKE ? ESCAPE '\\'";
+    countQuery += " AND tags LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(tag)}%`);
     countBinds.push(`%${escapeLikeWildcard(tag)}%`);
   }

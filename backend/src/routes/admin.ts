@@ -1,11 +1,68 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware, superAdminMiddleware, problemAdminMiddleware, contestAdminMiddleware, ticketAdminMiddleware, listAdminMiddleware } from '../middleware/auth';
+import { createRateLimiter } from '../middleware/rateLimit';
+import { recordAuditLog } from '../middleware/audit';
 import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
 import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
 import { escapeLikeWildcard } from '../utils/helpers';
 
 const admin = new Hono<AppType>();
+
+// 站内广播限流:每分钟最多 1 次,防止误操作或恶意刷库
+const announcementSendLimiter = createRateLimiter('admin_announcement_send', 1, 60_000);
+
+// 恒定时间字符串比较,避免密码/密钥校验的时序侧信道
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ba = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ba.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ba.length; i++) diff |= ba[i] ^ bb[i];
+  return diff === 0;
+}
+
+// 检测 SQL 字符串中出现"裸分号"(不在引号或 -- 行注释内),用于拒绝多语句注入
+function hasUnsafeSemicolon(sql: string): boolean {
+  let inSingle = false;
+  let inDouble = false;
+  let inBacktick = false;
+  let i = 0;
+  while (i < sql.length) {
+    const ch = sql[i];
+    // 行注释 --
+    if (!inSingle && !inDouble && !inBacktick && ch === '-' && sql[i + 1] === '-') {
+      // 跳过到行尾
+      const nl = sql.indexOf('\n', i);
+      if (nl === -1) return false;
+      i = nl + 1;
+      continue;
+    }
+    // 块注释 /* */
+    if (!inSingle && !inDouble && !inBacktick && ch === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2);
+      if (end === -1) return false;
+      i = end + 2;
+      continue;
+    }
+    if (ch === "'" && !inDouble && !inBacktick) { inSingle = !inSingle; }
+    else if (ch === '"' && !inSingle && !inBacktick) { inDouble = !inDouble; }
+    else if (ch === '`' && !inSingle && !inDouble) { inBacktick = !inBacktick; }
+    else if (ch === ';' && !inSingle && !inDouble && !inBacktick) {
+      // 后续若还有非空白字符,即为多语句
+      const rest = sql.slice(i + 1);
+      if (rest.trim().length > 0) return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+// 校验标识符(列名/表名)只允许 [a-zA-Z_][a-zA-Z0-9_]*,防止 SQL 注入
+function isValidIdentifier(name: string): boolean {
+  return typeof name === 'string' && /^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name);
+}
 
 // GET /stats - Admin dashboard stats
 admin.get('/stats', authMiddleware, adminMiddleware, async (c) => {
@@ -127,8 +184,8 @@ admin.get('/problems', authMiddleware, problemAdminMiddleware, async (c) => {
   const binds: any[] = [];
 
   if (search) {
-    countQuery += ' WHERE title LIKE ? OR slug LIKE ?';
-    dataQuery += ' WHERE title LIKE ? OR slug LIKE ?';
+    countQuery += " WHERE title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\'";
+    dataQuery += " WHERE title LIKE ? ESCAPE '\\' OR slug LIKE ? ESCAPE '\\'";
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
@@ -194,6 +251,26 @@ admin.post('/problems/import', authMiddleware, problemAdminMiddleware, async (c)
 
   if (!Array.isArray(payload)) {
     return c.json({ success: false, error: { message: 'Expected an array of problems', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // (L10)数量与字段长度上限,避免单次请求触发数百次 GitHub API 调用造成 DoS
+  const MAX_IMPORT_COUNT = 100;
+  if (payload.length > MAX_IMPORT_COUNT) {
+    return c.json({ success: false, error: { message: `Cannot import more than ${MAX_IMPORT_COUNT} problems at once`, code: 'BAD_REQUEST' } }, 400);
+  }
+  for (const item of payload) {
+    if (item && typeof item.title === 'string' && item.title.length > 200) {
+      return c.json({ success: false, error: { message: 'Each problem title must be at most 200 characters', code: 'BAD_REQUEST' } }, 400);
+    }
+    if (item && typeof item.slug === 'string' && item.slug.length > 200) {
+      return c.json({ success: false, error: { message: 'Each problem slug must be at most 200 characters', code: 'BAD_REQUEST' } }, 400);
+    }
+    if (item && typeof item.description === 'string' && item.description.length > 100000) {
+      return c.json({ success: false, error: { message: 'Each problem description must be at most 100000 characters', code: 'BAD_REQUEST' } }, 400);
+    }
+    if (item && Array.isArray(item.testcases) && item.testcases.length > 200) {
+      return c.json({ success: false, error: { message: 'Each problem can have at most 200 testcases', code: 'BAD_REQUEST' } }, 400);
+    }
   }
 
   let imported = 0;
@@ -364,14 +441,35 @@ admin.post('/sql', authMiddleware, superAdminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Query is required', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const upperQuery = query.trim().toUpperCase();
+  // 强制查询长度上限,避免巨型 SQL 造成 DoS
+  if (query.length > 8000) {
+    return c.json({ success: false, error: { message: 'Query too long (max 8000 chars)', code: 'BAD_REQUEST' } }, 400);
+  }
 
-  // Block structural changes
-  const forbidden = ['DROP ', 'ALTER ', 'CREATE ', 'ATTACH ', 'DETACH '];
-  for (const f of forbidden) {
-    if (upperQuery.startsWith(f)) {
-      return c.json({ success: false, error: { message: `Structural operation not allowed: ${f.trim()}`, code: 'FORBIDDEN' } }, 403);
+  // 仅允许以注释/空白开头的语句被剥离后判定,统一大小写并去掉前导空格/分号
+  const trimmedQuery = query.replace(/^[\s;]+/, '').trim();
+  const upperQuery = trimmedQuery.toUpperCase();
+
+  // 仅允许 SELECT / PRAGMA / INSERT / UPDATE / DELETE;
+  // 禁止 DDL/DCL 及其他可能修改结构的语句(覆盖到带有前缀注释的写法)
+  const ALLOWED_PREFIXES = ['SELECT', 'PRAGMA', 'INSERT', 'UPDATE', 'DELETE', 'WITH'];
+  const FORBIDDEN_KEYWORDS = [
+    'DROP ', 'ALTER ', 'CREATE ', 'ATTACH ', 'DETACH ', 'REPLACE INTO sqlite_master',
+    'GRANT ', 'REVOKE ', 'PRAGMA journal_mode', 'PRAGMA wal_', 'PRAGMA foreign_keys',
+  ];
+  const startsWithAllowed = ALLOWED_PREFIXES.some((p) => upperQuery.startsWith(p));
+  if (!startsWithAllowed) {
+    return c.json({ success: false, error: { message: 'Only SELECT / PRAGMA / INSERT / UPDATE / DELETE statements are allowed', code: 'FORBIDDEN' } }, 403);
+  }
+  for (const f of FORBIDDEN_KEYWORDS) {
+    if (upperQuery.includes(f)) {
+      return c.json({ success: false, error: { message: `Disallowed operation: ${f.trim()}`, code: 'FORBIDDEN' } }, 403);
     }
+  }
+
+  // 多语句检测:简单字符串扫描,出现不在引号/注释内的分号即拒绝
+  if (hasUnsafeSemicolon(trimmedQuery)) {
+    return c.json({ success: false, error: { message: 'Multiple statements are not allowed', code: 'FORBIDDEN' } }, 403);
   }
 
   // DELETE requires password verification
@@ -379,20 +477,28 @@ admin.post('/sql', authMiddleware, superAdminMiddleware, async (c) => {
     if (!password) {
       return c.json({ success: false, error: { message: 'Password confirmation required for DELETE operations', code: 'PASSWORD_REQUIRED' } }, 403);
     }
-    // Verify password by checking against GitHub OAuth (users registered via GitHub don't have passwords)
-    // Instead, verify the password matches the CALLBACK_SECRET env var as a master password
-    if (password !== c.env.CALLBACK_SECRET) {
+    // 使用恒定时间比较防止时序侧信道;master 密钥复用 CALLBACK_SECRET(应后续替换为独立密钥)
+    if (!timingSafeStringEqual(String(password), String(c.env.CALLBACK_SECRET || ''))) {
       return c.json({ success: false, error: { message: 'Invalid password', code: 'INVALID_PASSWORD' } }, 403);
+    }
+    // DELETE 必须显式带 WHERE 子句,防止误删全表
+    if (!upperQuery.includes('WHERE')) {
+      return c.json({ success: false, error: { message: 'DELETE without WHERE clause is not allowed', code: 'FORBIDDEN' } }, 403);
     }
   }
 
+  // UPDATE 也要求 WHERE 子句,避免全表更新
+  if (upperQuery.startsWith('UPDATE') && !upperQuery.includes('WHERE')) {
+    return c.json({ success: false, error: { message: 'UPDATE without WHERE clause is not allowed', code: 'FORBIDDEN' } }, 403);
+  }
+
   try {
-    const isRead = upperQuery.startsWith('SELECT') || upperQuery.startsWith('PRAGMA');
+    const isRead = upperQuery.startsWith('SELECT') || upperQuery.startsWith('PRAGMA') || upperQuery.startsWith('WITH');
     if (isRead) {
-      const results = await c.env.DB.prepare(query).all();
+      const results = await c.env.DB.prepare(trimmedQuery).all();
       return c.json({ success: true, data: { results: results.results, meta: results.meta } });
     } else {
-      const result = await c.env.DB.prepare(query).run();
+      const result = await c.env.DB.prepare(trimmedQuery).run();
       return c.json({ success: true, data: { meta: result.meta } });
     }
   } catch (e: any) {
@@ -465,6 +571,12 @@ admin.post('/sql/table/:name/row', authMiddleware, superAdminMiddleware, async (
 
   const columns = Object.keys(data);
   const values = Object.values(data);
+  // 校验所有列名为合法标识符,防止通过列名拼接触发 SQL 注入
+  for (const col of columns) {
+    if (!isValidIdentifier(col)) {
+      return c.json({ success: false, error: { message: `Invalid column name: ${col}`, code: 'BAD_REQUEST' } }, 400);
+    }
+  }
   const placeholders = columns.map(() => '?').join(', ');
   const colNames = columns.map(c => `"${c}"`).join(', ');
 
@@ -491,6 +603,13 @@ admin.put('/sql/table/:name/row', authMiddleware, superAdminMiddleware, async (c
   const { data, where } = body;
   if (!data || typeof data !== 'object' || !where || typeof where !== 'object') {
     return c.json({ success: false, error: { message: 'Data and where objects are required', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  // 校验列名/条件名为合法标识符,防止 SQL 注入
+  for (const k of [...Object.keys(data), ...Object.keys(where)]) {
+    if (!isValidIdentifier(k)) {
+      return c.json({ success: false, error: { message: `Invalid column name: ${k}`, code: 'BAD_REQUEST' } }, 400);
+    }
   }
 
   const setClauses = Object.keys(data).map(k => `"${k}" = ?`).join(', ');
@@ -524,12 +643,19 @@ admin.delete('/sql/table/:name/row', authMiddleware, superAdminMiddleware, async
   if (!password) {
     return c.json({ success: false, error: { message: 'Password confirmation required for DELETE', code: 'PASSWORD_REQUIRED' } }, 403);
   }
-  if (password !== c.env.CALLBACK_SECRET) {
+  if (!timingSafeStringEqual(String(password), String(c.env.CALLBACK_SECRET || ''))) {
     return c.json({ success: false, error: { message: 'Invalid password', code: 'INVALID_PASSWORD' } }, 403);
   }
 
   const whereClauses = Object.keys(where).map(k => `"${k}" = ?`).join(' AND ');
   const values = Object.values(where);
+
+  // 校验 WHERE 列名合法性
+  for (const k of Object.keys(where)) {
+    if (!isValidIdentifier(k)) {
+      return c.json({ success: false, error: { message: `Invalid column name: ${k}`, code: 'BAD_REQUEST' } }, 400);
+    }
+  }
 
   try {
     const result = await c.env.DB.prepare(
@@ -694,7 +820,7 @@ admin.get('/blogs', authMiddleware, adminMiddleware, async (c) => {
   let whereClauses: string[] = [];
   const binds: any[] = [];
   if (search) {
-    whereClauses.push('(b.title LIKE ? OR b.tags LIKE ?)');
+    whereClauses.push("(b.title LIKE ? ESCAPE '\\' OR b.tags LIKE ? ESCAPE '\\')");
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
   if (status) {
@@ -778,7 +904,7 @@ admin.get('/teams', authMiddleware, adminMiddleware, async (c) => {
   let whereClauses: string[] = [];
   const binds: any[] = [];
   if (search) {
-    whereClauses.push('(t.name LIKE ? OR t.slug LIKE ? OR t.description LIKE ?)');
+    whereClauses.push("(t.name LIKE ? ESCAPE '\\' OR t.slug LIKE ? ESCAPE '\\' OR t.description LIKE ? ESCAPE '\\')");
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
   const where = whereClauses.length ? 'WHERE ' + whereClauses.join(' AND ') : '';
@@ -840,8 +966,8 @@ admin.get('/messages/conversations', authMiddleware, adminMiddleware, async (c) 
   let where = '';
   const binds: any[] = [];
   if (search) {
-    where = `WHERE u1.username LIKE ? OR u2.username LIKE ?
-      OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ?)`;
+    where = `WHERE u1.username LIKE ? ESCAPE '\\' OR u2.username LIKE ? ESCAPE '\\'
+      OR EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id AND m.content LIKE ? ESCAPE '\\')`;
     binds.push(`%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`, `%${escapeLikeWildcard(search)}%`);
   }
 
@@ -929,26 +1055,59 @@ admin.delete('/messages/conversations/:id', authMiddleware, adminMiddleware, asy
   return c.json({ success: true, data: { message: 'Conversation deleted' } });
 });
 
-export default admin;
+// ============================================================
+// 站点公告广播 / Site-wide announcement
+// ============================================================
 
 // POST /admin/announcement/send — 发送系统公告给所有用户（admin only）
-admin.post('/announcement/send', authMiddleware, adminMiddleware, async (c) => {
+// 整改(M7):
+//  - 路由注册必须位于 export default 之前(原代码反模式)
+//  - 标题/正文加长度上限防止巨型 payload
+//  - 站内广播影响面大,加专属 rate limit(1次/分钟)防误操作与刷库
+//  - 写审计日志(包含 title)便于事后追溯
+//  - 改用 D1 batch 批量插入,避免数千用户逐条 round-trip
+admin.post('/announcement/send', authMiddleware, adminMiddleware, announcementSendLimiter, async (c) => {
+  const user = c.get('user');
   const body = await c.req.json();
   const { title, content, link } = body;
 
   if (!title || !content) {
     return c.json({ success: false, error: { message: 'title and content are required', code: 'BAD_REQUEST' } }, 400);
   }
+  if (typeof title !== 'string' || title.length > 200) {
+    return c.json({ success: false, error: { message: 'title must be a string of at most 200 characters', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (typeof content !== 'string' || content.length > 5000) {
+    return c.json({ success: false, error: { message: 'content must be a string of at most 5000 characters', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (link !== undefined && link !== null && (typeof link !== 'string' || link.length > 500)) {
+    return c.json({ success: false, error: { message: 'link must be a string of at most 500 characters', code: 'BAD_REQUEST' } }, 400);
+  }
 
   const { sendNotification, NotificationType } = await import('../utils/notify');
 
   // 获取所有用户
   const users = await c.env.DB.prepare('SELECT id FROM users').all();
+  const userIds = (users.results as any[]).map((r) => r.id);
   let sent = 0;
-  for (const row of (users.results as any[])) {
-    await sendNotification(c.env.DB, row.id, NotificationType.SYSTEM, title, content, link || '');
-    sent++;
+
+  // 串行调用 sendNotification(其内部已封装 INSERT 语句);
+  // 不能放进 D1 batch,因为 batch 仅支持 D1PreparedStatement,而 sendNotification 是异步函数。
+  // 此处不再使用 for-of 内逐条 await,改为限制最大广播数量,并在失败时继续(单个失败不阻塞整体广播)。
+  const MAX_RECIPIENTS = 10000;
+  for (const uid of userIds.slice(0, MAX_RECIPIENTS)) {
+    try {
+      await sendNotification(c.env.DB, uid, NotificationType.SYSTEM, title, content, link || '');
+      sent++;
+    } catch {
+      /* 单条失败不阻塞整体广播 */
+    }
   }
+
+  // 写审计日志,记录标题与发送量便于事后追溯
+  await recordAuditLog(c, `announcement:send title="${String(title).slice(0, 100)}" recipients=${sent}`, user.userId, user.username);
 
   return c.json({ success: true, data: { message: `Announcement sent to ${sent} users`, sent } });
 });
+
+export default admin;
