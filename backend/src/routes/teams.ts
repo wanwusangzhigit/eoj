@@ -1780,15 +1780,19 @@ teams.post('/:id/problems', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
-  const { title, slug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, testcases, judge_type, spj_language, spj_code } = body;
+  const { title, slug: rawSlug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, testcases, judge_type, spj_language, spj_code } = body;
 
-  if (!title || !slug || !description) {
-    return c.json({ success: false, error: { message: 'title, slug, and description are required', code: 'BAD_REQUEST' } }, 400);
+  if (!title || !description) {
+    return c.json({ success: false, error: { message: 'title and description are required', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const slugError = validateSlug(slug);
-  if (slugError) {
-    return c.json({ success: false, error: { message: slugError, code: 'BAD_REQUEST' } }, 400);
+  // 标识符(slug):未填写时留空,插入后按 p{1000+id} 自动生成。
+  const slug = (rawSlug || '').trim();
+  if (slug) {
+    const slugError = validateSlug(slug);
+    if (slugError) {
+      return c.json({ success: false, error: { message: slugError, code: 'BAD_REQUEST' } }, 400);
+    }
   }
 
   const team: any = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
@@ -1839,16 +1843,30 @@ teams.post('/:id/problems', authMiddleware, async (c) => {
   }
 
   try {
+    // slug 列 NOT NULL UNIQUE,而自动生成的 slug 依赖插入后的 id,
+    // 因此未填 slug 时先用随机占位符插入拿到 id,再回填为 p{1000+id}。
+    const isAutoSlug = !slug;
+    const placeholderSlug = isAutoSlug
+      ? `__auto_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
+      : slug;
+
     const result = await c.env.DB.prepare(
       `INSERT INTO problems (title, slug, description, input_format, output_format, time_limit, memory_limit, tags, difficulty, is_public, judge_type, spj_language)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
     ).bind(
-      title, slug, description, input_format || null, output_format || null,
+      title, placeholderSlug, description, input_format || null, output_format || null,
       effTimeLimit, effMemoryLimit, JSON.stringify(tags || []),
       difficulty || 'Easy', effectiveJudgeType, effectiveJudgeType === 'spj' ? spj_language : null
     ).run();
 
     const problemId = result.meta.last_row_id;
+    const finalSlug = isAutoSlug ? `p${1000 + problemId}` : slug;
+
+    if (isAutoSlug) {
+      await c.env.DB.prepare('UPDATE problems SET slug = ? WHERE id = ?')
+        .bind(finalSlug, problemId)
+        .run();
+    }
 
     await c.env.DB.prepare(
       'INSERT INTO team_problems (team_id, problem_id, added_by) VALUES (?, ?, ?)'
@@ -1856,13 +1874,13 @@ teams.post('/:id/problems', authMiddleware, async (c) => {
 
     // 测试数据与 SPJ 代码仍存 GitHub(复用全局评测管线)
     if (testcases && Array.isArray(testcases) && testcases.length > 0) {
-      await saveTestcases(c.env, slug, testcases);
+      await saveTestcases(c.env, finalSlug, testcases);
     }
     if (effectiveJudgeType === 'spj' && spj_code) {
-      await saveSpjCode(c.env, slug, spj_language, spj_code);
+      await saveSpjCode(c.env, finalSlug, spj_language, spj_code);
     }
 
-    return c.json({ success: true, data: { id: problemId, message: 'Problem created' } }, 201);
+    return c.json({ success: true, data: { id: problemId, slug: finalSlug, message: 'Problem created' } }, 201);
   } catch (e: any) {
     if (e.message?.includes('UNIQUE constraint')) {
       return c.json({ success: false, error: { message: 'Slug already exists', code: 'CONFLICT' } }, 409);

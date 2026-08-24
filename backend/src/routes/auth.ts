@@ -31,10 +31,77 @@ async function getOAuthCallbackBase(c: any): Promise<string> {
   return new URL(c.req.url).origin;
 }
 
-// OAuth 回调统一封装:生成一次性 exchange code 并重定向到前端。
-// 不再把 JWT 直接放到 URL fragment,避免通过 Referer / 浏览器历史 / 共享设备泄漏。
-async function redirectWithExchangeCode(c: any, jwt: string): Promise<Response> {
-  // 32 字节密码学随机 -> base64url
+// 校验并归一化 return_url 为"origin 串"(https://host),仅允许 http/https。
+// 空串返回 null。防御 URL 注入 / 开放重定向:仅提取 origin,不保留路径与 query。
+function normalizeReturnOrigin(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+    return u.origin;
+  } catch {
+    return null;
+  }
+}
+
+// 从 Cookie header 取出指定名字的值(解码)。找不到返回 null。
+function getCookieHeaderValue(c: any, name: string): string | null {
+  const cookieHeader: string = c.req.header('Cookie') || '';
+  const match = cookieHeader.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null;
+}
+
+// 读取 OAuth 起始时写入的 return_url(域名 B 的 origin),供回调成功后跳回。
+function getReturnOriginFromCookie(c: any): string | null {
+  return normalizeReturnOrigin(getCookieHeaderValue(c, 'oauth_return'));
+}
+
+// 将 OAuth state(含 return_url 与 CP OAuth 的 PKCE code_verifier)写入 DB,
+// 回调时按 state 反查。这样即使并发/多次点击导致 cookie 里的 state 被覆盖,
+// 只要授权服务商带回的 state 是某次真实发起的,就能命中并取回 return_url 与
+// code_verifier(消除 state_mismatch 误报,也避免 PKCE verifier 在跨域回跳中丢失)。
+async function storePendingState(c: any, oauthType: string, state: string, returnOrigin: string | null, codeVerifier?: string | null): Promise<void> {
+  const now = Date.now();
+  const expiresAt = now + 600_000; // 10 分钟
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO oauth_pending (state, oauth_type, return_url, code_verifier, created_at, expires_at) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(state, oauthType, returnOrigin, codeVerifier || null, now, expiresAt).run();
+  } catch (e) {
+    console.error('Failed to store OAuth pending state:', e);
+  }
+}
+
+// 回调时用 state 反查 DB,取回 return_url/code_verifier 并一次性删除该 state。
+// 返回 { return_url, code_verifier, matched }。matched=false 表示 state 未知(CSRF 伪装)。
+async function consumePendingState(c: any, oauthType: string, state: string): Promise<{ return_url: string | null; code_verifier: string | null; matched: boolean }> {
+  if (!state) return { return_url: null, code_verifier: null, matched: false };
+  const now = Date.now();
+  const row: any = await c.env.DB.prepare(
+    'SELECT return_url, code_verifier, oauth_type FROM oauth_pending WHERE state = ? AND oauth_type = ? AND expires_at > ?'
+  ).bind(state, oauthType, now).first().catch(() => null);
+  if (!row) return { return_url: null, code_verifier: null, matched: false };
+  await c.env.DB.prepare('DELETE FROM oauth_pending WHERE state = ?').bind(state).run().catch(() => {});
+  return {
+    return_url: row.return_url ? normalizeReturnOrigin(row.return_url) : null,
+    code_verifier: row.code_verifier || null,
+    matched: true,
+  };
+}
+
+// OAuth 回调统一封装:生成一次性 exchange code,并重定向到对应的前端 callback。
+// 优先跳转到发起登录的域名(return origin,可实现跨域 A->B 闭环);
+// 没有 return origin 时回退到站点 FRONTEND_URL。不再把 JWT 直接放到 URL fragment。
+async function redirectWithExchangeCode(c: any, jwt: string, returnOriginOverride?: string | null): Promise<Response> {
+  // 优先使用发起登录时 DB 里记录的 return_url(domain B),因为回调实际执行在 A 的
+  // origin 上,发起域名 B 的 oauth_return 跨域回不来;再兜底 cookie,最后才是站点主域。
+  const returnOrigin = normalizeReturnOrigin(returnOriginOverride)
+    || getReturnOriginFromCookie(c)
+    || normalizeReturnOrigin(c.env.FRONTEND_URL)
+    || '';
+  // 清除一次性 return cookie
+  c.header('Set-Cookie', 'oauth_return=; Path=/api/v1/auth/; Max-Age=0');
+  // 32 字节随机 -> base64url
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   const code = base64url(bytes.buffer as ArrayBuffer);
@@ -47,9 +114,9 @@ async function redirectWithExchangeCode(c: any, jwt: string): Promise<Response> 
   } catch (e) {
     console.error('Failed to store OAuth exchange code:', e);
     // 极端情况下回退到旧的 fragment 方式(仍能完成登录,但不暴露给 Referer)
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback#token=${jwt}`);
+    return c.redirect(`${returnOrigin}/auth/callback#token=${jwt}`);
   }
-  return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?code=${encodeURIComponent(code)}`);
+  return c.redirect(`${returnOrigin}/auth/callback?code=${encodeURIComponent(code)}`);
 }
 
 // CP OAuth with PKCE
@@ -91,13 +158,22 @@ auth.get('/cpoauth', async (c) => {
     code_challenge: codeChallenge,
     code_challenge_method: 'S256',
   });
-  const cpoauthUrl = `https://www.cpoauth.com/oauth/authorize?${params.toString()}`;
+const cpoauthUrl = `https://www.cpoauth.com/oauth/authorize?${params.toString()}`;
+
+  // 记录发起登录的来源域(domain B),回调成功后用于跳回。仅接受 origin,防开放重定向。
+  const returnOrigin = normalizeReturnOrigin(c.req.query('return_url'));
+
+  // 将 state + return_url + PKCE verifier 写入 DB,回调反查(消除 cookie 覆盖竞态与跨域 verifier 丢失)
+  await storePendingState(c, 'cpoauth', state, returnOrigin, codeVerifier);
 
   // 将 code_verifier + state 存入 cookie，回调时取出。
   // Path 限定在 /api/v1/auth/ 以缩小可读范围,降低无关子路径应用读取风险。
   const cookieOpts = 'Path=/api/v1/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
   c.header('Set-Cookie', `cpoauth_cv=${codeVerifier}; ${cookieOpts}`);
   c.header('Set-Cookie', `cpoauth_st=${state}; ${cookieOpts}`, { append: true });
+  if (returnOrigin) {
+    c.header('Set-Cookie', `oauth_return=${encodeURIComponent(returnOrigin)}; ${cookieOpts}`, { append: true });
+  }
   return c.redirect(cpoauthUrl);
 });
 
@@ -106,35 +182,34 @@ auth.get('/cpoauth/callback', async (c) => {
   const state = c.req.query('state');
   const error = c.req.query('error');
   const errorDesc = c.req.query('error_description');
+  // 校验 state::以 DB 中的 oauth_pending 为权威来源,并取回该次发起时记录的 return_url
+  const pending = await consumePendingState(c, 'cpoauth', state || '');
+  const returnOrigin = pending.matched
+    ? (pending.return_url || getReturnOriginFromCookie(c) || normalizeReturnOrigin(c.env.FRONTEND_URL) || '')
+    : (getReturnOriginFromCookie(c) || normalizeReturnOrigin(c.env.FRONTEND_URL) || '');
 
   if (error) {
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(errorDesc || '')}`);
+    return c.redirect(`${returnOrigin}/auth/callback?error=${encodeURIComponent(error)}&error_description=${encodeURIComponent(errorDesc || '')}`);
   }
   if (!code) {
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=missing_code`);
+    return c.redirect(`${returnOrigin}/auth/callback?error=missing_code`);
   }
 
-  // 校验 state 防止 OAuth 登录 CSRF：攻击者无法伪造 HttpOnly Cookie 中的随机 state
-  const cookieHeader = c.req.header('Cookie') || '';
-  const getCookie = (name: string) => {
-    const match = cookieHeader.split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
-    return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null;
-  };
-  const savedVerifier = getCookie('cpoauth_cv');
-  const savedState = getCookie('cpoauth_st');
-
-  // 严格校验 state 防止 OAuth 登录 CSRF:state 与 cookie 中保存的 state 都必须存在且匹配
-  if (!state || !savedState || state !== savedState) {
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=state_mismatch`);
+  // 严格校验 state 防止 OAuth 登录 CSRF:state 必须在 DB 中存在且未过期(一次性)
+  if (!pending.matched) {
+    return c.redirect(`${returnOrigin}/auth/callback?error=state_mismatch`);
   }
-  // state 一次性使用，校验通过后立即清除
+  // state 一次性使用，校验通过后立即清除 cookie
   c.header('Set-Cookie', 'cpoauth_st=; Path=/api/v1/auth/; Max-Age=0');
   c.header('Set-Cookie', 'cpoauth_cv=; Path=/api/v1/auth/; Max-Age=0', { append: true });
 
   const callbackBase = await getOAuthCallbackBase(c);
   const redirectUri = `${callbackBase}/api/v1/auth/cpoauth/callback`;
 
-  // 用授权码 + code_verifier 换取 access_token
+  // 用授权码 + code_verifier 换取 access_token。
+  // 优先使用发起时持久化到 DB 的 verifier(PKCE 在跨域回跳中 cookie 可能丢失),
+  // 兜底再读 cookie。
+  const codeVerifier = pending.code_verifier || (getCookieHeaderValue(c, 'cpoauth_cv') as string | null);
   const tokenBody: Record<string, string> = {
     grant_type: 'authorization_code',
     code,
@@ -142,11 +217,11 @@ auth.get('/cpoauth/callback', async (c) => {
     client_id: c.env.CPOAUTH_CLIENT_ID,
     client_secret: c.env.CPOAUTH_CLIENT_SECRET,
   };
-  if (savedVerifier) {
-    tokenBody.code_verifier = savedVerifier;
+  if (codeVerifier) {
+    tokenBody.code_verifier = codeVerifier;
   }
 
-  let tokenData: { access_token?: string; error?: string; error_description?: string };
+  let tokenData: { access_token?: string; error?: string; error_description?: string; statusMessage?: string; message?: string };
   let cpUser: { sub: string; username: string; display_name?: string; avatar_url?: string };
   try {
     const tokenResponse = await fetchWithTimeout('https://www.cpoauth.com/api/oauth/token', {
@@ -155,10 +230,11 @@ auth.get('/cpoauth/callback', async (c) => {
       body: JSON.stringify(tokenBody),
     });
 
-    tokenData = (await tokenResponse.json()) as { access_token?: string; error?: string; error_description?: string };
+    tokenData = (await tokenResponse.json()) as { access_token?: string; error?: string; error_description?: string; statusMessage?: string; message?: string };
     if (!tokenData.access_token) {
-      console.error('CP OAuth token error:', JSON.stringify(tokenData));
-      return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=token_failed&detail=${encodeURIComponent(tokenData.error || 'unknown')}`);
+      console.error('CP OAuth token error (redirect_uri used):', redirectUri, 'body sent:', JSON.stringify(tokenBody), 'server response:', JSON.stringify(tokenData));
+      const detail = tokenData.message || tokenData.error_description || tokenData.statusMessage || String(tokenData.error || 'unknown');
+      return c.redirect(`${returnOrigin}/auth/callback?error=token_failed&detail=${encodeURIComponent(detail)}`);
     }
 
     // 用 access_token 获取用户信息
@@ -174,12 +250,12 @@ auth.get('/cpoauth/callback', async (c) => {
     };
   } catch (e) {
     console.error('CP OAuth request failed (timeout/network):', e);
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=token_failed`);
+    return c.redirect(`${returnOrigin}/auth/callback?error=token_failed`);
   }
 
   if (!cpUser.sub || !cpUser.username) {
     console.error('CP OAuth userinfo error: missing sub or username', JSON.stringify(cpUser));
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=userinfo_failed`);
+    return c.redirect(`${returnOrigin}/auth/callback?error=userinfo_failed`);
   }
 
   // 根据 cpoauth_id 查找或创建用户
@@ -197,7 +273,7 @@ auth.get('/cpoauth/callback', async (c) => {
       // 安全策略:绝不自动把 CpOAuth 绑定到现有账号(否则攻击者只需在 cpoauth.com
       // 注册与目标相同的用户名即可接管账号)。要求用户先登录原账号再显式绑定。
       console.error('CP OAuth login refused: username already exists with different cpoauth_id', { existingId: existing.id });
-      return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=username_conflict`);
+      return c.redirect(`${returnOrigin}/auth/callback?error=username_conflict`);
     } else {
       // 创建新用户
       const result = await c.env.DB.prepare(
@@ -233,7 +309,7 @@ auth.get('/cpoauth/callback', async (c) => {
   c.header('Set-Cookie', 'cpoauth_cv=; Path=/api/v1/auth/; Max-Age=0');
   c.header('Set-Cookie', 'cpoauth_st=; Path=/api/v1/auth/; Max-Age=0', { append: true });
 
-  return redirectWithExchangeCode(c, token);
+  return redirectWithExchangeCode(c, token, pending.return_url);
 });
 
 // GitHub OAuth (existing)
@@ -242,10 +318,16 @@ auth.get('/github', async (c) => {
   const callbackBase = await getOAuthCallbackBase(c);
   const redirectUri = `${callbackBase}/api/v1/auth/github/callback`;
 
+  // 记录发起登录的来源域(domain B),回调成功后用于跳回。仅接受 origin,防开放重定向。
+  const returnOrigin = normalizeReturnOrigin(c.req.query('return_url'));
+
   // 生成 state 防止 OAuth CSRF（与 CP OAuth 一致），以 HttpOnly Cookie 存储，回调时校验
   const stateBytes = new Uint8Array(16);
   crypto.getRandomValues(stateBytes);
   const state = base64url(stateBytes.buffer as ArrayBuffer);
+
+  // 将 state + return_url 写入 DB,回调反查(消除 cookie 覆盖竞态导致的误判)
+  await storePendingState(c, 'github', state, returnOrigin);
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -257,6 +339,9 @@ auth.get('/github', async (c) => {
 
   const cookieOpts = 'Path=/api/v1/auth/; HttpOnly; Secure; SameSite=Lax; Max-Age=600';
   c.header('Set-Cookie', `gh_oauth_st=${state}; ${cookieOpts}`);
+  if (returnOrigin) {
+    c.header('Set-Cookie', `oauth_return=${encodeURIComponent(returnOrigin)}; ${cookieOpts}`, { append: true });
+  }
   return c.redirect(githubAuthUrl);
 });
 
@@ -267,17 +352,17 @@ auth.get('/github/callback', async (c) => {
     return c.json({ success: false, error: { message: 'Missing authorization code', code: 'BAD_REQUEST' } }, 400);
   }
 
-  // 校验 state 防止 OAuth 登录 CSRF：攻击者无法伪造 HttpOnly Cookie 中的随机 state
-  const cookieHeader = c.req.header('Cookie') || '';
-  const getCookie = (name: string) => {
-    const match = cookieHeader.split(';').map(s => s.trim()).find(s => s.startsWith(`${name}=`));
-    return match ? decodeURIComponent(match.split('=').slice(1).join('=')) : null;
-  };
-  const savedState = getCookie('gh_oauth_st');
-  if (!savedState || state !== savedState) {
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=state_mismatch`);
+  // 校验 state 防止 OAuth 登录 CSRF::以 DB 中的 oauth_pending 为权威来源,
+  // 并按该次发起时记录的 return_url 跳回来源域。consuming 会一次性删除该 state。
+  const pending = await consumePendingState(c, 'github', state || '');
+  // 跳回来源域(B)或站点主域,用于成功与失败重定向(cookie return_url 作为兜底)
+  const returnOrigin = pending.matched
+    ? (pending.return_url || getReturnOriginFromCookie(c) || normalizeReturnOrigin(c.env.FRONTEND_URL) || '')
+    : (getReturnOriginFromCookie(c) || normalizeReturnOrigin(c.env.FRONTEND_URL) || '');
+  if (!pending.matched) {
+    return c.redirect(`${returnOrigin}/auth/callback?error=state_mismatch`);
   }
-  // state 一次性使用，校验通过后立即清除
+  // state 一次性使用，校验通过后立即清除 cookie
   c.header('Set-Cookie', 'gh_oauth_st=; Path=/api/v1/auth/; Max-Age=0');
 
   let tokenData: { access_token?: string; error?: string };
@@ -315,7 +400,7 @@ auth.get('/github/callback', async (c) => {
     };
   } catch (e) {
     console.error('GitHub OAuth request failed (timeout/network):', e);
-    return c.redirect(`${c.env.FRONTEND_URL}/auth/callback?error=token_failed`);
+    return c.redirect(`${returnOrigin}/auth/callback?error=token_failed`);
   }
 
   let user: any = await c.env.DB.prepare('SELECT * FROM users WHERE github_id = ?')
@@ -351,7 +436,7 @@ auth.get('/github/callback', async (c) => {
     c.env.JWT_SECRET
   );
 
-  return redirectWithExchangeCode(c, token);
+  return redirectWithExchangeCode(c, token, pending.return_url);
 });
 
 // New: register with username/password

@@ -50,7 +50,18 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
     ...(showAI ? [{ to: '/ai', icon: Bot, label: t('nav.ai') }] : []),
   ] : [];
 
-  const adminNav = perms.hasAllPermissions
+  // 仪表盘对所有拥有任一管理权限的用户开放(与 AdminLayout 入口判定一致),
+  // 而非仅限 admin / super_admin。这样仅拥有题目、工单等单项权限的用户
+  // 也能从主侧边栏看到并进入管理后台仪表盘。
+  const hasAnyAdminPermission =
+    perms.hasAllPermissions ||
+    perms.canManageContests ||
+    perms.canManageProblems ||
+    perms.canManageLists ||
+    perms.canManageTickets ||
+    perms.canManageUploads;
+
+  const adminNav = hasAnyAdminPermission
     ? [{ to: '/admin/dashboard', icon: Shield, label: t('nav.admin') }]
     : [];
 

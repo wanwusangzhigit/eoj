@@ -13,6 +13,7 @@ import JSZip from 'jszip';
 import '../Admin.css';
 // 复用团队测试数据面板的完整视觉规范(.team-testcase-panel 作用域样式)
 import '../Teams.css';
+import { distributeScores } from '../../utils/testcaseScore';
 
 const SPJ_LANGUAGES = ['python', 'cpp', 'java', 'javascript', 'c', 'go', 'rust'];
 
@@ -38,12 +39,17 @@ export default function AdminTestcases() {
   const [importPreview, setImportPreview] = useState<{ fileName: string; parsed: any[] } | null>(null);
   const [selectedProblemJudgeType, setSelectedProblemJudgeType] = useState<string>('default');
   const testcaseSearchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropzoneFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ── SPJ 管理状态 ──
   const [spjCode, setSpjCode] = useState('');
   const [spjLanguage, setSpjLanguage] = useState('cpp');
   const [spjLoading, setSpjLoading] = useState(false);
   const [spjSaving, setSpjSaving] = useState(false);
+
+  // ── 输入/输出格式编辑状态 ──
+  const [formatForm, setFormatForm] = useState<{ input_format: string; output_format: string }>({ input_format: '', output_format: '' });
+  const [formatSaving, setFormatSaving] = useState(false);
 
   // 容量限制(与团队面板默认一致:单题总量 5MB)
   const maxTotalTestcaseSize = 5 * 1024 * 1024;
@@ -67,6 +73,7 @@ export default function AdminTestcases() {
     setSelectedTestcases(new Set());
     setEditingIdx(null);
     setImportPreview(null);
+    setFormatForm({ input_format: problem.input_format || '', output_format: problem.output_format || '' });
     // 重置并加载 SPJ 代码(仅当题目为 SPJ 判题时)
     setSpjCode('');
     setSpjLanguage('cpp');
@@ -89,6 +96,16 @@ export default function AdminTestcases() {
     } catch (e) {
       console.error('Failed to fetch testcases:', e);
       setExistingTestcases([]);
+    }
+    // 通过 slug 拉取完整题目信息,刷新输入/输出格式(搜索结果可能不含这些字段)
+    if (problem.slug) {
+      try {
+        const full = await api.getProblem(problem.slug);
+        const p = full.problem;
+        setFormatForm({ input_format: p.input_format || '', output_format: p.output_format || '' });
+      } catch (e) {
+        console.error('Failed to fetch problem details:', e);
+      }
     }
   }, []);
 
@@ -128,6 +145,25 @@ export default function AdminTestcases() {
     }
   };
 
+  const handleSaveFormat = async () => {
+    if (!selectedTestcaseProblem || formatSaving) return;
+    setFormatSaving(true);
+    try {
+      await api.updateProblem(selectedTestcaseProblem.id, {
+        input_format: formatForm.input_format,
+        output_format: formatForm.output_format,
+      });
+      if (selectedTestcaseProblem.slug) {
+        setSelectedTestcaseProblem({ ...selectedTestcaseProblem, input_format: formatForm.input_format, output_format: formatForm.output_format });
+      }
+      addToast('success', t('admin.problemUpdated'));
+    } catch (e: any) {
+      addToast('error', e.message || t('common.error'));
+    } finally {
+      setFormatSaving(false);
+    }
+  };
+
   // Handle navigation from Create Problem page
   useEffect(() => {
     const problemId = searchParams.get('problemId');
@@ -164,7 +200,8 @@ export default function AdminTestcases() {
       addToast('error', t('admin.atLeastOneTestcase'));
       return;
     }
-    setImportPreview({ fileName, parsed });
+    // 上传数据时按 100 分总分均匀分配(样例为 0 分)
+    setImportPreview({ fileName, parsed: distributeScores(parsed) });
   };
 
   const confirmImportPreview = () => {
@@ -204,8 +241,9 @@ export default function AdminTestcases() {
       );
       const parsed: any[] = [];
       for (const [name, entry] of inEntries) {
-        const outName = name.replace(/\.in$/i, '.out');
-        const outEntry = zip.files[outName];
+        const base = name.replace(/\.in$/i, '');
+        // 允许导入 .out / .ans 任一扩展名的输出文件
+        const outEntry = zip.files[`${base}.out`] || zip.files[`${base}.ans`];
         if (!outEntry || outEntry.dir) continue;
         const input = await entry.async('string');
         const output = await outEntry.async('string');
@@ -774,16 +812,60 @@ export default function AdminTestcases() {
             )}
           </div>
 
+          <div className="testcase-existing testcase-format" style={{ marginTop: 16 }}>
+            <h3><FileText size={16} style={{ color: 'var(--primary)' }} /> {t('admin.inputOutputFormat')}</h3>
+            <div className="form-group">
+              <label>{t('admin.inputFormat')}</label>
+              <textarea
+                className="form-input form-textarea"
+                rows={3}
+                value={formatForm.input_format}
+                onChange={(e) => setFormatForm({ ...formatForm, input_format: e.target.value })}
+                placeholder={t('admin.inputFormatPlaceholder')}
+              />
+            </div>
+            <div className="form-group">
+              <label>{t('admin.outputFormat')}</label>
+              <textarea
+                className="form-input form-textarea"
+                rows={3}
+                value={formatForm.output_format}
+                onChange={(e) => setFormatForm({ ...formatForm, output_format: e.target.value })}
+                placeholder={t('admin.outputFormatPlaceholder')}
+              />
+            </div>
+            <div className="form-actions">
+              <button className="btn btn-primary btn-sm" onClick={handleSaveFormat} disabled={formatSaving}>
+                <Save size={14} /> {formatSaving ? t('admin.saving') : t('admin.saveFormat')}
+              </button>
+            </div>
+          </div>
+
           <div className="testcase-new" style={{ marginTop: 16 }}>
             <h3><Upload size={16} style={{ color: 'var(--primary)' }} /> {t('admin.addNewTestcases')}</h3>
             <div
               className={`testcase-dropzone${dragActive ? ' active' : ''}`}
+              onClick={() => dropzoneFileInputRef.current?.click()}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
               onDragLeave={() => setDragActive(false)}
               onDrop={handleDrop}
             >
               <Upload size={22} />
               <span>{t('teams.testcaseDropHint')}</span>
+              <input
+                ref={dropzoneFileInputRef}
+                type="file"
+                accept=".json,.zip"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) {
+                    if (/\.(json)$/i.test(file.name)) importJsonFile(file);
+                    else if (/\.(zip)$/i.test(file.name)) importZipFile(file);
+                  }
+                  e.target.value = '';
+                }}
+              />
             </div>
             {importPreview && (
               <div className="testcase-import-preview">

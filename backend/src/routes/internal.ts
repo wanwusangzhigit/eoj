@@ -38,7 +38,12 @@ internal.post('/callback', async (c) => {
 
   // 类型与长度上限校验,防止持有 CALLBACK_SECRET 的恶意调用方塞入超大 payload
   // 导致 D1 行/字段超过 SQLite 限制(默认 1GB 但实际由 wrangler 限制)。
-  if (typeof submission_id !== 'number' || !Number.isFinite(submission_id)) {
+  // submission_id 可能以字符串形式传入,校验其为合法数字即可接受。
+  if (typeof submission_id !== 'number' && typeof submission_id !== 'string') {
+    return c.json({ success: false, error: { message: 'submission_id must be a number', code: 'BAD_REQUEST' } }, 400);
+  }
+  const submissionIdStr = String(submission_id);
+  if (!/^\d+$/.test(submissionIdStr) || submissionIdStr.length > 64) {
     return c.json({ success: false, error: { message: 'submission_id must be a number', code: 'BAD_REQUEST' } }, 400);
   }
   if (typeof status !== 'string' || status.length > 64) {
@@ -75,7 +80,7 @@ internal.post('/callback', async (c) => {
   }
 
   const existing = await c.env.DB.prepare('SELECT id FROM submissions WHERE id = ?')
-    .bind(submission_id)
+    .bind(submissionIdStr)
     .first();
 
   if (!existing) {
@@ -95,10 +100,10 @@ internal.post('/callback', async (c) => {
 
   // Delete old testcases and logs for this submission (supports rejudge)
   await c.env.DB.prepare('DELETE FROM submission_testcases WHERE submission_id = ?')
-    .bind(submission_id)
+    .bind(submissionIdStr)
     .run();
   await c.env.DB.prepare('DELETE FROM judge_logs WHERE submission_id = ?')
-    .bind(submission_id)
+    .bind(submissionIdStr)
     .run();
 
   // Insert testcase details
@@ -109,7 +114,7 @@ internal.post('/callback', async (c) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
-        submission_id,
+        submissionIdStr,
         tc.testcase_id || tc.id || null,
         tc.status || status,
         tc.time_used || 0,
@@ -128,7 +133,7 @@ internal.post('/callback', async (c) => {
       await c.env.DB.prepare(
         `INSERT INTO judge_logs (submission_id, log_type, message) VALUES (?, ?, ?)`
       )
-        .bind(submission_id, log.log_type || 'info', log.message || '')
+        .bind(submissionIdStr, log.log_type || 'info', log.message || '')
         .run();
     }
   }
@@ -137,7 +142,7 @@ internal.post('/callback', async (c) => {
   await c.env.DB.prepare(
     `INSERT INTO judge_logs (submission_id, log_type, message) VALUES (?, ?, ?)`
   )
-    .bind(submission_id, 'result', `Judging finished: ${status}, score=${score || 0}, time=${time_used || 0}ms, memory=${memory_used || 0}KB`)
+    .bind(submissionIdStr, 'result', `Judging finished: ${status}, score=${score || 0}, time=${time_used || 0}ms, memory=${memory_used || 0}KB`)
     .run();
 
   await c.env.DB.prepare(
@@ -150,7 +155,7 @@ internal.post('/callback', async (c) => {
       memory_used || null,
       details ? JSON.stringify(details) : null,
       github_run_id || null,
-      submission_id
+      submissionIdStr
     )
     .run();
 

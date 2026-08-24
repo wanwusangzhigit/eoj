@@ -32,6 +32,7 @@ const WRITABLE_SETTINGS = new Set([
   'ai_temperature', 'ai_allowed_models', 'ai_models_config',
   // OAuth
   'oauth_protocol', 'oauth_callback_url',
+  'cors_origins',
   // 验证码
   'captcha_enabled', 'captcha_strength', 'captcha_type',
   'captcha_register', 'captcha_login', 'captcha_submit',

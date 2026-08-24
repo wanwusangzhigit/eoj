@@ -61,19 +61,21 @@ export default function AdminCreateProblem() {
   };
 
   const handleCreateProblem = async () => {
-    if (!problemForm.title || !problemForm.slug || !problemForm.description) {
+    if (!problemForm.title || !problemForm.description) {
       addToast('error', t('admin.titleRequired'));
       return;
     }
     setSaving(true);
     try {
       const data: any = { ...problemForm };
+      data.slug = data.slug.trim();
       if (problemForm.judge_type === 'spj') {
         data.spj_code = spjCode;
       }
       const result = await api.createProblem(data);
+      const problemSlug = data.slug || result.slug || '';
       addToast('success', t('admin.problemCreated'));
-      navigate(`/admin/testcases?problemId=${result.id}&problemTitle=${encodeURIComponent(problemForm.title)}&problemSlug=${encodeURIComponent(problemForm.slug)}&problemDifficulty=${problemForm.difficulty}&problemJudgeType=${problemForm.judge_type}`);
+      navigate(`/admin/testcases?problemId=${result.id}&problemTitle=${encodeURIComponent(problemForm.title)}&problemSlug=${encodeURIComponent(problemSlug)}&problemDifficulty=${problemForm.difficulty}&problemJudgeType=${problemForm.judge_type}`);
     } catch (e: any) {
       addToast('error', e.message || t('common.error'));
     } finally {
