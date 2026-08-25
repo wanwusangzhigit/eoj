@@ -11,6 +11,18 @@
   padding-right: 8px;
 }
 
+/* 页底通栏区块:题目趋势 / 相关题目 / 提交语言分布。
+   作为 grid 的第三个子项,跨满两列并落到页面最下方。 */
+.problem-bottom-sections {
+  grid-column: 1 / -1;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 28px;
+}
+
 .breadcrumb {
   display: flex;
   align-items: center;
@@ -847,7 +859,7 @@
 
 /* ── 题目提交趋势图 ── */
 .problem-trend-section {
-  margin-top: 20px;
+  margin-top: 0;
 }
 
 .problem-trend-section h3 {

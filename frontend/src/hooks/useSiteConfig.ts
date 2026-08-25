@@ -28,6 +28,9 @@ const defaults: SiteConfig = {
   contact: {
     email: '',
   },
+  editor: {
+    default_language: 'python',
+  },
 };
 
 function deepMerge(target: any, source: any): any {

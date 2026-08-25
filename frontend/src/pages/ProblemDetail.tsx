@@ -16,6 +16,7 @@ import StatusBadge from '../components/StatusBadge';
 import Captcha, { type CaptchaHandle } from '../components/Captcha';
 import { Send, Clock, MemoryStick, ChevronLeft, ChevronRight, Tag, Heart, CheckCircle, XCircle, AlertCircle, Users, BookOpen, MessageSquare, ThumbsUp, Eye, Plus, X, Sparkles, Flag, Save, Trash2 } from 'lucide-react';
 import { LANGUAGES, LANGUAGE_TEMPLATES } from '../constants';
+import { getSiteConfig } from '../hooks/useSiteConfig';
 import RatingBadge from '../components/RatingBadge';
 import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
@@ -39,8 +40,10 @@ export default function ProblemDetail() {
   const { theme } = useThemeStore();
   const [problem, setProblem] = useState<any>(null);
   const [sampleTestcases, setSampleTestcases] = useState<any[]>([]);
-  const [language, setLanguage] = useState('python');
-  const [sourceCode, setSourceCode] = useState(LANGUAGE_TEMPLATES.python);
+  const preferredLanguage = getSiteConfig()?.editor?.default_language;
+  const initialLang = preferredLanguage && LANGUAGE_TEMPLATES[preferredLanguage] ? preferredLanguage : 'python';
+  const [language, setLanguage] = useState(initialLang);
+  const [sourceCode, setSourceCode] = useState(LANGUAGE_TEMPLATES[initialLang]);
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmissionId, setLastSubmissionId] = useState<number | null>(null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
@@ -933,60 +936,6 @@ export default function ProblemDetail() {
           })()}
         </div>
 
-        {trend.length > 0 && (
-          <div className="problem-trend-section">
-            <h3>{t('problemDetail.trend')}</h3>
-            <div className="problem-trend-chart">
-              {(() => {
-                const max = Math.max(1, ...trend.map((d) => d.total));
-                return trend.map((d) => (
-                  <div key={d.day} className="trend-col" title={`${d.day}: ${d.accepted} AC / ${d.total} 提交`}>
-                    <div className="trend-bars">
-                      <div className="trend-ac" style={{ height: `${(d.accepted / max) * 100}%` }} />
-                      <div className="trend-total" style={{ height: `${(d.total / max) * 100}%` }} />
-                    </div>
-                    <span className="trend-label">{d.day.slice(3)}</span>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
-
-        {relatedProblems.length > 0 && (
-          <div className="related-problems-section">
-            <h3>关联题目</h3>
-            <div className="related-problems-list">
-              {relatedProblems.map((p: any) => (
-                <Link key={p.id} to={`/problems/${p.slug}`} className="related-problem-item">
-                  <span className="related-problem-title">{p.title}</span>
-                  <span className="related-problem-difficulty">{p.difficulty}</span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {problemLanguages.length > 0 && (
-          <div className="problem-languages-section">
-            <h3>提交语言分布</h3>
-            <div className="language-bars" style={{display:'flex',flexDirection:'column',gap:8,margin:'12px 0'}}>
-              {(() => {
-                const total = problemLanguages.reduce((s: number, l: any) => s + l.count, 0);
-                return problemLanguages.map((lang: any) => (
-                  <div key={lang.language} className="language-bar-item" style={{display:'flex',alignItems:'center',gap:8}}>
-                    <span style={{width:80,fontSize:13,color:'var(--text-secondary)'}}>{lang.language}</span>
-                    <div style={{flex:1,height:16,background:'var(--bg-tertiary)',borderRadius:8,overflow:'hidden'}}>
-                      <div style={{width:`${(lang.count / total) * 100}%`,height:'100%',background:'var(--accent)',borderRadius:8,transition:'width 0.3s'}} />
-                    </div>
-                    <span style={{width:40,fontSize:12,color:'var(--text-muted)',textAlign:'right'}}>{lang.count}</span>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        )}
-
         <div className="problem-description">
           <h3>{t('problemDetail.description')}</h3>
           <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(problem.description) }} />
@@ -1650,6 +1599,63 @@ export default function ProblemDetail() {
           </div>
         </div>
       )}
+
+      {/* 页底通栏区块:题目趋势 / 相关题目 / 提交语言分布 */}
+      <div className="problem-bottom-sections">
+        {trend.length > 0 && (
+          <div className="problem-trend-section">
+            <h3>{t('problemDetail.trend')}</h3>
+            <div className="problem-trend-chart">
+              {(() => {
+                const max = Math.max(1, ...trend.map((d) => d.total));
+                return trend.map((d) => (
+                  <div key={d.day} className="trend-col" title={`${d.day}: ${d.accepted} AC / ${d.total} 提交`}>
+                    <div className="trend-bars">
+                      <div className="trend-ac" style={{ height: `${(d.accepted / max) * 100}%` }} />
+                      <div className="trend-total" style={{ height: `${(d.total / max) * 100}%` }} />
+                    </div>
+                    <span className="trend-label">{d.day.slice(3)}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
+
+        {relatedProblems.length > 0 && (
+          <div className="related-problems-section">
+            <h3>关联题目</h3>
+            <div className="related-problems-list">
+              {relatedProblems.map((p: any) => (
+                <Link key={p.id} to={`/problems/${p.slug}`} className="related-problem-item">
+                  <span className="related-problem-title">{p.title}</span>
+                  <span className="related-problem-difficulty">{p.difficulty}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {problemLanguages.length > 0 && (
+          <div className="problem-languages-section">
+            <h3>提交语言分布</h3>
+            <div className="language-bars" style={{display:'flex',flexDirection:'column',gap:8,margin:'12px 0'}}>
+              {(() => {
+                const total = problemLanguages.reduce((s: number, l: any) => s + l.count, 0);
+                return problemLanguages.map((lang: any) => (
+                  <div key={lang.language} className="language-bar-item" style={{display:'flex',alignItems:'center',gap:8}}>
+                    <span style={{width:80,fontSize:13,color:'var(--text-secondary)'}}>{lang.language}</span>
+                    <div style={{flex:1,height:16,background:'var(--bg-tertiary)',borderRadius:8,overflow:'hidden'}}>
+                      <div style={{width:`${(lang.count / total) * 100}%`,height:'100%',background:'var(--accent)',borderRadius:8,transition:'width 0.3s'}} />
+                    </div>
+                    <span style={{width:40,fontSize:12,color:'var(--text-muted)',textAlign:'right'}}>{lang.count}</span>
+                  </div>
+                ));
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
