@@ -31,14 +31,19 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/')) return;    // API 永不缓存
   if (url.pathname === '/__dev_info' || url.pathname === '/__seed') return;
 
-  // 导航请求:network-first + 离线回退
+  // 导航请求:network-first + 离线回退。
+  // 始终 resolve 为合法 Response,绝不向 respondWith 传入 undefined（否则抛
+  // "Failed to convert value to 'Response'"）。
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE_SHELL).then((c) => c.put('/index.html', copy)).catch(() => {});
-          return res;
+          if (res && res.status < 500) {
+            const copy = res.clone();
+            caches.open(CACHE_SHELL).then((c) => c.put('/index.html', copy)).catch(() => {});
+            return res;
+          }
+          return caches.match('/index.html').then((c) => c || Response.error());
         })
         .catch(() =>
           caches.match('/index.html').then((cached) => cached || Response.error())
@@ -47,19 +52,25 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 静态资源:stale-while-revalidate
+  // 静态资源:stale-while-revalidate。
+  // 网络失败且无缓存时必须回退到 Response.error(),绝不能让 promise resolve 成
+  // undefined（否则 respondWith 抛 "Failed to convert value to 'Response'"）。
   event.respondWith(
     caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res.ok) {
-            const copy = res.clone();
-            caches.open(CACHE_ASSETS).then((c) => c.put(req, copy)).catch(() => {});
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
+      if (cached) {
+        const network = fetch(req)
+          .then((res) => {
+            if (res && res.ok) {
+              const copy = res.clone();
+              caches.open(CACHE_ASSETS).then((c) => c.put(req, copy)).catch(() => {});
+            }
+            return res;
+          })
+          .catch(() => cached);
+        return network;
+      }
+      return fetch(req)
+        .catch(() => Response.error());
     })
   );
 });

@@ -24,4 +24,7 @@ export interface SiteConfig {
   contact: {
     email: string;
   };
+  editor: {
+    default_language: string;
+  };
 }

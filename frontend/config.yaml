@@ -22,3 +22,6 @@ home:
 
 contact:
   email: ""
+
+editor:
+  default_language: "cpp"   # 代码编辑器默认语言:python / cpp / java / javascript
