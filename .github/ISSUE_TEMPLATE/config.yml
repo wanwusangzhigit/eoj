@@ -1,0 +1,7 @@
+# 禁止创建空白 Issue
+blank_issues_enabled: false
+
+contact_links:
+  - name: 🛡️ 安全漏洞报告 / Security Vulnerability
+    url: https://github.com/wanwusangzhigit/eoj/security/advisories/new
+    about: 发现安全漏洞请通过 Security Advisories 私密报告 / Report security vulnerabilities privately
