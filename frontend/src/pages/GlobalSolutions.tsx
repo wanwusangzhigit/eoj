@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { ThumbsUp, Eye, BookOpen, Clock, Code, AlertCircle } from 'lucide-react';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './GlobalSolutions.css';
 
 const LANGUAGE_BADGE: Record<string, string> = {
@@ -23,17 +24,25 @@ const SORT_OPTIONS = [
   { value: 'popular' },
 ];
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 solutions loader 的返回)
+interface GlobalSolutionsSSRData {
+  solutions?: any[];
+  pagination?: any;
+}
+
 export default function GlobalSolutions() {
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<GlobalSolutionsSSRData>('solutions');
+  const firstRunRef = useRef<boolean>(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [solutions, setSolutions] = useState<any[]>([]);
+  const [solutions, setSolutions] = useState<any[]>(ssr?.solutions ?? []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pagination, setPagination] = useState<any>({});
+  const [pagination, setPagination] = useState<any>(ssr?.pagination ?? {});
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   useDocumentTitle(t('solutions.title'));
 
@@ -63,10 +72,16 @@ export default function GlobalSolutions() {
   };
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSolutions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, sort, search]);
+  }, [page, sort, search, ssr]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Search, FileText, User, BookOpen, MessageSquare, Lightbulb, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
@@ -6,18 +6,26 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
 import { t } from '../i18n';
 import { highlightText } from '../utils/highlight';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Search.css';
 
 const TYPE_TABS = ['all', 'problems', 'users', 'blogs', 'discussions', 'solutions'] as const;
 type SearchType = (typeof TYPE_TABS)[number];
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 search loader 的返回)
+interface SearchSSRData {
+  results?: { results?: any[]; total?: number } | null;
+}
+
 export default function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<SearchSSRData>('search');
+  const firstRunRef = useRef<boolean>(true);
   const [query, setQuery] = useState(searchParams.get('q') || '');
   const [type, setType] = useState<SearchType>((searchParams.get('type') as SearchType) || 'all');
-  const [results, setResults] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
+  const [results, setResults] = useState<any[]>(ssr?.results?.results ?? []);
+  const [total, setTotal] = useState(ssr?.results?.total ?? 0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -44,13 +52,19 @@ export default function SearchPage() {
   }, [addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     const q = searchParams.get('q') || '';
     const t = (searchParams.get('type') as SearchType) || 'all';
     setQuery(q);
     setType(t);
     setPage(1);
     runSearch(q, t);
-  }, [searchParams, runSearch]);
+  }, [searchParams, runSearch, ssr]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

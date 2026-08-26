@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -7,6 +7,7 @@ import ImageUploadButton from '../components/ImageUploadButton';
 import { Ticket, ChevronRight, Send, Clock, User } from 'lucide-react';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './TicketDetail.css';
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
@@ -29,13 +30,20 @@ const CATEGORY_BADGE_CLASS: Record<string, string> = {
   other: 'badge badge-category-other',
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 ticketDetail loader 的返回)
+interface TicketDetailSSRData {
+  ticket?: { ticket: any; replies: any[] } | null;
+}
+
 export default function TicketDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [ticket, setTicket] = useState<any>(null);
-  const [replies, setReplies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TicketDetailSSRData>('ticketDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [ticket, setTicket] = useState<any>(ssr?.ticket?.ticket ?? null);
+  const [replies, setReplies] = useState<any[]>(ssr?.ticket?.replies ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -59,9 +67,15 @@ export default function TicketDetail() {
   }, [id, addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTicket();
-  }, [fetchTicket]);
+  }, [fetchTicket, ssr]);
 
   const handleReply = async () => {
     if (!id || !replyContent.trim() || submitting) return;

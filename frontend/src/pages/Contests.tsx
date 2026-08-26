@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -11,7 +11,14 @@ import { useNow } from '../hooks/useNow';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { parseContestTimeToMs, formatContestTime } from '../utils/contestTime';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Contests.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 contests loader 的返回)
+interface ContestsSSRData {
+  contests?: any[];
+  pagination?: any;
+}
 
 const STATUS_OPTIONS = ['all', 'upcoming', 'running', 'ended'] as const;
 
@@ -31,12 +38,14 @@ export default function Contests() {
   const perms = usePermissions();
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [contests, setContests] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<ContestsSSRData>('contests');
+  const firstRunRef = useRef<boolean>(true);
+  const [contests, setContests] = useState<any[]>(ssr?.contests ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState<any>(null);
+  const [pagination, setPagination] = useState<any>(ssr?.pagination ?? null);
   const now = useNow();
   useDocumentTitle(t('contests.title'));
 
@@ -60,9 +69,15 @@ export default function Contests() {
   }, [statusFilter, page]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContests();
-  }, [fetchContests]);
+  }, [fetchContests, ssr]);
 
   // 切换状态筛选时回到第一页
   const changeStatusFilter = (status: string) => {

@@ -10,15 +10,25 @@ import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { highlightText } from '../utils/highlight';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ProblemList.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 problemList loader 的返回)
+interface ProblemListSSRData {
+  problems?: { problems?: any[]; pagination?: any };
+  tags?: { tags?: string[] };
+  userSolved?: { problems?: { id: number }[] };
+}
 
 export default function ProblemList() {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const [problems, setProblems] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
+  const ssr = useSSRPage<ProblemListSSRData>('problemList');
+  const firstRunRef = useRef<boolean>(true);
+  const [problems, setProblems] = useState<any[]>(ssr?.problems?.problems ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.problems?.pagination ?? {});
   const initialSearch = searchParams.get('search') || '';
   const [search, setSearch] = useState(initialSearch);
   const [debouncedSearch, setDebouncedSearch] = useState(initialSearch);
@@ -28,12 +38,14 @@ export default function ProblemList() {
   const [passRateFilter, setPassRateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [error, setError] = useState('');
-  const [allTags, setAllTags] = useState<string[]>([]);
+  const [allTags, setAllTags] = useState<string[]>(ssr?.tags?.tags ?? []);
   const [tagTree, setTagTree] = useState<any[]>([]);
   const [selectedTagId, setSelectedTagId] = useState<number | 0>(0);
-  const [solvedProblems, setSolvedProblems] = useState<Set<number>>(new Set());
+  const [solvedProblems, setSolvedProblems] = useState<Set<number>>(
+    () => new Set((ssr?.userSolved?.problems ?? []).map((p) => p.id))
+  );
   const [attemptedProblems, setAttemptedProblems] = useState<Set<number>>(new Set());
   useDocumentTitle(t('problemList.title'));
 
@@ -94,13 +106,19 @@ export default function ProblemList() {
   }, [addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProblems();
     if (user) {
       fetchUserProgress();
     }
     fetchTags();
-  }, [user, fetchProblems, fetchUserProgress, fetchTags]);
+  }, [user, fetchProblems, fetchUserProgress, fetchTags, ssr]);
 
   const getProblemStatus = (problemId: number) => {
     if (solvedProblems.has(problemId)) return 'accepted';

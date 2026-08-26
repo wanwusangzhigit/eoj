@@ -10,6 +10,7 @@ import { parseContestTimeToMs, formatContestTime } from '../utils/contestTime';
 import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown, Bell, Plus, Send, X, Download, Copy, Award, Image, Trash2 } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ContestDetail.css';
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
@@ -41,6 +42,20 @@ function formatCountdown(ms: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 contestDetail loader 的返回)
+interface ContestDetailSSRData {
+  contest?: {
+    contest?: any;
+    server_time?: string;
+    effective_status?: string;
+    problems?: any[];
+    is_registered?: boolean;
+    is_virtual?: boolean;
+  } | null;
+  announcements?: { announcements?: any[] };
+  clarifications?: { clarifications?: any[] };
+}
+
 export default function ContestDetail() {
   const { id, teamId, matchId } = useParams<{ id?: string; teamId?: string; matchId?: string }>();
   const isTeamMatch = !!teamId && !!matchId;
@@ -48,17 +63,22 @@ export default function ContestDetail() {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
-  const [contest, setContest] = useState<any>(null);
-  const [serverOffsetMs, setServerOffsetMs] = useState<number>(0);
-  const [serverStatus, setServerStatus] = useState<string>('');
-  const [problems, setProblems] = useState<any[]>([]);
+  const ssr = useSSRPage<ContestDetailSSRData>('contestDetail');
+  const ssrFirstRunRef = useRef<boolean>(true);
+  const [contest, setContest] = useState<any>(ssr?.contest?.contest ?? null);
+  const [serverOffsetMs, setServerOffsetMs] = useState<number>(() => {
+    const sm = ssr?.contest?.server_time;
+    return sm ? new Date(sm).getTime() - Date.now() : 0;
+  });
+  const [serverStatus, setServerStatus] = useState<string>(ssr?.contest?.effective_status ?? '');
+  const [problems, setProblems] = useState<any[]>(ssr?.contest?.problems ?? []);
   const [rankings, setRankings] = useState<any[]>([]);
   const [rankingProblems, setRankingProblems] = useState<any[]>([]);
   const [rankingsMeta, setRankingsMeta] = useState<any>({});
   const [rankingsPagination, setRankingsPagination] = useState<{ page: number; pageSize: number; total: number; totalPages: number } | null>(null);
-  const [registered, setRegistered] = useState(false);
-  const [virtualParticipant, setVirtualParticipant] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [registered, setRegistered] = useState<boolean>(!!ssr?.contest?.is_registered);
+  const [virtualParticipant, setVirtualParticipant] = useState<boolean>(!!ssr?.contest?.is_virtual);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<'problems' | 'rankings' | 'review' | 'announcements' | 'clarifications'>('problems');
   const [registering, setRegistering] = useState(false);
@@ -68,8 +88,8 @@ export default function ContestDetail() {
   const [selectedProblem, setSelectedProblem] = useState<string | null>(null);
   const [myProblemStatus, setMyProblemStatus] = useState<Record<string, { status: string; score: number; best_score: number }>>({});
   // ── 赛时公告 / 答疑 state ──
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [clarifications, setClarifications] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>(ssr?.announcements?.announcements ?? []);
+  const [clarifications, setClarifications] = useState<any[]>(ssr?.clarifications?.clarifications ?? []);
   const [showAnnouncementForm, setShowAnnouncementForm] = useState(false);
   const [annTitle, setAnnTitle] = useState('');
   const [annContent, setAnnContent] = useState('');
@@ -349,6 +369,12 @@ export default function ContestDetail() {
 
   useEffect(() => {
     if (!id && !isTeamMatch) return;
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && ssrFirstRunRef.current) {
+      ssrFirstRunRef.current = false;
+      return;
+    }
+    ssrFirstRunRef.current = false;
     // 竞态保护:id/参数切换或组件卸载时,取消标记使在途响应被丢弃,
     // 避免旧请求结果覆盖新数据
     let cancelled = false;
@@ -359,7 +385,7 @@ export default function ContestDetail() {
     if (user) fetchClarifications(isCancelled);
     fetchAnnouncements(isCancelled);
     return () => { cancelled = true; };
-  }, [fetchContest, id, isTeamMatch, fetchAnnouncements, fetchClarifications, user]);
+  }, [fetchContest, id, isTeamMatch, fetchAnnouncements, fetchClarifications, user, ssr]);
 
   // 比赛状态(由服务端时间校正后的 getStatus 计算),供倒计时等后续逻辑使用
   const status = getStatus();

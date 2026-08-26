@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -7,19 +7,27 @@ import { renderMarkdown } from '../utils/markdown';
 import { useToastStore } from '../store/toast';
 import { t } from '../i18n';
 import ImageUploadButton from '../components/ImageUploadButton';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './SolutionDetail.css';
 
 const LANGUAGES = ['C', 'C++', 'Java', 'Python', 'JavaScript', 'Go', 'Rust', 'TypeScript'];
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 solutionDetail loader 的返回)
+interface SolutionDetailSSRData {
+  solution?: { solution: any; is_voted: boolean } | null;
+}
 
 export default function SolutionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { addToast } = useToastStore();
+  const ssr = useSSRPage<SolutionDetailSSRData>('solutionDetail');
+  const firstRunRef = useRef<boolean>(true);
 
-  const [solution, setSolution] = useState<any>(null);
-  const [isVoted, setIsVoted] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [solution, setSolution] = useState<any>(ssr?.solution?.solution ?? null);
+  const [isVoted, setIsVoted] = useState<boolean>(ssr?.solution?.is_voted ?? false);
+  const [loading, setLoading] = useState(!ssr);
   const [voting, setVoting] = useState(false);
 
   // Edit mode
@@ -48,9 +56,15 @@ export default function SolutionDetail() {
 
   useEffect(() => {
     if (!id) return;
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSolution();
-  }, [id, fetchSolution]);
+  }, [id, fetchSolution, ssr]);
 
   const handleVote = async () => {
     if (!user || voting) return;

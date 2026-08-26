@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -7,11 +7,19 @@ import { PenSquare, Heart, MessageCircle, Eye } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Blogs.css';
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 blogs loader 的返回)
+interface BlogsSSRData {
+  blogs?: any[];
+}
+
 export default function Blogs() {
-  const [blogs, setBlogs] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<BlogsSSRData>('blogs');
+  const firstRunRef = useRef<boolean>(true);
+  const [blogs, setBlogs] = useState<any[]>(ssr?.blogs ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [sort, setSort] = useState<'latest' | 'hot'>('latest');
   const [view, setView] = useState<'all' | 'mine'>('all');
   const { user } = useAuthStore();
@@ -30,9 +38,15 @@ export default function Blogs() {
   }, [sort, view]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBlogs();
-  }, [fetchBlogs]);
+  }, [fetchBlogs, ssr]);
 
   return (
     <div className="blogs-page">

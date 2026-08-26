@@ -9,6 +9,7 @@ import type { CaptchaHandle } from '../components/Captcha';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Solutions.css';
 
 const LANGUAGE_NAMES: Record<string, string> = {
@@ -21,6 +22,12 @@ const LANGUAGE_NAMES: Record<string, string> = {
   rust: 'Rust',
   other: 'Other',
 };
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 solutions loader 的返回)
+interface SolutionsSSRData {
+  solutions?: any[];
+  pagination?: any;
+}
 
 export default function Solutions() {
   const addToast = useToastStore((s) => s.addToast);
@@ -42,15 +49,17 @@ export default function Solutions() {
   ];
   const [searchParams] = useSearchParams();
   const { user } = useAuthStore();
+  const ssr = useSSRPage<SolutionsSSRData>('solutions');
+  const firstRunRef = useRef<boolean>(true);
 
   const problemId = Number(searchParams.get('problem_id'));
   const problemTitle = searchParams.get('problem_title') || '';
 
-  const [solutions, setSolutions] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
+  const [solutions, setSolutions] = useState<any[]>(ssr?.solutions ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.pagination ?? {});
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState('newest');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
 
   const [showForm, setShowForm] = useState(false);
@@ -86,9 +95,15 @@ export default function Solutions() {
   }, [problemId, page, sort, addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSolutions();
-  }, [fetchSolutions]);
+  }, [fetchSolutions, ssr]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

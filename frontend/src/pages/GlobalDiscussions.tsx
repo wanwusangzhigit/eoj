@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { MessageSquare, Eye, Pin, Clock, Tag, AlertCircle } from 'lucide-react';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './GlobalDiscussions.css';
 
 const CATEGORY_OPTIONS = ['all', 'question', 'share', 'general'] as const;
 const SORT_OPTIONS = ['newest', 'active'] as const;
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 discussions loader 的返回)
+interface GlobalDiscussionsSSRData {
+  discussions?: any[];
+  pagination?: any;
+}
 
 const CATEGORY_BADGE_CLASS: Record<string, string> = {
   question: 'global-discussion-category-badge question',
@@ -28,11 +35,13 @@ const formatDate = (dateStr: string) => {
 
 export default function GlobalDiscussions() {
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<GlobalDiscussionsSSRData>('discussions');
+  const firstRunRef = useRef<boolean>(true);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [discussions, setDiscussions] = useState<any[]>([]);
+  const [discussions, setDiscussions] = useState<any[]>(ssr?.discussions ?? []);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [pagination, setPagination] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [pagination, setPagination] = useState<any>(ssr?.pagination ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -65,10 +74,16 @@ export default function GlobalDiscussions() {
   };
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDiscussions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryFilter, sortBy, page]);
+  }, [categoryFilter, sortBy, page, ssr]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pinnedDiscussions = discussions.filter((d: any) => d.is_pinned);
