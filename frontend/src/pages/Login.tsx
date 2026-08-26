@@ -11,7 +11,7 @@ import './Login.css';
 const API_BASE = import.meta.env.VITE_API_BASE || '/api/v1';
 
 export default function Login() {
-  const { user, setToken, fetchUser } = useAuthStore();
+  const { user, fetchUser } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [mode, setMode] = useState<'login' | 'register'>(location.pathname === '/register' ? 'register' : 'login');
@@ -180,11 +180,13 @@ export default function Login() {
 
     try {
       setLoading(true);
-      const data = mode === 'register'
-        ? await api.register(username.trim(), password, email.trim() || undefined, captchaUuid, captchaAnswer, verificationCode || undefined)
-        : await api.login(username.trim(), password, captchaUuid, captchaAnswer);
+      // 后端响应会 Set-Cookie 写入 httpOnly token(SSR 时代无需客户端持有 token 字符串)
+      if (mode === 'register') {
+        await api.register(username.trim(), password, email.trim() || undefined, captchaUuid, captchaAnswer, verificationCode || undefined);
+      } else {
+        await api.login(username.trim(), password, captchaUuid, captchaAnswer);
+      }
 
-      setToken(data.token);
       await fetchUser();
       navigate('/', { replace: true });
     } catch (err: any) {

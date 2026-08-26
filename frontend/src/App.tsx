@@ -1,4 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// StaticRouter 服务端渲染用,从 react-router 直接导出(v7 起 server 入口合并到主包);
+// 客户端 bundle 通过 vite externals 处理,体积不会浪费。
+import { StaticRouter } from 'react-router';
 import { useEffect, lazy, Suspense } from 'react';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -9,6 +12,7 @@ import { useSettingsStore } from './store/settings';
 import { useThemeStore } from './store/theme';
 import { api } from './api/client';
 import { applyThemeAccent, applyCustomCss } from './utils/theme';
+import { getSSRGlobal } from './ssr/hydrate';
 import './styles/global.css';
 import './styles/components.css';
 import 'katex/dist/katex.min.css';
@@ -96,14 +100,20 @@ const ShareView = lazy(() => import('./pages/ShareView'));
 const AnnualReport = lazy(() => import('./pages/AnnualReport'));
 const CustomPage = lazy(() => import('./pages/CustomPage'));
 
-function App() {
-  const { fetchUser, token } = useAuthStore();
+function App({ ssrLocation }: { ssrLocation?: string } = {}) {
+  // SSR 时代认证态由 httpOnly cookie 承载;初始 user 已通过 SSR 数据注入 store。
+  // 这里订阅 user 变化(登录/登出),保持原有副作用语义。
+  const user = useAuthStore((s) => s.user);
+  const fetchUser = useAuthStore((s) => s.fetchUser);
+  const isServer = ssrLocation !== undefined;
 
   useEffect(() => {
-    if (token) {
+    // 已登录用户首屏若 user 已存在(SSR 注入或刚登录),无需重复请求;
+    // 若 user 为空但 cookie 有效(API 端可识别),则触发一次 /me 拉取。
+    if (!user) {
       fetchUser();
     }
-  }, [token, fetchUser]);
+  }, [user]);
 
   // 主题定制:加载站点设置并应用管理端配置的主题色
   useEffect(() => {
@@ -117,10 +127,14 @@ function App() {
 
   // 用户级主题:登录后从 user_settings 恢复用户保存的深浅主题与自定义 CSS
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
     const applyServerTheme = async () => {
       try {
-        const data = await api.getUserSettings();
+        // SSR 已经注入 userSettings 时直接用,避免一次额外请求
+        const ssrUserSettings = getSSRGlobal()?.userSettings;
+        const data = ssrUserSettings
+          ? { settings: { theme: ssrUserSettings.theme, custom_css: ssrUserSettings.custom_css } as Record<string, string> }
+          : await api.getUserSettings();
         const t = data.settings?.theme;
         if (t === 'dark' || t === 'light') {
           useThemeStore.getState().applyServerTheme(t);
@@ -135,14 +149,13 @@ function App() {
       }
     };
     applyServerTheme();
-  }, [token]);
+  }, [user]);
 
-  return (
-    <BrowserRouter>
-      <ErrorBoundary>
-        <Layout>
-          <Suspense fallback={<div className="loading-container"><div className="loading-spinner"></div><p>{t('common.loading')}</p></div>}>
-            <Routes>
+  const routesElement = (
+    <ErrorBoundary>
+      <Layout>
+        <Suspense fallback={<div className="loading-container"><div className="loading-spinner"></div><p>{t('common.loading')}</p></div>}>
+          <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/problems" element={<ProblemList />} />
             <Route path="/problems/:slug" element={<ProblemDetail />} />
@@ -247,10 +260,24 @@ function App() {
             <Route path="/annual-report" element={<AnnualReport />} />
             <Route path="/page/:slug" element={<CustomPage />} />
             <Route path="*" element={<NotFound />} />
-            </Routes>
-          </Suspense>
-        </Layout>
-      </ErrorBoundary>
+          </Routes>
+        </Suspense>
+      </Layout>
+    </ErrorBoundary>
+  );
+
+  // SSR 与 CSR 共用同一棵路由树,仅外层 Router 不同:服务端用 StaticRouter
+  // (基于传入的 location 字符串做匹配),客户端用 BrowserRouter(基于 history API)。
+  if (isServer) {
+    return (
+      <StaticRouter location={ssrLocation!}>
+        {routesElement}
+      </StaticRouter>
+    );
+  }
+  return (
+    <BrowserRouter>
+      {routesElement}
     </BrowserRouter>
   );
 }

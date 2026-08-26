@@ -726,8 +726,13 @@ class ApiClient {
     this.baseUrl = baseUrl;
   }
 
+  /**
+   * SSR 时代:认证 token 由 httpOnly cookie 承载,浏览器自动随请求发送。
+   * 此处不再读 localStorage,但仍保留对 Authorization 头的注入能力(用于
+   * 显式传入 token 的场景,如 SSE EventSource 必须通过 URL 传 token)。
+   */
   private getToken(): string | null {
-    return localStorage.getItem('token');
+    return null;
   }
 
   private async request<T>(path: string, options: RequestInit = {}, skipJsonBody?: boolean): Promise<T> {
@@ -744,7 +749,7 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    // Add device fingerprint header
+    // Add device fingerprint header (client-only)
     try {
       const fingerprint = await getDeviceFingerprint();
       if (fingerprint) {
@@ -759,11 +764,12 @@ class ApiClient {
         const response = await fetch(`${this.baseUrl}${path}`, {
           ...options,
           headers,
+          // 让浏览器自动带上同域 cookie(httpOnly token 由它携带)
+          credentials: 'include',
         });
 
         // Auto-logout on 401
-        if (response.status === 401 && token) {
-          localStorage.removeItem('token');
+        if (response.status === 401) {
           window.dispatchEvent(new Event('auth:expired'));
           throw new Error('Session expired. Please login again.');
         }
@@ -1102,6 +1108,10 @@ class ApiClient {
 
   async getMe() {
     return this.request<{ user: User }>('/auth/me');
+  }
+
+  async logout() {
+    return this.request<{ message: string }>('/auth/logout', { method: 'POST' });
   }
 
   async getCaptcha() {
@@ -1854,6 +1864,8 @@ class ApiClient {
     context?: string,
     model?: string
   ): AsyncGenerator<{ type: string; data: AIStreamData }> {
+    // SSR 时代认证 cookie 自动随 fetch 携带(credentials: include),
+    // Authorization 头保留作为兼容(若客户端 token 仍存在则用之)。
     const token = useAuthStore.getState().token;
     const url = `${API_BASE}/ai/chat`;
     const response = await fetch(url, {
@@ -1862,6 +1874,7 @@ class ApiClient {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      credentials: 'include',
       body: JSON.stringify({ messages, context, model, stream: true }),
     });
 
