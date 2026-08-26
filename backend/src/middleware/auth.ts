@@ -1,13 +1,15 @@
 import { Context, Next } from 'hono';
 import { AppType } from '../types';
+import { getAuthTokenFromRequest } from '../utils/cookie';
 
 export async function authMiddleware(c: Context<AppType>, next: Next) {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // SSR 时代:优先读 httpOnly cookie(浏览器自动携带),然后回退到 Authorization 头
+  // 用于兼容仍持有旧 JWT 的客户端(SPA 老缓存、移动端等)。
+  const token = getAuthTokenFromRequest(c);
+  if (!token) {
     return c.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, 401);
   }
 
-  const token = authHeader.slice(7);
   const { verifyJWT } = await import('../utils/jwt');
   const payload = await verifyJWT(token, c.env.JWT_SECRET, (c.env as any).JWT_SECRET_PREVIOUS);
   if (!payload) {
@@ -47,9 +49,8 @@ export async function authMiddleware(c: Context<AppType>, next: Next) {
 // 可选鉴权:有有效 token 则解析用户并写入 c.get('user'),无 token 或 token 无效则放行(不 401)。
 // 用于公开接口中需要区分「已登录用户」与「游客」的场景(如比赛详情返回 is_registered)。
 export async function optionalAuthMiddleware(c: Context<AppType>, next: Next) {
-  const authHeader = c.req.header('Authorization');
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.slice(7);
+  const token = getAuthTokenFromRequest(c);
+  if (token) {
     const { verifyJWT } = await import('../utils/jwt');
     const payload = await verifyJWT(token, c.env.JWT_SECRET, (c.env as any).JWT_SECRET_PREVIOUS);
     if (payload) {

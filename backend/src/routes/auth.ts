@@ -6,6 +6,7 @@ import { fetchWithTimeout } from '../utils/fetch-timeout';
 import * as bcrypt from 'bcryptjs';
 import { createRateLimiter } from '../middleware/rateLimit';
 import { captchaMiddleware } from '../middleware/captcha';
+import { setAuthCookie, clearAuthCookie, getAuthTokenFromRequest } from '../utils/cookie';
 
 const auth = new Hono<AppType>();
 
@@ -588,6 +589,7 @@ auth.post('/register', captchaMiddleware('register'), createRateLimiter('registe
 
   try {
     const token = await signJWT({ userId: user.id, username: user.username, role: user.role, permissions: user.permissions ? JSON.parse(user.permissions) : [] }, c.env.JWT_SECRET);
+    setAuthCookie(c, token);
     return c.json({ success: true, data: { token } });
   } catch (e) {
     console.error('JWT Sign Error:', e);
@@ -621,6 +623,7 @@ auth.post('/login', captchaMiddleware('login'), createRateLimiter('login', 10, 3
 
   try {
     const token = await signJWT({ userId: user.id, username: user.username, role: user.role, permissions: user.permissions ? JSON.parse(user.permissions) : [] }, c.env.JWT_SECRET);
+    setAuthCookie(c, token);
     return c.json({ success: true, data: { token } });
   } catch (e) {
     console.error('JWT Sign Error:', e);
@@ -835,12 +838,12 @@ auth.post('/reset-password', createRateLimiter('resetPassword', 5, 300_000), asy
 });
 
 auth.get('/me', async (c) => {
-  const authHeader = c.req.header('Authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  // SSR 时代:优先 httpOnly cookie,回退 Authorization 头兼容旧客户端
+  const token = getAuthTokenFromRequest(c);
+  if (!token) {
     return c.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, 401);
   }
 
-  const token = authHeader.slice(7);
   const { verifyJWT } = await import('../utils/jwt');
   const payload = await verifyJWT(token, c.env.JWT_SECRET, (c.env as any).JWT_SECRET_PREVIOUS);
   if (!payload) {
@@ -913,7 +916,15 @@ auth.post('/exchange', createRateLimiter('oauthExchange', 10, 60_000), async (c)
     await c.env.DB.prepare('DELETE FROM oauth_exchange_codes WHERE expires_at < ?').bind(now).run();
   } catch { /* ignore cleanup errors */ }
 
+  // 同步设置 httpOnly cookie,使 SSR 页面刷新后即可识别登录态
+  setAuthCookie(c, row.jwt);
   return c.json({ success: true, data: { token: row.jwt } });
+});
+
+// POST /auth/logout — 清除认证 cookie。SSR 必需:前端无法用 JS 删除 httpOnly cookie。
+auth.post('/logout', async (c) => {
+  clearAuthCookie(c);
+  return c.json({ success: true, data: { message: 'Logged out' } });
 });
 
 export default auth;
