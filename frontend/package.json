@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:assets": "cross-env VITE_ASSETS_MODE=true tsc -b && cross-env VITE_ASSETS_MODE=true vite build",
-    "build:site": "npm run build:assets && node scripts/copy-to-backend.mjs",
+    "build:ssr": "cross-env VITE_ASSETS_MODE=true VITE_SSR_MODE=true tsc -b && cross-env VITE_ASSETS_MODE=true VITE_SSR_MODE=true vite build --ssr src/entry-server.tsx --outDir dist/server",
+    "build:site": "npm run build:assets && npm run build:ssr && node scripts/copy-to-backend.mjs",
     "lint": "eslint .",
     "preview": "vite preview"
   },

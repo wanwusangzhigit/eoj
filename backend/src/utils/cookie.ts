@@ -24,15 +24,47 @@ export function getCookie(c: Context<AppType>, name: string): string | null {
 /**
  * 从请求里取出认证 token:优先 httpOnly cookie,然后回退到 Authorization 头。
  * 保留 Header 通道是为了渐进迁移期兼容旧客户端(SPA 老缓存、移动端等)。
+ *
+ * 同时接受 Hono Context 与裸 Request:SSR loader 持有原始 Request 时可直接调用。
  */
-export function getAuthTokenFromRequest(c: Context<AppType>): string | null {
-  const cookieToken = getCookie(c, 'token');
+export function getAuthTokenFromRequest(c: Context<AppType>): string | null;
+export function getAuthTokenFromRequest(req: { header: (name: string) => string | undefined | null }): string | null;
+export function getAuthTokenFromRequest(input: any): string | null {
+  // 优先 cookie
+  const cookieHeader: string =
+    (input?.req?.header?.('Cookie') as string) ?? (input?.header?.('Cookie') as string) ?? '';
+  const cookieToken = readCookieFromHeader(cookieHeader, 'token');
   if (cookieToken) return cookieToken;
-  const authHeader = c.req.header('Authorization');
+  // 回退 Authorization 头
+  const authHeader: string | undefined =
+    (input?.req?.header?.('Authorization') as string) ?? (input?.header?.('Authorization') as string);
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }
   return null;
+}
+
+function readCookieFromHeader(cookieHeader: string, name: string): string | null {
+  if (!cookieHeader) return null;
+  const target = `${name}=`;
+  for (const part of cookieHeader.split(';')) {
+    const trimmed = part.trim();
+    if (trimmed.startsWith(target)) {
+      try {
+        return decodeURIComponent(trimmed.slice(target.length));
+      } catch {
+        return trimmed.slice(target.length);
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * 从 Cookie header 字符串读取值(SSR loader / 通用工具用)。
+ */
+export function readCookie(cookieHeader: string, name: string): string | null {
+  return readCookieFromHeader(cookieHeader, name);
 }
 
 /**
