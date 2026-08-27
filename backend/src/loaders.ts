@@ -334,20 +334,37 @@ const ENTRIES: LoaderEntry[] = [
   },
 
   // ──── 比赛题目详情(contest problem 变体)── /match/:id/problem/:problemId
+  // 数据结构与 problemDetail 一致(problem.problem),供 ProblemDetail 统一消费。
   {
     match: (p) => /^\/match\/[^/]+\/problem\/[^/]+$/.test(p),
-    pageKey: 'contestProblem',
+    pageKey: 'problemDetail',
     load: async (ctx) => {
       const [, , contestId, , problemId] = ctx.url.pathname.split('/');
-      const [contest, problem] = await Promise.all([
-        callApi(ctx, `/api/v1/contests/${contestId}`),
-        callApi(ctx, `/api/v1/contests/${contestId}/problems/${problemId}`),
-      ]);
-      return { contest, problem };
+      const problem = await callApi(ctx, `/api/v1/contests/${contestId}/problems/${problemId}`);
+      return { problem, related: null, languages: null, trend: null, favorite: null, status: null, submissions: null };
     },
   },
 
-  // ──── 队伍主页 ────
+  // ──── 队伍题目详情 / 队伍比赛题目详情 ────
+  // 数据结构与 problemDetail 一致,供共享用途。返回 {problem, ...} 形状。
+  {
+    match: (p) => /^\/team\/[^/]+\/(problem\/[^/]+|match\/[^/]+\/problem\/[^/]+)$/.test(p),
+    pageKey: 'problemDetail',
+    load: async (ctx) => {
+      const parts = ctx.url.pathname.split('/').filter(Boolean);
+      const teamSlug = parts[1];
+      let problem = null;
+      if (parts[2] === 'problem') {
+        const problemId = parts[3];
+        problem = await callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/problems/${problemId}`);
+      } else if (parts[2] === 'match' && parts[4] === 'problem') {
+        const contestId = parts[3];
+        const problemId = parts[5];
+        problem = await callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/contests/${contestId}/problems/${problemId}`);
+      }
+      return { problem, related: null, languages: null, trend: null, favorite: null, status: null, submissions: null };
+    },
+  },
   {
     match: (p) => /^\/team\/[^/]+$/.test(p),
     pageKey: 'teamDetail',
@@ -363,19 +380,7 @@ const ENTRIES: LoaderEntry[] = [
     },
   },
 
-  // ──── 队伍题目详情 / 队伍比赛题目详情 ────
-  {
-    match: (p) => /^\/team\/[^/]+\/(problem\/[^/]+|match\/[^/]+\/problem\/[^/]+)$/.test(p),
-    pageKey: 'teamProblem',
-    load: async (ctx) => {
-      const parts = ctx.url.pathname.split('/').filter(Boolean);
-      const teamSlug = parts[1];
-      const team = await callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}`);
-      return { team };
-    },
-  },
-
-  // ──── 队伍比赛详情 ────
+  // ──── 队伍比赛详情(team contest,不是题目)── /team/:teamId/match/:matchId
   {
     match: (p) => /^\/team\/[^/]+\/match\/[^/]+$/.test(p),
     pageKey: 'teamContest',
@@ -495,7 +500,7 @@ const ENTRIES: LoaderEntry[] = [
     pageKey: 'ai',
     load: async (ctx) => {
       if (!ctx.user) return {};
-      return { models: await callApi(ctx, '/api/v1/ai/models') };
+      return { status: await callApi(ctx, '/api/v1/ai/status') };
     },
   },
 
