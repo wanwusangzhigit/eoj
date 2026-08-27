@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
 import CodeMirror from '@uiw/react-codemirror';
+import ClientOnly from '../components/ClientOnly';
 import ImageUploadButton from '../components/ImageUploadButton';
 import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
@@ -1524,14 +1525,16 @@ export default function ProblemDetail() {
         )}
 
         <div className="editor-wrapper">
-          <CodeMirror
-            value={sourceCode}
-            height="400px"
-            theme={theme === 'dark' ? oneDark : undefined}
-            extensions={[getLangExtension(language)]}
-            onChange={handleSourceCodeChange}
-            style={{ fontSize: `${settings.editor_font_size || 14}px` }}
-          />
+          <ClientOnly>
+            <CodeMirror
+              value={sourceCode}
+              height="400px"
+              theme={theme === 'dark' ? oneDark : undefined}
+              extensions={[getLangExtension(language)]}
+              onChange={handleSourceCodeChange}
+              style={{ fontSize: `${settings.editor_font_size || 14}px` }}
+            />
+          </ClientOnly>
         </div>
 
         {captchaEnabled && (

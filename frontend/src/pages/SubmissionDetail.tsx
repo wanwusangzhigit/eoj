@@ -8,6 +8,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import EmptyState from '../components/EmptyState';
 import { ChevronRight, Clock, MemoryStick, Code2, ChevronDown, ChevronUp, FileQuestion, RefreshCw, AlertCircle, RotateCcw, Terminal, Share2, History, GitCompare } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
+import ClientOnly from '../components/ClientOnly';
 import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
 import { java } from '@codemirror/lang-java';
@@ -434,15 +435,17 @@ export default function SubmissionDetail() {
       <div className="source-code-section">
         <h2><Code2 size={18} /> {t('submissionDetail.sourceCode')}</h2>
         <div className="source-code-editor">
-          <CodeMirror
-            value={submission.source_code}
-            height="auto"
-            theme={theme === 'dark' ? oneDark : undefined}
-            extensions={[getLangExtension(submission.language)]}
-            readOnly={true}
-            style={{ fontSize: `${settings.editor_font_size || 14}px` }}
-            basicSetup={{ lineNumbers: true, foldGutter: false }}
-          />
+          <ClientOnly>
+            <CodeMirror
+              value={submission.source_code}
+              height="auto"
+              theme={theme === 'dark' ? oneDark : undefined}
+              extensions={[getLangExtension(submission.language)]}
+              readOnly={true}
+              style={{ fontSize: `${settings.editor_font_size || 14}px` }}
+              basicSetup={{ lineNumbers: true, foldGutter: false }}
+            />
+          </ClientOnly>
         </div>
       </div>
     </div>

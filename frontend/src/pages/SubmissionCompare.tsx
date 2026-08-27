@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import LoadingSpinner from '../components/LoadingSpinner';
 import CodeMirror from '@uiw/react-codemirror';
+import ClientOnly from '../components/ClientOnly';
 import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
 import { java } from '@codemirror/lang-java';
@@ -78,25 +79,29 @@ export default function SubmissionCompare() {
       <div className="compare-code" style={{ display: 'flex', gap: 16 }}>
         <div className="compare-code-panel" style={{ flex: 1 }}>
           <h3 style={{ marginBottom: 8 }}>#{a.id} 代码</h3>
-          <CodeMirror
-            value={a.source_code}
-            height="500px"
-            theme={theme === 'dark' ? oneDark : undefined}
-            extensions={[getLangExtension(a.language)]}
-            readOnly={true}
-            basicSetup={{ lineNumbers: true, foldGutter: false }}
-          />
+          <ClientOnly>
+            <CodeMirror
+              value={a.source_code}
+              height="500px"
+              theme={theme === 'dark' ? oneDark : undefined}
+              extensions={[getLangExtension(a.language)]}
+              readOnly={true}
+              basicSetup={{ lineNumbers: true, foldGutter: false }}
+            />
+          </ClientOnly>
         </div>
         <div className="compare-code-panel" style={{ flex: 1 }}>
           <h3 style={{ marginBottom: 8 }}>#{b.id} 代码</h3>
-          <CodeMirror
-            value={b.source_code}
-            height="500px"
-            theme={theme === 'dark' ? oneDark : undefined}
-            extensions={[getLangExtension(b.language)]}
-            readOnly={true}
-            basicSetup={{ lineNumbers: true, foldGutter: false }}
-          />
+          <ClientOnly>
+            <CodeMirror
+              value={b.source_code}
+              height="500px"
+              theme={theme === 'dark' ? oneDark : undefined}
+              extensions={[getLangExtension(b.language)]}
+              readOnly={true}
+              basicSetup={{ lineNumbers: true, foldGutter: false }}
+            />
+          </ClientOnly>
         </div>
       </div>
     </div>
