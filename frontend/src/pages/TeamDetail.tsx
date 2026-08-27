@@ -18,18 +18,29 @@ import { useToastStore } from '../store/toast';
 import { useSettingsStore } from '../store/settings';
 import { formatContestTime } from '../utils/contestTime';
 import { distributeScores } from '../utils/testcaseScore';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Teams.css';
 
 type Tab = 'overview' | 'announcements' | 'discussions' | 'problemSets' | 'contests' | 'members' | 'rankings' | 'settings' | 'problems' | 'groups';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 teamDetail loader 的返回)
+interface TeamDetailSSRData {
+  team?: { team?: any };
+  members?: { members?: any[] };
+  problemSets?: { problemSets?: any[] };
+  contests?: { contests?: any[] };
+}
 
 export default function TeamDetail() {
   const { teamId } = useParams<{ teamId: string }>();
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [team, setTeam] = useState<any>(null);
-  const [members, setMembers] = useState<any[]>([]);
+  const ssr = useSSRPage<TeamDetailSSRData>('teamDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [team, setTeam] = useState<any>(ssr?.team?.team ?? null);
+  const [members, setMembers] = useState<any[]>(ssr?.members?.members ?? []);
   const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [tab, setTab] = useState<Tab>('overview');
   useDocumentTitle(team?.name || t('teams.title'));
 
@@ -49,9 +60,15 @@ export default function TeamDetail() {
   }, [teamId, addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     const load = async () => { fetchTeam(); };
     load();
-  }, [fetchTeam]);
+  }, [fetchTeam, ssr]);
 
   const handleJoin = async () => {
     if (!team) return;

@@ -6,7 +6,13 @@ import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Messages.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 messages loader 的返回:未登录时返回 {})
+interface MessagesSSRData {
+  conversations?: { conversations?: any[] };
+}
 
 export default function Messages() {
   const { id } = useParams<{ id?: string }>();
@@ -15,11 +21,13 @@ export default function Messages() {
   const addToast = useToastStore((s) => s.addToast);
   useDocumentTitle(t('messages.title'));
 
-  const [conversations, setConversations] = useState<any[]>([]);
+  const ssr = useSSRPage<MessagesSSRData>('messages');
+  const firstRunRef = useRef<boolean>(true);
+  const [conversations, setConversations] = useState<any[]>(ssr?.conversations?.conversations ?? []);
   const [selectedId, setSelectedId] = useState<number | null>(id ? parseInt(id) : null);
   const [messages, setMessages] = useState<any[]>([]);
   const [messageInput, setMessageInput] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -86,11 +94,17 @@ export default function Messages() {
   }, [messages]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     const init = async () => {
       await fetchConversations();
     };
     init();
-  }, [fetchConversations]);
+  }, [fetchConversations, ssr]);
 
   // Auto-refresh conversations list every 15s to pick up new messages / unread counts
   useEffect(() => {

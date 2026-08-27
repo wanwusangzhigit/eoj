@@ -1,18 +1,26 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { BarChart3, Flame, CalendarDays, CheckCircle, Send, Tag, Trophy, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './AnnualReport.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 annualReport loader 的返回:未登录时返回 {})
+interface AnnualReportSSRData {
+  report?: any;
+}
 
 export default function AnnualReport() {
   const { user } = useAuthStore();
   const currentYear = new Date().getFullYear();
+  const ssr = useSSRPage<AnnualReportSSRData>('annualReport');
+  const firstRunRef = useRef<boolean>(true);
   const [year, setYear] = useState(currentYear);
-  const [report, setReport] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [report, setReport] = useState<any>(ssr?.report ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [error, setError] = useState('');
   useDocumentTitle(t('annualReport.title'));
 
@@ -30,8 +38,14 @@ export default function AnnualReport() {
   }, []);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     fetchReport(year);
-  }, [year, fetchReport]);
+  }, [year, fetchReport, ssr]);
 
   if (!user) {
     return (

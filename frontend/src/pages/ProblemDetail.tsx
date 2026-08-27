@@ -51,6 +51,10 @@ export default function ProblemDetail() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
+  // SSR 注入数据(对应 backend/src/loaders.ts 中 problemDetail loader 的返回)。
+  // 团队私有题 / 团队比赛题变体的 loader(teamProblem/contestProblem)返回结构与本页所需
+  // 不一致(仅含 team/contest/team 元数据,无 problem 详情),因此团队/比赛题路由不消费 SSR,
+  // 统一回退到客户端 fetchProblem 拉取,保持现有逻辑不变。
   const ssr = useSSRPage<ProblemDetailSSRData>('problemDetail');
   const ssrFirstRunRef = useRef<boolean>(true);
   const [problem, setProblem] = useState<any>(ssr?.problem?.problem ?? null);

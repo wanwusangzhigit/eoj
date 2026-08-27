@@ -332,6 +332,202 @@ const ENTRIES: LoaderEntry[] = [
       return { page: await callApi(ctx, `/api/v1/pages/${encodeURIComponent(slug)}`) };
     },
   },
+
+  // ──── 比赛题目详情(contest problem 变体)── /match/:id/problem/:problemId
+  {
+    match: (p) => /^\/match\/[^/]+\/problem\/[^/]+$/.test(p),
+    pageKey: 'contestProblem',
+    load: async (ctx) => {
+      const [, , contestId, , problemId] = ctx.url.pathname.split('/');
+      const [contest, problem] = await Promise.all([
+        callApi(ctx, `/api/v1/contests/${contestId}`),
+        callApi(ctx, `/api/v1/contests/${contestId}/problems/${problemId}`),
+      ]);
+      return { contest, problem };
+    },
+  },
+
+  // ──── 队伍主页 ────
+  {
+    match: (p) => /^\/team\/[^/]+$/.test(p),
+    pageKey: 'teamDetail',
+    load: async (ctx) => {
+      const teamSlug = decodeURIComponent(ctx.url.pathname.split('/')[2]);
+      const [team, members, problemSets, contests] = await Promise.all([
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}`),
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/members`),
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/problem-sets`),
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/contests`),
+      ]);
+      return { team, members, problemSets, contests };
+    },
+  },
+
+  // ──── 队伍题目详情 / 队伍比赛题目详情 ────
+  {
+    match: (p) => /^\/team\/[^/]+\/(problem\/[^/]+|match\/[^/]+\/problem\/[^/]+)$/.test(p),
+    pageKey: 'teamProblem',
+    load: async (ctx) => {
+      const parts = ctx.url.pathname.split('/').filter(Boolean);
+      const teamSlug = parts[1];
+      const team = await callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}`);
+      return { team };
+    },
+  },
+
+  // ──── 队伍比赛详情 ────
+  {
+    match: (p) => /^\/team\/[^/]+\/match\/[^/]+$/.test(p),
+    pageKey: 'teamContest',
+    load: async (ctx) => {
+      const parts = ctx.url.pathname.split('/').filter(Boolean);
+      const teamSlug = parts[1];
+      const contestId = parts[3];
+      const [team, contest] = await Promise.all([
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}`),
+        callApi(ctx, `/api/v1/teams/${encodeURIComponent(teamSlug)}/contests/${contestId}`),
+      ]);
+      return { team, contest };
+    },
+  },
+
+  // ──── 队伍列表页 ────
+  {
+    match: (p) => p === '/teams',
+    pageKey: 'teams',
+    load: async (ctx) => callApi(ctx, '/api/v1/teams?page=1&pageSize=20'),
+  },
+
+  // ──── 训练详情 ────
+  {
+    match: (p) => /^\/training\/[^/]+$/.test(p),
+    pageKey: 'trainingDetail',
+    load: async (ctx) => {
+      const id = ctx.url.pathname.split('/')[2];
+      return { plan: await callApi(ctx, `/api/v1/training/${id}`) };
+    },
+  },
+
+  // ──── 收藏夹(登录)──
+  {
+    match: (p) => p === '/favorites',
+    pageKey: 'favorites',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { favorites: await callApi(ctx, '/api/v1/problems/user/favorites?pageSize=20') };
+    },
+  },
+
+  // ──── 收藏集列表 ────
+  {
+    match: (p) => p === '/collections',
+    pageKey: 'collections',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { collections: await callApi(ctx, '/api/v1/collections') };
+    },
+  },
+
+  // ──── 收藏集详情(下拉列表项)──
+  {
+    match: (p) => /^\/collections\/[^/]+$/.test(p),
+    pageKey: 'collectionDetail',
+    load: async (ctx) => {
+      const id = ctx.url.pathname.split('/')[2];
+      if (!ctx.user) return {};
+      return { collection: await callApi(ctx, `/api/v1/collections/${id}`) };
+    },
+  },
+
+  // ──── 代码模板 ────
+  {
+    match: (p) => p === '/templates',
+    pageKey: 'templates',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { templates: await callApi(ctx, '/api/v1/templates') };
+    },
+  },
+
+  // ──── 我的文件 ────
+  {
+    match: (p) => p === '/my-files',
+    pageKey: 'myFiles',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { uploads: await callApi(ctx, '/api/v1/uploads') };
+    },
+  },
+
+  // ──── 通知 ────
+  {
+    match: (p) => p === '/notifications',
+    pageKey: 'notifications',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { notifications: await callApi(ctx, '/api/v1/notifications?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 消息中心 ────
+  {
+    match: (p) => p === '/messages' || /^\/messages\/[^/]+$/.test(p),
+    pageKey: 'messages',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { conversations: await callApi(ctx, '/api/v1/messages/conversations?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 用户设置 ────
+  {
+    match: (p) => p === '/settings',
+    pageKey: 'userSettingsPage',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { settings: await callApi(ctx, '/api/v1/user/settings') };
+    },
+  },
+
+  // ──── AI 助手 ────
+  {
+    match: (p) => p === '/ai',
+    pageKey: 'ai',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { models: await callApi(ctx, '/api/v1/ai/models') };
+    },
+  },
+
+  // ──── 错题本 ────
+  {
+    match: (p) => p === '/wrong-problems',
+    pageKey: 'wrongProblems',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { problems: await callApi(ctx, '/api/v1/users/wrong-problems?pageSize=20') };
+    },
+  },
+
+  // ──── 年度报告 ────
+  {
+    match: (p) => p === '/annual-report',
+    pageKey: 'annualReport',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { report: await callApi(ctx, '/api/v1/users/annual-report') };
+    },
+  },
+
+  // ──── 代码分享页 ────
+  {
+    match: (p) => /^\/shares\/[^/]+$/.test(p),
+    pageKey: 'shareView',
+    load: async (ctx) => {
+      const token = ctx.url.pathname.split('/')[2];
+      return { share: await callApi(ctx, `/api/v1/shares/${encodeURIComponent(token)}`) };
+    },
+  },
 ];
 
 /**

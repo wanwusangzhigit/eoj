@@ -8,7 +8,13 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { Image, FileText, Trash2, Upload, ChevronLeft, ChevronRight, Copy, Check } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './MyFiles.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 myFiles loader 的返回:未登录时返回 {})
+interface MyFilesSSRData {
+  uploads?: { uploads?: any[]; pagination?: { totalPages?: number } };
+}
 
 export default function MyFiles() {
   const { user } = useAuthStore();
@@ -16,10 +22,12 @@ export default function MyFiles() {
   const getImageUploadEnabled = useSettingsStore((s) => s.getImageUploadEnabled);
   const getUploadEnabled = useSettingsStore((s) => s.getUploadEnabled);
   const perms = usePermissions();
-  const [uploads, setUploads] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<MyFilesSSRData>('myFiles');
+  const firstRunRef = useRef<boolean>(true);
+  const [uploads, setUploads] = useState<any[]>(ssr?.uploads?.uploads ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [totalPages, setTotalPages] = useState(ssr?.uploads?.pagination?.totalPages ?? 1);
   const [uploading, setUploading] = useState(false);
   const [filePublic, setFilePublic] = useState(true);
   const [activeTab, setActiveTab] = useState<'image' | 'file'>('image');
@@ -49,10 +57,16 @@ export default function MyFiles() {
   }, [effectiveTab, page, addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     fetchUploads(1);
-  }, [fetchUploads]);
+  }, [fetchUploads, ssr]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

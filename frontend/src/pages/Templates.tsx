@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api/client';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Code2, Trash2, Save, Edit3 } from 'lucide-react';
+import { useSSRPage } from '../ssr/useSSRPage';
 import '../pages/Admin.css';
 
 const LANGUAGES = [
@@ -15,11 +16,18 @@ const LANGUAGES = [
   { value: 'rust', label: 'Rust' },
 ];
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 templates loader 的返回:未登录时返回 {})
+interface TemplatesSSRData {
+  templates?: { templates?: any[] };
+}
+
 export default function Templates() {
   useDocumentTitle('代码模板管理');
   const addToast = useToastStore((s) => s.addToast);
-  const [templates, setTemplates] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TemplatesSSRData>('templates');
+  const firstRunRef = useRef<boolean>(true);
+  const [templates, setTemplates] = useState<any[]>(ssr?.templates?.templates ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [editLang, setEditLang] = useState('');
   const [editContent, setEditContent] = useState('');
   const [editName, setEditName] = useState('');
@@ -33,9 +41,15 @@ export default function Templates() {
   }, []);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTemplates();
-  }, [fetchTemplates]);
+  }, [fetchTemplates, ssr]);
 
   const handleSave = async () => {
     if (!editLang || !editContent) return;

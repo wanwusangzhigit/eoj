@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,6 +6,7 @@ import { Bell, Check, CheckCheck, ChevronLeft, ChevronRight } from 'lucide-react
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Notifications.css';
 
 const TYPES = ['all', 'mention', 'follow', 'message', 'contest', 'solution_review', 'report', 'system'];
@@ -22,10 +23,17 @@ const typeColor = (type: string) => {
   }
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 notifications loader 的返回:未登录时返回 {})
+interface NotificationsSSRData {
+  notifications?: { notifications?: any[]; pagination?: any };
+}
+
 export default function Notifications() {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<NotificationsSSRData>('notifications');
+  const firstRunRef = useRef<boolean>(true);
+  const [notifications, setNotifications] = useState<any[]>(ssr?.notifications?.notifications ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.notifications?.pagination ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [page, setPage] = useState(1);
   const [type, setType] = useState('all');
   const navigate = useNavigate();
@@ -50,9 +58,15 @@ export default function Notifications() {
   }, [page, type, addToast]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications();
-  }, [fetchNotifications]);
+  }, [fetchNotifications, ssr]);
 
   const handleItemClick = async (n: any) => {
     if (!n.is_read) {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -6,14 +6,22 @@ import { BookX, ChevronLeft, ChevronRight, RefreshCw, AlertCircle, TrendingUp } 
 import { DIFFICULTY_COLORS } from '../constants';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './WrongProblems.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 wrongProblems loader 的返回:未登录时返回 {})
+interface WrongProblemsSSRData {
+  problems?: { problems?: any[]; pagination?: any };
+}
 
 export default function WrongProblems() {
   const { user } = useAuthStore();
-  const [problems, setProblems] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
+  const ssr = useSSRPage<WrongProblemsSSRData>('wrongProblems');
+  const firstRunRef = useRef<boolean>(true);
+  const [problems, setProblems] = useState<any[]>(ssr?.problems?.problems ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.problems?.pagination ?? {});
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [error, setError] = useState('');
   useDocumentTitle(t('wrongProblems.title'));
 
@@ -32,8 +40,14 @@ export default function WrongProblems() {
   }, [page]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     fetchWrong();
-  }, [fetchWrong]);
+  }, [fetchWrong, ssr]);
 
   if (!user) {
     return (
