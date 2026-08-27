@@ -47,32 +47,38 @@ export interface SSRDataEnvelope {
   page: SSRPageData;
 }
 
-const SSR_DATA_WINDOW_KEY = '__SSR_DATA__';
+const SSR_DATA_ELEMENT_ID = '__SSR_DATA__';
 
 /**
- * 服务端渲染时注入的 HTML 片段:序列化为带转义的 JSON,放进 <script>。
- * 注意:JSON.stringify 的 `</` 会被转义为 `<\/` 防止提前结束 <script> 标签。
+ * 服务端渲染时注入的 HTML 片段。
+ *
+ * 使用 `<script type="application/json">` 而非可执行 `<script>`:
+ * - JSON 类型的 script 不含可执行代码,不受 CSP `script-src` 限制(无需 'unsafe-inline')
+ * - 避免内联脚本与生产环境的严格 CSP 冲突
+ *
+ * JSON 内 `</` 必须转义为 `<\/`,防止提前结束 <script> 标签。
  */
 export function serializeSSRData(data: SSRDataEnvelope): string {
   const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/--\u003e/g, '--\\u003e');
-  return `<script>window.${SSR_DATA_WINDOW_KEY}=${json};</script>`;
+  return `<script type="application/json" id="${SSR_DATA_ELEMENT_ID}">${json}</script>`;
 }
 
 /**
- * 客户端:从 window 取出 SSR 数据并清空(防止内存泄漏 + 防止重复消费)。
- * 仅在浏览器入口调用一次。
+ * 客户端:从 `<script type="application/json">` 元素读取 SSR 数据并移除该元素。
+ * 避免污染 window(全局命名空间)与重复消费。仅在浏览器入口调用一次。
  */
 export function consumeSSRData(): SSRDataEnvelope | null {
-  if (typeof window === 'undefined') return null;
-  const w = window as unknown as { [SSR_DATA_WINDOW_KEY]?: SSRDataEnvelope };
-  const data = w[SSR_DATA_WINDOW_KEY];
-  if (!data) return null;
+  if (typeof document === 'undefined') return null;
+  const el = document.getElementById(SSR_DATA_ELEMENT_ID);
+  if (!el || !el.textContent) return null;
   try {
-    delete w[SSR_DATA_WINDOW_KEY];
+    const data = JSON.parse(el.textContent) as SSRDataEnvelope;
+    el.remove();
+    return data;
   } catch {
-    w[SSR_DATA_WINDOW_KEY] = undefined;
+    // 解析失败(不可能发生,除非被篡改)返回 null
+    return null;
   }
-  return data;
 }
 
 /**
