@@ -16,6 +16,28 @@ import type { Context } from 'hono';
 import type { AppType } from './types';
 import { runPageLoader } from './loaders';
 import type { SSRDataEnvelope } from './ssr-types';
+import { Buffer as NodeBuffer } from 'node:buffer';
+
+// react-dom/server 的 renderToReadableStream(React 19)内部依赖 Node 的 setImmediate
+// 与 globalVars 等 Node 全局/API,而 Cloudflare Workers 环境下默认没有。这里补 runtime
+// 环境缺失的 Node 全局,保证 Worker 下 SSR 可运行。
+const g = globalThis as any;
+if (typeof g.setImmediate !== 'function') {
+  g.setImmediate = (fn: (...args: any[]) => void, ...args: any[]) => {
+    if (typeof queueMicrotask === 'function') {
+      queueMicrotask(() => fn(...args));
+    } else {
+      setTimeout(() => fn(...args), 0);
+    }
+    return 0;
+  };
+  g.clearImmediate = g.clearImmediate || ((id: number) => {});
+}
+// SSR bundle 内代码可能直接引用全局 Buffer(nodejs_compat 在 dev 下不总是挂到
+// globalThis),此处显式补齐,避免 "Buffer is not defined"。
+if (typeof g.Buffer === 'undefined') {
+  g.Buffer = NodeBuffer;
+}
 
 // SSR 渲染器由前端构建产物提供(esm 模块,由 Wrangler 在打包时引入)
 // 路径相对于 backend/src/,实际文件位于 backend/ssr/entry-server.js

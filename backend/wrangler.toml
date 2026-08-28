@@ -12,7 +12,8 @@ database_id = ""
 [assets]
 directory = "./public"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
+not_found_handling = "none"
+run_worker_first = true
 
 [[send_email]]
 name = "SEND_EMAIL"

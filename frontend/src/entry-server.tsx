@@ -82,7 +82,8 @@ export async function render(
     const body = await new Response(stream).text();
     responseBody = inject(indexHtml, body);
   } catch (e: unknown) {
-    console.error('[SSR] fatal:', e instanceof Error ? e.message : String(e));
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[SSR] fatal:', msg);
     responseBody = inject(indexHtml, '');
     status = 200;
   }
