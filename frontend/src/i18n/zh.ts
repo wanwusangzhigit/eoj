@@ -901,6 +901,8 @@ const zh = {
     problems: '题目',
     rankings: '排行榜',
     participants: '参赛人数',
+    details: '详情',
+    noDescription: '暂无比赛描述',
     startTime: '开始时间',
     endTime: '结束时间',
     noContests: '暂无比赛',
