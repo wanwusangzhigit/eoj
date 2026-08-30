@@ -882,6 +882,8 @@ const en: Translations = {
     problems: 'Problems',
     rankings: 'Rankings',
     participants: 'Participants',
+    details: 'Overview',
+    noDescription: 'No contest description provided',
     startTime: 'Start Time',
     endTime: 'End Time',
     noContests: 'No contests yet',

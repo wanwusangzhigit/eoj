@@ -7,7 +7,7 @@ import RatingBadge from '../components/RatingBadge';
 import { SkeletonTable } from '../components/Skeleton';
 import { getRatingColor } from '../utils/rating';
 import { parseContestTimeToMs, formatContestTime } from '../utils/contestTime';
-import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown, Bell, Plus, Send, X, Download, Copy, Award, Image, Trash2 } from 'lucide-react';
+import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown, Bell, Plus, Send, X, Download, Copy, Award, Image, Trash2, FileText, UserCheck } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import './ContestDetail.css';
@@ -60,7 +60,7 @@ export default function ContestDetail() {
   const [virtualParticipant, setVirtualParticipant] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
-  const [activeTab, setActiveTab] = useState<'problems' | 'rankings' | 'review' | 'announcements' | 'clarifications'>('problems');
+  const [activeTab, setActiveTab] = useState<'overview' | 'problems' | 'rankings' | 'review' | 'announcements' | 'clarifications'>('overview');
   const [registering, setRegistering] = useState(false);
   const [virtualStarting, setVirtualStarting] = useState(false);
   const [ratingChanges, setRatingChanges] = useState<any[]>([]);
@@ -842,6 +842,12 @@ export default function ContestDetail() {
 
         <div className="contest-tabs">
           <button
+            className={`tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            <FileText size={14} /> {t('contests.details')}
+          </button>
+          <button
             className={`tab-btn ${activeTab === 'problems' ? 'active' : ''}`}
             onClick={() => setActiveTab('problems')}
           >
@@ -874,6 +880,103 @@ export default function ContestDetail() {
             </button>
           )}
         </div>
+
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <div className="contest-overview">
+            <div className="card contest-overview-card">
+              <h3 className="contest-overview-title">
+                <FileText size={18} /> {t('contests.details')}
+              </h3>
+
+              {contest.description ? (
+                <p className="contest-overview-desc">{contest.description}</p>
+              ) : (
+                <p className="contest-overview-desc muted">{t('contests.noDescription')}</p>
+              )}
+
+              <div className="contest-meta">
+                <span className="meta-item">
+                  <Calendar size={14} />
+                  {t('contests.startTime')}: {formatDate(contest.start_time)}
+                </span>
+                <span className="meta-item">
+                  <Calendar size={14} />
+                  {t('contests.endTime')}: {formatDate(contest.end_time)}
+                </span>
+                <span className="meta-item">
+                  <Users size={14} />
+                  {t('contests.participants')}: {contest.participant_count ?? 0}
+                </span>
+                {contest.duration_minutes > 0 && (
+                  <span className="meta-item">
+                    <Timer size={14} />
+                    {t('contests.durationMinutes')}: {contest.duration_minutes} {t('contests.minutes')}
+                  </span>
+                )}
+                {contest.freeze_minutes > 0 && (
+                  <span className="meta-item">
+                    <Clock size={14} />
+                    {t('contests.freezeMinutes')}: {contest.freeze_minutes} {t('contests.minutes')}
+                  </span>
+                )}
+                <span className="meta-item">
+                  <UserCheck size={14} />
+                  {t('contests.contestType')}: {contest.scoring_type === 'oi' ? t('contests.oiType')
+                    : contest.scoring_type === 'ioi' ? t('contests.ioiType')
+                    : t('contests.icpcType')}
+                </span>
+              </div>
+            </div>
+
+            <div className="contest-info-panel">
+              <div className="contest-info-panel-section">
+                <h4 className="contest-info-panel-title">
+                  <BookOpen size={14} /> {t('contests.contestRules')}
+                </h4>
+                <ul className="contest-info-panel-list">
+                  <li>
+                    <span className="info-item-label">{t('contests.scoringRule')}:</span>
+                    {contest.scoring_type === 'oi'
+                      ? t('contests.ruleOi')
+                      : contest.scoring_type === 'ioi'
+                        ? t('contests.ruleIoi')
+                        : t('contests.ruleIcpc')}
+                  </li>
+                  <li>
+                    <span className="info-item-label">{t('contests.ratedContest')}:</span>
+                    {contest.is_rated ? t('contests.yes') : t('contests.no')}
+                  </li>
+                  {contest.duration_minutes > 0 && (
+                    <li>
+                      <span className="info-item-label">{t('contests.durationMinutes')}:</span>
+                      {contest.duration_minutes} {t('contests.minutes')}
+                    </li>
+                  )}
+                  <li>
+                    <span className="info-item-label">{t('contests.freezeMinutes')}:</span>
+                    {contest.freeze_minutes > 0 ? `${contest.freeze_minutes} ${t('contests.minutes')}` : t('contests.noFreeze')}
+                  </li>
+                  <li>
+                    <span className="info-item-label">{t('contests.allowVirtual')}:</span>
+                    {contest.allow_virtual ? t('contests.yes') : t('contests.virtualDisabled')}
+                  </li>
+                </ul>
+              </div>
+              <div className="contest-info-panel-section">
+                <h4 className="contest-info-panel-title">
+                  <AlertCircle size={14} /> {t('contests.noticeTitle')}
+                </h4>
+                <ul className="contest-info-panel-list">
+                  <li>{t('contests.noticeRegister')}</li>
+                  <li>{t('contests.noticeTimeWindow')}</li>
+                  <li>{t('contests.noticeClarify')}</li>
+                  <li>{t('contests.noticeRanking')}</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Announcements Tab */}
         {activeTab === 'announcements' && (
