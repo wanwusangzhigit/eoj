@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Trash2, ChevronLeft, ChevronRight, Image, File,
@@ -11,11 +12,13 @@ import '../Admin.css';
 export default function AdminUploads() {
   useDocumentTitle(t('admin.uploadManagement'));
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<{ uploads?: { uploads?: any[]; pagination?: any } }>('adminUploads');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [adminUploads, setAdminUploads] = useState<any[]>([]);
-  const [uploadPagination, setUploadPagination] = useState<any>(null);
+  const [adminUploads, setAdminUploads] = useState<any[]>(ssr?.uploads?.uploads ?? []);
+  const [uploadPagination, setUploadPagination] = useState<any>(ssr?.uploads?.pagination ?? null);
   const [uploadPage, setUploadPage] = useState(1);
   const [uploadTypeFilter, setUploadTypeFilter] = useState('');
 
@@ -28,9 +31,15 @@ export default function AdminUploads() {
   }, [uploadPage, uploadTypeFilter]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.uploads && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdminUploads();
-  }, [fetchAdminUploads, refreshKey]);
+  }, [fetchAdminUploads, refreshKey, ssr]);
 
   const handleDeleteUpload = async (id: number) => {
     if (!window.confirm(t('common.deleteConfirm'))) return;

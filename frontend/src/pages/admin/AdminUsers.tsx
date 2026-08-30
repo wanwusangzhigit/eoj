@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { usePermissions } from '../../hooks/usePermissions';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Search, Shield, User, ChevronLeft, ChevronRight, CheckSquare, Square,
@@ -15,15 +16,17 @@ export default function AdminUsers() {
   // 与后端权限对齐:编辑权限是 super admin 专属接口(superAdminMiddleware),
   // 普通 admin 不应看到入口,避免点击后看到 403 困惑
   const perms = usePermissions();
+  const ssr = useSSRPage<{ users?: { users?: any[]; pagination?: any } }>('adminUsers');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [userList, setUserList] = useState<any[]>([]);
+  const [userList, setUserList] = useState<any[]>(ssr?.users?.users ?? []);
   const [userSearch, setUserSearch] = useState('');
   const [debouncedUserSearch, setDebouncedUserSearch] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
   const [userPage, setUserPage] = useState(1);
-  const [userPagination, setUserPagination] = useState<any>(null);
+  const [userPagination, setUserPagination] = useState<any>(ssr?.users?.pagination ?? null);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const [editingPermissions, setEditingPermissions] = useState<number | null>(null);
@@ -44,9 +47,15 @@ export default function AdminUsers() {
   }, [userPage, debouncedUserSearch]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.users && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUserList();
-  }, [fetchUserList, refreshKey]);
+  }, [fetchUserList, refreshKey, ssr]);
 
   // Debounce user search
   useEffect(() => {

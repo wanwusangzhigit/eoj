@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { Pin, Edit3, Trash2, Plus, X, Check } from 'lucide-react';
 import { t } from '../../i18n';
 
 export default function AdminAnnouncements() {
   const addToast = useToastStore((s) => s.addToast);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<{ announcements?: { announcements?: any[] } }>('adminAnnouncements');
+  const firstRunRef = useRef(true);
+  const [announcements, setAnnouncements] = useState<any[]>(ssr?.announcements?.announcements ?? []);
+  const [loading, setLoading] = useState(!ssr?.announcements);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [title, setTitle] = useState('');
@@ -30,8 +33,14 @@ export default function AdminAnnouncements() {
   }, [addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.announcements && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     refresh();
-  }, [refresh]);
+  }, [refresh, ssr]);
 
   const openCreate = () => {
     setEditingId(null);

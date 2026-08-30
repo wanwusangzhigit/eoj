@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import '../Admin.css';
@@ -26,11 +27,13 @@ const STATUS_COLORS: Record<string, string> = {
 export default function AdminReports() {
   useDocumentTitle(t('reports.title'));
   const addToast = useToastStore((s) => s.addToast);
-  const [reports, setReports] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
+  const ssr = useSSRPage<{ reports?: { reports?: any[]; pagination?: any } }>('adminReports');
+  const firstRunRef = useRef(true);
+  const [reports, setReports] = useState<any[]>(ssr?.reports?.reports ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.reports?.pagination ?? null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr?.reports);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [updateStatus, setUpdateStatus] = useState('in_progress');
   const [adminReply, setAdminReply] = useState('');
@@ -49,9 +52,15 @@ export default function AdminReports() {
   }, [page, statusFilter, addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.reports && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReports();
-  }, [fetchReports]);
+  }, [fetchReports, ssr]);
 
   const handleOpenDetail = (r: any) => {
     setSelectedReport(r);

@@ -1,18 +1,28 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './FollowList.css';
+
+interface FollowListSSRData {
+  followers?: { users?: any[]; pagination?: any } | null;
+  following?: { users?: any[]; pagination?: any } | null;
+}
 
 export default function FollowList() {
   const { username, type } = useParams<{ username: string; type: string }>();
   const isFollowers = type === 'followers';
-  const [users, setUsers] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<FollowListSSRData>('followList');
+  const firstRunRef = useRef(true);
+  const ssrKey = isFollowers ? 'followers' : 'following';
+  const ssrList = ssr?.[ssrKey];
+  const [users, setUsers] = useState<any[]>(ssrList?.users ?? []);
+  const [pagination, setPagination] = useState<any>(ssrList?.pagination ?? null);
+  const [loading, setLoading] = useState(!ssrList);
   const [page, setPage] = useState(1);
   useDocumentTitle(isFollowers ? t('follow.followers') : t('follow.followingList'));
 
@@ -33,9 +43,15 @@ export default function FollowList() {
   }, [username, isFollowers, page]);
 
   useEffect(() => {
+    // SSR 已注入对应 tab 数据则跳过首次拉取
+    if (ssrList && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, ssrList]);
 
   return (
     <div className="follow-list-page">

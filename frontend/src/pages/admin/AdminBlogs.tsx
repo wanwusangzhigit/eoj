@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { Search, Trash2, Eye, ChevronLeft, ChevronRight, X, FileText } from 'lucide-react';
 import '../Admin.css';
@@ -26,13 +27,15 @@ export default function AdminBlogs() {
   useDocumentTitle(t('admin.blogManagement'));
   const addToast = useToastStore((s) => s.addToast);
 
-  const [blogs, setBlogs] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
+  const ssr = useSSRPage<{ blogs?: { blogs?: any[]; pagination?: any } }>('adminBlogs');
+  const firstRunRef = useRef(true);
+  const [blogs, setBlogs] = useState<any[]>(ssr?.blogs?.blogs ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.blogs?.pagination ?? null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr?.blogs);
   const [selectedBlog, setSelectedBlog] = useState<any>(null);
   const [blogDetail, setBlogDetail] = useState<string>('');
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -61,9 +64,15 @@ export default function AdminBlogs() {
   }, [page, debouncedSearch, statusFilter, addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.blogs && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBlogs();
-  }, [fetchBlogs]);
+  }, [fetchBlogs, ssr]);
 
   const handleOpenDetail = async (blog: any) => {
     setSelectedBlog(blog);

@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import { useAuthStore } from '../../store/auth';
 import { usePermissions } from '../../hooks/usePermissions';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Users, FileText, Send, CheckCircle, Swords, BookOpen, Ticket,
@@ -148,7 +149,8 @@ export default function AdminDashboard() {
   const { user } = useAuthStore();
   const perms = usePermissions();
   useDocumentTitle(t('admin.dashboard'));
-  const [stats, setStats] = useState<any>(null);
+  const ssr = useSSRPage<{ stats: any }>('adminDashboard');
+  const [stats, setStats] = useState<any>(ssr?.stats ?? null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -160,9 +162,11 @@ export default function AdminDashboard() {
   }, []);
 
   useEffect(() => {
+    // SSR 已注入统计则跳过首次拉取
+    if (ssr?.stats) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchStats();
-  }, [fetchStats]);
+  }, [fetchStats, ssr]);
 
   if (!user || (!perms.hasAllPermissions && !perms.canManageContests && !perms.canManageProblems && !perms.canManageLists && !perms.canManageTickets && !perms.canManageUploads)) {
     return (

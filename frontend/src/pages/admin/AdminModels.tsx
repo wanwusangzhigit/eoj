@@ -3,6 +3,7 @@ import { api } from '../../api/client';
 import type { AIModelConfig } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { Save, Plus, Trash2 } from 'lucide-react';
 import '../Admin.css';
@@ -10,10 +11,11 @@ import '../Admin.css';
 export default function AdminModels() {
   useDocumentTitle(t('admin.aiModels'));
   const addToast = useToastStore((s) => s.addToast);
-  const [aiModels, setAiModels] = useState<AIModelConfig[]>([]);
+  const ssr = useSSRPage<{ models?: { models?: AIModelConfig[] } }>('adminModels');
+  const [aiModels, setAiModels] = useState<AIModelConfig[]>(ssr?.models?.models ?? []);
   const [aiModelsLoading, setAiModelsLoading] = useState(false);
   const [aiModelsSaving, setAiModelsSaving] = useState(false);
-  const [aiModelsLoaded, setAiModelsLoaded] = useState(false);
+  const [aiModelsLoaded, setAiModelsLoaded] = useState(!!ssr?.models);
 
   const fetchAIModels = useCallback(async () => {
     setAiModelsLoading(true);

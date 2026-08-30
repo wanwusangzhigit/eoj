@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { Plus, Edit3, Trash2, X, Check, Link2 } from 'lucide-react';
 import { t } from '../../i18n';
 
 export default function AdminFriendLinks() {
   const addToast = useToastStore((s) => s.addToast);
-  const [links, setLinks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<{ links?: { links?: any[] } }>('adminFriendLinks');
+  const firstRunRef = useRef(true);
+  const [links, setLinks] = useState<any[]>(ssr?.links?.links ?? []);
+  const [loading, setLoading] = useState(!ssr?.links);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [name, setName] = useState('');
@@ -33,8 +36,14 @@ export default function AdminFriendLinks() {
   }, [addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.links && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     refresh();
-  }, [refresh]);
+  }, [refresh, ssr]);
 
   const openCreate = () => {
     setEditingId(null);

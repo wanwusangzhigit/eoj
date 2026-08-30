@@ -8,17 +8,24 @@ import EmptyState from '../components/EmptyState';
 import { Filter, Inbox, Search, LogIn, AlertCircle, Download } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Submissions.css';
+
+interface SubmissionsSSRData {
+  submissions?: { submissions?: any[]; pagination?: any };
+}
 
 export default function Submissions() {
   const { user } = useAuthStore();
-  const [submissions, setSubmissions] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
+  const ssr = useSSRPage<SubmissionsSSRData>('submissions');
+  const firstRunRef = useRef<boolean>(true);
+  const [submissions, setSubmissions] = useState<any[]>(ssr?.submissions?.submissions ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.submissions?.pagination ?? {});
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState('');
   const [languageFilter, setLanguageFilter] = useState('');
   const [userIdFilter, setUserIdFilter] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [debouncedUserId, setDebouncedUserId] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,9 +61,15 @@ export default function Submissions() {
   }, [page, statusFilter, languageFilter, isAdmin, debouncedUserId]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) fetchSubmissions();
-  }, [user, fetchSubmissions]);
+  }, [user, fetchSubmissions, ssr]);
 
   // Auto-refresh when there are pending/running submissions
   useEffect(() => {

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { ShieldAlert, Search, ArrowLeft, Play } from 'lucide-react';
 import CodeDiff from '../../components/CodeDiff';
@@ -16,7 +17,9 @@ const SIMILARITY_COLORS = (sim: number) => {
 export default function AdminPlagiarism() {
   useDocumentTitle(t('plagiarism.title'));
   const addToast = useToastStore((s) => s.addToast);
-  const [contests, setContests] = useState<any[]>([]);
+  const ssr = useSSRPage<{ contests?: { contests?: any[] } }>('adminPlagiarism');
+  const firstRunRef = useRef(true);
+  const [contests, setContests] = useState<any[]>(ssr?.contests?.contests ?? []);
   const [selectedContestId, setSelectedContestId] = useState<number | null>(null);
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -47,9 +50,15 @@ export default function AdminPlagiarism() {
   }, [selectedContestId, addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.contests && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchContests();
-  }, [fetchContests]);
+  }, [fetchContests, ssr]);
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */

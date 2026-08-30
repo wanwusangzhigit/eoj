@@ -16,6 +16,7 @@ import { javascript } from '@codemirror/lang-javascript';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { useThemeStore } from '../store/theme';
 import { useSettingsStore } from '../store/settings';
+import { useSSRPage } from '../ssr/useSSRPage';
 import { t } from '../i18n';
 import './SubmissionDetail.css';
 
@@ -29,21 +30,30 @@ const getLangExtension = (lang: string) => {
   }
 };
 
+interface SubmissionDetailSSRData {
+  submission?: any;
+  testcases?: any[];
+  logs?: any[];
+  history?: { id: number; language: string; status: string; score: number | null; created_at: string }[];
+}
+
 export default function SubmissionDetail() {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
   const settings = useSettingsStore((s) => s.settings);
   const addToast = useToastStore((s) => s.addToast);
-  const [submission, setSubmission] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<SubmissionDetailSSRData>('submissionDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [submission, setSubmission] = useState<any>(ssr?.submission ?? null);
+  const [loading, setLoading] = useState(!ssr?.submission);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [expandedTestCases, setExpandedTestCases] = useState<number[]>([]);
   const [rejudging, setRejudging] = useState(false);
-  const [testcases, setTestcases] = useState<any[]>([]);
-  const [logs, setLogs] = useState<any[]>([]);
+  const [testcases, setTestcases] = useState<any[]>(ssr?.testcases ?? []);
+  const [logs, setLogs] = useState<any[]>(ssr?.logs ?? []);
   const [logsExpanded, setLogsExpanded] = useState(false);
-  const [history, setHistory] = useState<{ id: number; language: string; status: string; score: number | null; created_at: string }[]>([]);
+  const [history, setHistory] = useState<{ id: number; language: string; status: string; score: number | null; created_at: string }[]>(ssr?.history ?? []);
 
   // Polling cleanup refs (Bug 2 fix)
   const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -102,17 +112,25 @@ export default function SubmissionDetail() {
   }, [fetchSubmission]);
 
   useEffect(() => {
+    // SSR 已注入提交数据则跳过首次拉取
+    if (ssr?.submission && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchSubmission();
-  }, [fetchSubmission]);
+  }, [fetchSubmission, ssr]);
 
   // 拉取同题历史提交(用于「提交历史对比」面板)
   useEffect(() => {
     if (!id) return;
+    // SSR 已注入 history 时跳过
+    if (ssr?.history) return;
     api.getSubmissionHistory(parseInt(id))
       .then((d) => { if (isMountedRef.current) setHistory(d.history || []); })
       .catch(() => { /* ignore */ });
-  }, [id]);
+  }, [id, ssr]);
 
   const toggleTestCase = (index: number) => {
     setExpandedTestCases(prev =>

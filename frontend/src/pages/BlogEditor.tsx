@@ -8,14 +8,26 @@ import MarkdownToolbar from '../components/MarkdownToolbar';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Blogs.css';
+
+interface BlogEditSSRData {
+  blog?: { title?: string; content?: string; tags?: string; status?: string } | null;
+}
 
 export default function BlogEditor() {
   const { id } = useParams<{ id?: string }>();
   const blogId = id ? parseInt(id) : null;
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
-  const [form, setForm] = useState({ title: '', content: '', tags: '', status: 'published' });
+  const ssr = useSSRPage<BlogEditSSRData>('blogEdit');
+  const firstRunRef = useRef(true);
+  const [form, setForm] = useState({
+    title: ssr?.blog?.title ?? '',
+    content: ssr?.blog?.content ?? '',
+    tags: ssr?.blog?.tags ?? '',
+    status: ssr?.blog?.status ?? 'published',
+  });
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [captchaUuid, setCaptchaUuid] = useState('');
@@ -44,10 +56,16 @@ export default function BlogEditor() {
 
   useEffect(() => {
     if (blogId) {
+      // SSR 已注入博客数据则跳过首次拉取
+      if (ssr?.blog && firstRunRef.current) {
+        firstRunRef.current = false;
+        return;
+      }
+      firstRunRef.current = false;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchBlog();
     }
-  }, [blogId, fetchBlog]);
+  }, [blogId, fetchBlog, ssr]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

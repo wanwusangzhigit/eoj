@@ -423,24 +423,15 @@ const ENTRIES: LoaderEntry[] = [
     },
   },
 
-  // ──── 收藏集列表 ────
+  // ──── 收藏集列表 / 收藏集详情 ────
+  // Collections.tsx 对 /collections 与 /collections/:id 复用同一管理组件(不使用 :id),
+  // 统一注入 pageKey 'collections',避免 detail 数据写入组件不读取的键。
   {
-    match: (p) => p === '/collections',
+    match: (p) => p === '/collections' || /^\/collections\/[^/]+$/.test(p),
     pageKey: 'collections',
     load: async (ctx) => {
       if (!ctx.user) return {};
       return { collections: await callApi(ctx, '/api/v1/collections') };
-    },
-  },
-
-  // ──── 收藏集详情(下拉列表项)──
-  {
-    match: (p) => /^\/collections\/[^/]+$/.test(p),
-    pageKey: 'collectionDetail',
-    load: async (ctx) => {
-      const id = ctx.url.pathname.split('/')[2];
-      if (!ctx.user) return {};
-      return { collection: await callApi(ctx, `/api/v1/collections/${id}`) };
     },
   },
 
@@ -531,6 +522,353 @@ const ENTRIES: LoaderEntry[] = [
     load: async (ctx) => {
       const token = ctx.url.pathname.split('/')[2];
       return { share: await callApi(ctx, `/api/v1/shares/${encodeURIComponent(token)}`) };
+    },
+  },
+
+  // ──── 提交列表(需登录)──
+  {
+    match: (p) => p === '/submissions',
+    pageKey: 'submissions',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { submissions: await callApi(ctx, '/api/v1/submissions?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 提交对比(必须位于 /submissions/:id 之前)──
+  {
+    match: (p) => /^\/submissions\/compare\/[^/]+\/[^/]+$/.test(p),
+    pageKey: 'submissionCompare',
+    load: async (ctx) => {
+      const [, , , id1, id2] = ctx.url.pathname.split('/');
+      if (!ctx.user) return {};
+      return { compare: await callApi(ctx, `/api/v1/submissions/compare/${id1}/${id2}`) };
+    },
+  },
+
+  // ──── 提交详情 ────
+  {
+    match: (p) => /^\/submissions\/[^/]+$/.test(p),
+    pageKey: 'submissionDetail',
+    load: async (ctx) => {
+      const id = ctx.url.pathname.split('/')[2];
+      const submission = await callApi(ctx, `/api/v1/submissions/${id}`);
+      const data: Record<string, unknown> = { submission };
+      if (submission) {
+        const [history, logs, testcases] = await Promise.all([
+          callApi(ctx, `/api/v1/submissions/${id}/history`),
+          callApi(ctx, `/api/v1/submissions/${id}/logs`),
+          callApi(ctx, `/api/v1/submissions/${id}/testcases`),
+        ]);
+        data.history = history;
+        data.logs = logs;
+        data.testcases = testcases;
+      }
+      return data;
+    },
+  },
+
+  // ──── 关注列表(被关注/粉丝)──
+  {
+    match: (p) => /^\/users\/[^/]+\/(followers|following)$/.test(p),
+    pageKey: 'followList',
+    load: async (ctx) => {
+      const parts = ctx.url.pathname.split('/').filter(Boolean);
+      const username = parts[1];
+      const tab = parts[2];
+      const data: Record<string, unknown> = {};
+      data[tab] = await callApi(ctx, `/api/v1/users/${encodeURIComponent(username)}/${tab}?page=1&pageSize=20`);
+      return data;
+    },
+  },
+
+  // ──── 创建/编辑比赛(编辑模式预载数据)──
+  {
+    match: (p) => /^\/match\/[^/]+\/edit$/.test(p),
+    pageKey: 'contestEdit',
+    load: async (ctx) => {
+      const id = ctx.url.pathname.split('/')[2];
+      if (!ctx.user) return { contest: null, problems: null };
+      const contest = await callApi(ctx, `/api/v1/contests/${id}`);
+      const problems = contest
+        ? await callApi(ctx, `/api/v1/contests/${id}/problems`)
+        : null;
+      return { contest, problems };
+    },
+  },
+
+  // ──── 博客编辑(编辑模式预载博客数据)──
+  {
+    match: (p) => /^\/blog\/[^/]+\/edit$/.test(p),
+    pageKey: 'blogEdit',
+    load: async (ctx) => {
+      const id = ctx.url.pathname.split('/')[2];
+      if (!ctx.user) return {};
+      return { blog: await callApi(ctx, `/api/v1/blogs/${id}`) };
+    },
+  },
+
+  // ──── 管理后台:仪表盘 ────
+  {
+    match: (p) => p === '/admin/dashboard',
+    pageKey: 'adminDashboard',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { stats: await callApi(ctx, '/api/v1/admin/stats') };
+    },
+  },
+
+  // ──── 管理后台:题目管理 ────
+  {
+    match: (p) => p === '/admin/problems',
+    pageKey: 'adminProblems',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { problems: await callApi(ctx, '/api/v1/admin/problems?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:测试数据 ────
+  {
+    match: (p) => p === '/admin/testcases',
+    pageKey: 'adminTestcases',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { problems: await callApi(ctx, '/api/v1/admin/problems?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:标签管理 ────
+  {
+    match: (p) => p === '/admin/tags',
+    pageKey: 'adminTags',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { categories: await callApi(ctx, '/api/v1/tags/categories') };
+    },
+  },
+
+  // ──── 管理后台:题解审核 ────
+  {
+    match: (p) => p === '/admin/solution-review',
+    pageKey: 'adminSolutionReview',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { solutions: await callApi(ctx, '/api/v1/solutions/admin/review?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:举报处理 ────
+  {
+    match: (p) => p === '/admin/reports',
+    pageKey: 'adminReports',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { reports: await callApi(ctx, '/api/v1/problems/admin/reports?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:用户管理 ────
+  {
+    match: (p) => p === '/admin/users',
+    pageKey: 'adminUsers',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { users: await callApi(ctx, '/api/v1/users/list?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:比赛管理 ────
+  {
+    match: (p) => p === '/admin/contests',
+    pageKey: 'adminContests',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { contests: await callApi(ctx, '/api/v1/admin/contests?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:抄袭检测(列表先取比赛)──
+  {
+    match: (p) => p === '/admin/plagiarism',
+    pageKey: 'adminPlagiarism',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { contests: await callApi(ctx, '/api/v1/contests?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:工单管理 ────
+  {
+    match: (p) => p === '/admin/tickets',
+    pageKey: 'adminTickets',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { tickets: await callApi(ctx, '/api/v1/admin/tickets?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:题单管理 ────
+  {
+    match: (p) => p === '/admin/lists',
+    pageKey: 'adminLists',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { lists: await callApi(ctx, '/api/v1/admin/lists?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:训练管理 ────
+  {
+    match: (p) => p === '/admin/training',
+    pageKey: 'adminTraining',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { plans: await callApi(ctx, '/api/v1/training?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:上传管理 ────
+  {
+    match: (p) => p === '/admin/uploads',
+    pageKey: 'adminUploads',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { uploads: await callApi(ctx, '/api/v1/uploads?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:SQL (超级管理员)──
+  {
+    match: (p) => p === '/admin/sql',
+    pageKey: 'adminSql',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { tables: await callApi(ctx, '/api/v1/admin/sql/tables') };
+    },
+  },
+
+  // ──── 管理后台:公告发送(站点设置)──
+  {
+    match: (p) => p === '/admin/announcement',
+    pageKey: 'adminAnnouncement',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { settings: await callApi(ctx, '/api/v1/settings') };
+    },
+  },
+
+  // ──── 管理后台:公告列表 ────
+  {
+    match: (p) => p === '/admin/announcements',
+    pageKey: 'adminAnnouncements',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { announcements: await callApi(ctx, '/api/v1/announcements/admin/list?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:友情链接 ────
+  {
+    match: (p) => p === '/admin/friend-links',
+    pageKey: 'adminFriendLinks',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { links: await callApi(ctx, '/api/v1/friend-links/admin') };
+    },
+  },
+
+  // ──── 管理后台:自定义页面 ────
+  {
+    match: (p) => p === '/admin/custom-pages',
+    pageKey: 'adminCustomPages',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { pages: await callApi(ctx, '/api/v1/pages/admin') };
+    },
+  },
+
+  // ──── 管理后台:站点设置 ────
+  {
+    match: (p) => p === '/admin/settings',
+    pageKey: 'adminSettings',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { settings: await callApi(ctx, '/api/v1/settings') };
+    },
+  },
+
+  // ──── 管理后台:AI 模型设置 ────
+  {
+    match: (p) => p === '/admin/models',
+    pageKey: 'adminModels',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { models: await callApi(ctx, '/api/v1/ai/models') };
+    },
+  },
+
+  // ──── 管理后台:审计日志 ────
+  {
+    match: (p) => p === '/admin/audit-logs',
+    pageKey: 'adminAuditLogs',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { logs: await callApi(ctx, '/api/v1/audit/logs?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:封禁管理 ────
+  {
+    match: (p) => p === '/admin/bans',
+    pageKey: 'adminBans',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      const [bannedIPs, bannedDevices] = await Promise.all([
+        callApi(ctx, '/api/v1/audit/banned-ips?page=1&pageSize=20'),
+        callApi(ctx, '/api/v1/audit/banned-devices?page=1&pageSize=20'),
+      ]);
+      return { bannedIPs, bannedDevices };
+    },
+  },
+
+  // ──── 管理后台:博客管理 ────
+  {
+    match: (p) => p === '/admin/blogs',
+    pageKey: 'adminBlogs',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { blogs: await callApi(ctx, '/api/v1/admin/blogs?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:队伍管理 ────
+  {
+    match: (p) => p === '/admin/teams',
+    pageKey: 'adminTeams',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { teams: await callApi(ctx, '/api/v1/admin/teams?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:站内消息 ────
+  {
+    match: (p) => p === '/admin/messages',
+    pageKey: 'adminMessages',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { conversations: await callApi(ctx, '/api/v1/admin/messages/conversations?page=1&pageSize=20') };
+    },
+  },
+
+  // ──── 管理后台:广告位(站点设置)──
+  {
+    match: (p) => p === '/admin/ads',
+    pageKey: 'adminAds',
+    load: async (ctx) => {
+      if (!ctx.user) return {};
+      return { settings: await callApi(ctx, '/api/v1/settings') };
     },
   },
 ];
