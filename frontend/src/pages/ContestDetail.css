@@ -245,6 +245,49 @@
   color: var(--text-primary);
 }
 
+.contest-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.contest-overview-card {
+  padding: 20px;
+}
+
+.contest-overview-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.contest-overview-title svg {
+  color: var(--accent);
+}
+
+.contest-overview-desc {
+  margin: 0 0 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.contest-overview-desc.muted {
+  color: var(--text-tertiary);
+}
+
+.contest-overview .contest-meta {
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
 .meta-item {
   display: flex;
   align-items: center;
