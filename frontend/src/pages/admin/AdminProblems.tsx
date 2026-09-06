@@ -5,6 +5,7 @@ import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { DIFFICULTIES, DIFFICULTY_COLORS } from '../../constants';
 import { t } from '../../i18n';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import DOMPurify from 'dompurify';
 import {
   Search, Trash2, Edit3, X, ChevronLeft, ChevronRight, FileText, Save, Download, Upload,
@@ -15,11 +16,13 @@ export default function AdminProblems() {
   useDocumentTitle(t('admin.problemManagement'));
   const addToast = useToastStore((s) => s.addToast);
   const navigate = useNavigate();
+  const ssr = useSSRPage<{ problems?: { problems?: any[]; pagination?: any } }>('adminProblems');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [adminProblems, setAdminProblems] = useState<any[]>([]);
-  const [problemPagination, setProblemPagination] = useState<any>(null);
+  const [adminProblems, setAdminProblems] = useState<any[]>(ssr?.problems?.problems ?? []);
+  const [problemPagination, setProblemPagination] = useState<any>(ssr?.problems?.pagination ?? null);
   const [problemSearch, setProblemSearch] = useState('');
   const [debouncedProblemSearch, setDebouncedProblemSearch] = useState('');
   const searchTimerRef = useRef<ReturnType<typeof setTimeout>>(null);
@@ -51,9 +54,15 @@ export default function AdminProblems() {
   }, [problemPage, debouncedProblemSearch]);
 
   useEffect(() => {
+    // SSR 已注入题目列表则跳过首次拉取
+    if (ssr?.problems && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdminProblems();
-  }, [fetchAdminProblems, refreshKey]);
+  }, [fetchAdminProblems, refreshKey, ssr]);
 
   // Debounce problem search
   useEffect(() => {

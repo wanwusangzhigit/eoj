@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { formatContestTime, parseContestTimeToMs } from '../../utils/contestTime';
 import {
@@ -34,11 +35,13 @@ function contestStatus(c: any): 'upcoming' | 'running' | 'ended' {
 export default function AdminContests() {
   useDocumentTitle(t('admin.contestManagement'));
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<{ contests?: { contests?: any[]; pagination?: any } }>('adminContests');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [adminContests, setAdminContests] = useState<any[]>([]);
-  const [contestPagination, setContestPagination] = useState<any>(null);
+  const [adminContests, setAdminContests] = useState<any[]>(ssr?.contests?.contests ?? []);
+  const [contestPagination, setContestPagination] = useState<any>(ssr?.contests?.pagination ?? null);
   const [contestPage, setContestPage] = useState(1);
 
   const fetchAdminContests = useCallback(async () => {
@@ -50,9 +53,15 @@ export default function AdminContests() {
   }, [contestPage]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.contests && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdminContests();
-  }, [fetchAdminContests, refreshKey]);
+  }, [fetchAdminContests, refreshKey, ssr]);
 
   const handleDeleteContest = async (id: number) => {
     if (!window.confirm(t('admin.deleteConfirm'))) return;

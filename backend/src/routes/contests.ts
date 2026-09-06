@@ -247,6 +247,63 @@ contests.get('/', async (c) => {
   });
 });
 
+// GET /contests/ical — 导出当前用户已报名比赛的 ICS 日历文件
+// 注意:必须注册在 /:id 通配路由之前,否则 /ical 会被 /:id 抓住(id="ical")导致 404。
+contests.get('/ical', authMiddleware, async (c) => {
+  const user = c.get('user');
+
+  const rows = await c.env.DB.prepare(
+    `SELECT c.id, c.title, c.start_time, c.end_time, c.description
+     FROM contests c JOIN contest_participants cp ON c.id = cp.contest_id
+     WHERE cp.user_id = ? AND cp.is_virtual = 0
+     ORDER BY c.start_time ASC`
+  ).bind(user.userId).all();
+
+  // ICS 转义:逗号/分号/换行/反斜杠
+  const esc = (s: string) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+
+  // 转 UTC 格式 YYYYMMDDTHHMMSSZ
+  const toUtc = (t: string) => {
+    const d = new Date(parseContestTimeToMs(t));
+    return isNaN(d.getTime())
+      ? ''
+      : d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  };
+
+  const nowIso = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const events = (rows.results as any[])
+    .filter((r) => toUtc(r.start_time) && toUtc(r.end_time))
+    .map((r) => {
+      const lines = [
+        'BEGIN:VEVENT',
+        `UID:contest-${r.id}@oj`,
+        `DTSTAMP:${nowIso}`,
+        `DTSTART:${toUtc(r.start_time)}`,
+        `DTEND:${toUtc(r.end_time)}`,
+        `SUMMARY:${esc(r.title)}`,
+        `DESCRIPTION:${esc(r.description || '')}`,
+        'END:VEVENT',
+      ];
+      return lines.join('\r\n');
+    })
+    .join('\r\n');
+
+  const ics = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//OJ System//Contests//ZH-CN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    events,
+    'END:VCALENDAR',
+  ].filter(Boolean).join('\r\n');
+
+  c.header('Content-Type', 'text/calendar; charset=utf-8');
+  c.header('Content-Disposition', 'attachment; filename="my-contests.ics"');
+  c.header('Cache-Control', 'no-store');
+  return c.body(ics);
+});
+
 // Get contest detail
 // 公开比赛详情,但需识别已登录用户以返回正确的 is_registered(可选鉴权)
 contests.get('/:id', optionalAuthMiddleware, async (c) => {
@@ -821,62 +878,6 @@ contests.get('/:id/rankings', optionalAuthMiddleware, async (c) => {
       pagination,
     },
   });
-});
-
-// GET /contests/ical — 导出当前用户已报名比赛的 ICS 日历文件
-contests.get('/ical', authMiddleware, async (c) => {
-  const user = c.get('user');
-
-  const rows = await c.env.DB.prepare(
-    `SELECT c.id, c.title, c.start_time, c.end_time, c.description
-     FROM contests c JOIN contest_participants cp ON c.id = cp.contest_id
-     WHERE cp.user_id = ? AND cp.is_virtual = 0
-     ORDER BY c.start_time ASC`
-  ).bind(user.userId).all();
-
-  // ICS 转义:逗号/分号/换行/反斜杠
-  const esc = (s: string) => String(s || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-
-  // 转 UTC 格式 YYYYMMDDTHHMMSSZ
-  const toUtc = (t: string) => {
-    const d = new Date(parseContestTimeToMs(t));
-    return isNaN(d.getTime())
-      ? ''
-      : d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  };
-
-  const nowIso = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const events = (rows.results as any[])
-    .filter((r) => toUtc(r.start_time) && toUtc(r.end_time))
-    .map((r) => {
-      const lines = [
-        'BEGIN:VEVENT',
-        `UID:contest-${r.id}@oj`,
-        `DTSTAMP:${nowIso}`,
-        `DTSTART:${toUtc(r.start_time)}`,
-        `DTEND:${toUtc(r.end_time)}`,
-        `SUMMARY:${esc(r.title)}`,
-        `DESCRIPTION:${esc(r.description || '')}`,
-        'END:VEVENT',
-      ];
-      return lines.join('\r\n');
-    })
-    .join('\r\n');
-
-  const ics = [
-    'BEGIN:VCALENDAR',
-    'VERSION:2.0',
-    'PRODID:-//OJ System//Contests//ZH-CN',
-    'CALSCALE:GREGORIAN',
-    'METHOD:PUBLISH',
-    events,
-    'END:VCALENDAR',
-  ].filter(Boolean).join('\r\n');
-
-  c.header('Content-Type', 'text/calendar; charset=utf-8');
-  c.header('Content-Disposition', 'attachment; filename="my-contests.ics"');
-  c.header('Cache-Control', 'no-store');
-  return c.body(ics);
 });
 
 // GET /contests/:id/certificate — 生成当前用户的比赛成绩证书(SVG→PNG)

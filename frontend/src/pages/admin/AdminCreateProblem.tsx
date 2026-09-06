@@ -7,6 +7,7 @@ import { DIFFICULTIES } from '../../constants';
 import { t } from '../../i18n';
 import { Save, Code2 } from 'lucide-react';
 import CodeMirror from '@uiw/react-codemirror';
+import ClientOnly from '../../components/ClientOnly';
 import { cpp } from '@codemirror/lang-cpp';
 import { python } from '@codemirror/lang-python';
 import { java } from '@codemirror/lang-java';
@@ -189,14 +190,16 @@ export default function AdminCreateProblem() {
           <div className="form-group">
             <label><Code2 size={16} /> {t('admin.spjCode')}</label>
             <div className="spj-code-editor" style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
-              <CodeMirror
-                value={spjCode}
-                onChange={(val) => setSpjCode(val)}
-                height="300px"
-                theme={theme === 'dark' ? oneDark : undefined}
-                extensions={[getLangExtension(problemForm.spj_language)]}
-                basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true }}
-              />
+              <ClientOnly>
+                <CodeMirror
+                  value={spjCode}
+                  onChange={(val) => setSpjCode(val)}
+                  height="300px"
+                  theme={theme === 'dark' ? oneDark : undefined}
+                  extensions={[getLangExtension(problemForm.spj_language)]}
+                  basicSetup={{ lineNumbers: true, foldGutter: true, highlightActiveLine: true }}
+                />
+              </ClientOnly>
             </div>
             <small style={{ color: 'var(--text-secondary)', marginTop: '4px', display: 'block' }}>
               {t('admin.spjHint')}

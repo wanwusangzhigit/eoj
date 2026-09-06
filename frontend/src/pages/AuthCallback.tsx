@@ -17,12 +17,12 @@ const errorKeyMap: Record<string, string> = {
 export default function AuthCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { setToken, fetchUser } = useAuthStore();
+  const { fetchUser } = useAuthStore();
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
 
   // OAuth 成功流程:后端把 JWT 存在服务端,只把一次性 exchange code 放在 ?code=
-  // 前端调用 POST /api/v1/auth/exchange 拿 JWT,避免 token 出现在 URL fragment
-  // 而被 Referer / 浏览器历史 / 共享设备泄漏。
+  // 前端调用 POST /api/v1/auth/exchange 拿 JWT,后端同时 Set-Cookie 写入 httpOnly cookie,
+  // 客户端不再需要持有 token 字符串(SSR 时代由 cookie 自动携带)。
   const exchangeCode = searchParams.get('code');
   const oauthError = searchParams.get('error');
   const errorDesc = searchParams.get('error_description');
@@ -40,9 +40,9 @@ export default function AuthCallback() {
       try {
         // 用 api 客户端(始终指向 API 服务端 A)兑换,而不是当前页面的相对路径。
         // 跨域登录时本页落在域名 B 上,相对路径会指到 B 而非 A。
-        const data = await api.exchangeOAuthCode(exchangeCode);
+        // 后端响应会 Set-Cookie 写入 httpOnly token,客户端只需刷新登录态。
+        await api.exchangeOAuthCode(exchangeCode);
         if (cancelled) return;
-        setToken(data.token);
         await fetchUser();
         if (cancelled) return;
         navigate('/', { replace: true });
@@ -51,7 +51,7 @@ export default function AuthCallback() {
       }
     })();
     return () => { cancelled = true; };
-  }, [exchangeCode, oauthError, setToken, fetchUser, navigate]);
+  }, [exchangeCode, oauthError, fetchUser, navigate]);
 
   if (error) {
     return (

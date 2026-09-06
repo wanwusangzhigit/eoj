@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Training.css';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -15,13 +16,25 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   advanced: '#fe2c55',
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 trainingDetail loader 的返回)
+interface TrainingDetailSSRData {
+  plan?: { plan?: any; chapters?: any[] };
+}
+
 export default function TrainingDetail() {
   const { id } = useParams<{ id: string }>();
   const planId = parseInt(id || '0');
-  const [plan, setPlan] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TrainingDetailSSRData>('trainingDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [plan, setPlan] = useState<any>(ssr?.plan?.plan ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
-  const [expandedChapters, setExpandedChapters] = useState<Record<number, boolean>>({});
+  // 默认展开所有章节(SSR 命中时直接用注入数据初始化)
+  const [expandedChapters, setExpandedChapters] = useState<Record<number, boolean>>(() => {
+    const exp: Record<number, boolean> = {};
+    (ssr?.plan?.plan?.chapters || []).forEach((ch: any) => { exp[ch.id] = true; });
+    return exp;
+  });
   const [progress, setProgress] = useState<{ completed: number; total: number; percent: number } | null>(null);
   const [joining, setJoining] = useState(false);
   const { user } = useAuthStore();
@@ -56,11 +69,17 @@ export default function TrainingDetail() {
   }, [planId]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     /* eslint-disable react-hooks/set-state-in-effect */
     fetchPlan();
     if (user) fetchProgress();
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [fetchPlan, fetchProgress, user]);
+  }, [fetchPlan, fetchProgress, user, ssr]);
 
   const toggleChapter = (chapterId: number) => {
     setExpandedChapters((prev) => ({ ...prev, [chapterId]: !prev[chapterId] }));

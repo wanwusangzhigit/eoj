@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,11 +6,19 @@ import EmptyState from '../components/EmptyState';
 import { List, Search, User, Hash, PlusCircle, AlertCircle } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ProblemLists.css';
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 problemLists loader 的返回)
+interface ProblemListsSSRData {
+  lists?: any[];
+}
+
 export default function ProblemLists() {
-  const [lists, setLists] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<ProblemListsSSRData>('problemLists');
+  const firstRunRef = useRef<boolean>(true);
+  const [lists, setLists] = useState<any[]>(ssr?.lists ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -32,9 +40,15 @@ export default function ProblemLists() {
   }, [search]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLists();
-  }, [fetchLists]);
+  }, [fetchLists, ssr]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

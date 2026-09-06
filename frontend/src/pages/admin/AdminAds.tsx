@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { useSettingsStore } from '../../store/settings';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Megaphone, Save, Loader2 } from 'lucide-react';
@@ -20,37 +21,44 @@ const SLOT_DEFS: SlotDef[] = [
   { key: 'blog_side', label: 'blog_side', hint: 'blog_side_hint' },
 ];
 
+const buildSlotsFromData = (data: any): Record<string, { slot: string; enabled: boolean }> => {
+  const next: Record<string, { slot: string; enabled: boolean }> = {};
+  for (const def of SLOT_DEFS) {
+    next[def.key] = {
+      slot: data?.[`ads_slot_${def.key}`] || '',
+      enabled: data?.[`ads_slot_${def.key}_enabled`] !== 'false',
+    };
+  }
+  return next;
+};
+
 export default function AdminAds() {
   useDocumentTitle(t('admin.adsManagement'));
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
-  const [clientId, setClientId] = useState('');
-  const [enabled, setEnabled] = useState(false);
-  const [slots, setSlots] = useState<Record<string, { slot: string; enabled: boolean }>>({});
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<{ settings?: any }>('adminAds');
+  const ssrSettings = ssr?.settings ?? undefined;
+  const [clientId, setClientId] = useState(ssrSettings?.ads_client_id || '');
+  const [enabled, setEnabled] = useState(ssrSettings?.ads_enabled === 'true');
+  const [slots, setSlots] = useState<Record<string, { slot: string; enabled: boolean }>>(() => buildSlotsFromData(ssrSettings));
+  const [loading, setLoading] = useState(!ssrSettings);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
+    if (ssrSettings) return; // SSR 已注入设置则跳过首次拉取
     (async () => {
       try {
         const data = await api.getSettings();
         setClientId(data.ads_client_id || '');
         setEnabled(data.ads_enabled === 'true');
-        const next: Record<string, { slot: string; enabled: boolean }> = {};
-        for (const def of SLOT_DEFS) {
-          next[def.key] = {
-            slot: data[`ads_slot_${def.key}`] || '',
-            enabled: data[`ads_slot_${def.key}_enabled`] !== 'false',
-          };
-        }
-        setSlots(next);
+        setSlots(buildSlotsFromData(data));
       } catch {
         setMessage({ type: 'error', text: t('common.loadError') });
       } finally {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [ssrSettings]);
 
   const handleSave = async () => {
     setMessage(null);

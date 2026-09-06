@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
 import CodeMirror from '@uiw/react-codemirror';
+import ClientOnly from '../components/ClientOnly';
 import ImageUploadButton from '../components/ImageUploadButton';
 import { python } from '@codemirror/lang-python';
 import { cpp } from '@codemirror/lang-cpp';
@@ -21,9 +22,21 @@ import RatingBadge from '../components/RatingBadge';
 import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ProblemDetail.css';
 
 const DRAFT_KEY = (slug: string, lang: string) => `draft:${slug}:${lang}`;
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 problemDetail loader 的返回)
+interface ProblemDetailSSRData {
+  problem?: { problem?: any; sampleTestcases?: any[]; stats?: any } | null;
+  related?: { problems?: any[] };
+  languages?: { languages?: any[] };
+  trend?: { trend?: { day: string; total: number; accepted: number }[] };
+  favorite?: { is_favorited?: boolean };
+  status?: { solved?: boolean; attempted?: boolean };
+  submissions?: { submissions?: any[] };
+}
 
 export default function ProblemDetail() {
   const { slug, problemId, teamId, id: matchId } = useParams<{ slug?: string; problemId?: string; teamId?: string; id?: string }>();
@@ -38,8 +51,13 @@ export default function ProblemDetail() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { theme } = useThemeStore();
-  const [problem, setProblem] = useState<any>(null);
-  const [sampleTestcases, setSampleTestcases] = useState<any[]>([]);
+  // SSR 注入数据(对应 backend/src/loaders.ts 中 problemDetail loader 的返回)。
+  // 团队私有题 / 团队比赛题目 / 比赛题目变体的 loader 也统一写入 pageKey 'problemDetail'
+  // 并返回 {problem, ...} 形状,与公开题数据结构一致,因此此处可直接消费全部变体的 SSR 数据。
+  const ssr = useSSRPage<ProblemDetailSSRData>('problemDetail');
+  const ssrFirstRunRef = useRef<boolean>(true);
+  const [problem, setProblem] = useState<any>(ssr?.problem?.problem ?? null);
+  const [sampleTestcases, setSampleTestcases] = useState<any[]>(ssr?.problem?.sampleTestcases ?? []);
   const preferredLanguage = getSiteConfig()?.editor?.default_language;
   const initialLang = preferredLanguage && LANGUAGE_TEMPLATES[preferredLanguage] ? preferredLanguage : 'python';
   const [language, setLanguage] = useState(initialLang);
@@ -47,20 +65,22 @@ export default function ProblemDetail() {
   const [submitting, setSubmitting] = useState(false);
   const [lastSubmissionId, setLastSubmissionId] = useState<number | null>(null);
   const [lastStatus, setLastStatus] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState('');
   const [contestAccessDenied, setContestAccessDenied] = useState<{ reason: string; contestId?: number | string } | null>(null);
   const [, setServerOffsetMs] = useState<number>(0);
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavorited, setIsFavorited] = useState<boolean>(!!ssr?.favorite?.is_favorited);
   const [favoriteLoading, setFavoriteLoading] = useState(false);
-  const [submissionStatus, setSubmissionStatus] = useState<'none' | 'accepted' | 'attempted'>('none');
-  const [stats, setStats] = useState<any>(null);
-  const [trend, setTrend] = useState<{ day: string; total: number; accepted: number }[]>([]);
-  const [recentSubmissions, setRecentSubmissions] = useState<any[]>([]);
+  const [submissionStatus, setSubmissionStatus] = useState<'none' | 'accepted' | 'attempted'>(
+    ssr?.status ? (ssr.status.solved ? 'accepted' : ssr.status.attempted ? 'attempted' : 'none') : 'none'
+  );
+  const [stats, setStats] = useState<any>(ssr?.problem?.stats ?? null);
+  const [trend, setTrend] = useState<{ day: string; total: number; accepted: number }[]>(ssr?.trend?.trend ?? []);
+  const [recentSubmissions, setRecentSubmissions] = useState<any[]>(ssr?.submissions?.submissions ?? []);
   const [prevProblem, setPrevProblem] = useState<any>(null);
   const [nextProblem, setNextProblem] = useState<any>(null);
-  const [relatedProblems, setRelatedProblems] = useState<any[]>([]);
-  const [problemLanguages, setProblemLanguages] = useState<any[]>([]);
+  const [relatedProblems, setRelatedProblems] = useState<any[]>(ssr?.related?.problems ?? []);
+  const [problemLanguages, setProblemLanguages] = useState<any[]>(ssr?.languages?.languages ?? []);
   useDocumentTitle(problem?.title, problem?.description ? problem.description.slice(0, 150) : undefined);
 
   // ── Tab state ──
@@ -126,6 +146,12 @@ export default function ProblemDetail() {
   const captchaRef = useRef<CaptchaHandle>(null);
   // ── Fetch problem on slug change (separate from user-specific checks) ──
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && ssrFirstRunRef.current) {
+      ssrFirstRunRef.current = false;
+      return;
+    }
+    ssrFirstRunRef.current = false;
     if (!problemKey) return;
     setLoading(true);
     let cancelled = false;
@@ -214,7 +240,7 @@ export default function ProblemDetail() {
 
     fetchProblem();
     return () => { cancelled = true; };
-  }, [problemKey, slug, problemId, teamId, matchId, isContestProblem, isTeamProblem, isTeamContestProblem]);
+  }, [problemKey, slug, problemId, teamId, matchId, isContestProblem, isTeamProblem, isTeamContestProblem, ssr]);
 
   // ── Fetch user-specific data when user + problem are available ──
   useEffect(() => {
@@ -1502,14 +1528,16 @@ export default function ProblemDetail() {
         )}
 
         <div className="editor-wrapper">
-          <CodeMirror
-            value={sourceCode}
-            height="400px"
-            theme={theme === 'dark' ? oneDark : undefined}
-            extensions={[getLangExtension(language)]}
-            onChange={handleSourceCodeChange}
-            style={{ fontSize: `${settings.editor_font_size || 14}px` }}
-          />
+          <ClientOnly>
+            <CodeMirror
+              value={sourceCode}
+              height="400px"
+              theme={theme === 'dark' ? oneDark : undefined}
+              extensions={[getLangExtension(language)]}
+              onChange={handleSourceCodeChange}
+              style={{ fontSize: `${settings.editor_font_size || 14}px` }}
+            />
+          </ClientOnly>
         </div>
 
         {captchaEnabled && (

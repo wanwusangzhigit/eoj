@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,16 +6,24 @@ import { List, ChevronRight, User, StickyNote, Hash, Copy, Share2, CheckCircle, 
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import { useAuthStore } from '../store/auth';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ProblemListDetail.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 problemListDetail loader 的返回)
+interface ProblemListDetailSSRData {
+  list?: { list: any; items: any[] } | null;
+}
 
 export default function ProblemListDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const addToast = useToastStore((s) => s.addToast);
   const { user } = useAuthStore();
-  const [list, setList] = useState<any>(null);
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<ProblemListDetailSSRData>('problemListDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [list, setList] = useState<any>(ssr?.list?.list ?? null);
+  const [items, setItems] = useState<any[]>(ssr?.list?.items ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
 
   // 克隆题单到自己的题单
@@ -70,9 +78,15 @@ export default function ProblemListDetail() {
 
   useEffect(() => {
     if (!id) return;
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchList();
-  }, [id, fetchList]);
+  }, [id, fetchList, ssr]);
 
   if (loading) {
     return <LoadingSpinner />;

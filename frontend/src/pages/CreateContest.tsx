@@ -1,26 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { Trophy, ChevronRight, Plus, X, Send, Edit3 } from 'lucide-react';
 import { t } from '../i18n';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './CreateContest.css';
 
 import { toLocalDatetimeString } from '../utils/contestTime';
+
+interface ContestEditSSRData {
+  contest?: any;
+  problems?: { problems?: any[] } | null;
+}
 
 export default function CreateContest() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const { id: contestId } = useParams<{ id: string }>();
   const isEditing = !!contestId;
+  const ssr = useSSRPage<ContestEditSSRData>('contestEdit');
+  const ssrContest = (ssr?.contest ?? null) as any | null;
+  const firstRunRef = useRef<boolean>(true);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
-  const [isPublic, setIsPublic] = useState(true);
-  const [scoringType, setScoringType] = useState<'oi' | 'icpc' | 'ioi'>('icpc');
-  const [freezeMinutes, setFreezeMinutes] = useState<number>(0);
+  const [title, setTitle] = useState(ssrContest?.title ?? '');
+  const [description, setDescription] = useState(ssrContest?.description ?? '');
+  const [startTime, setStartTime] = useState(ssrContest?.start_time ? toLocalDatetimeString(ssrContest.start_time) : '');
+  const [endTime, setEndTime] = useState(ssrContest?.end_time ? toLocalDatetimeString(ssrContest.end_time) : '');
+  const [isPublic, setIsPublic] = useState(ssrContest ? !!ssrContest.is_public : true);
+  const [scoringType, setScoringType] = useState<'oi' | 'icpc' | 'ioi'>(ssrContest?.scoring_type === 'oi' || ssrContest?.scoring_type === 'ioi' ? ssrContest.scoring_type : 'icpc');
+  const [freezeMinutes, setFreezeMinutes] = useState<number>(ssrContest?.freeze_minutes ?? 0);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -28,12 +37,21 @@ export default function CreateContest() {
   // Problem search
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [selectedProblems, setSelectedProblems] = useState<any[]>([]);
+  const ssrProblems = isEditing ? (ssr?.problems?.problems ?? []) : [];
+  const [selectedProblems, setSelectedProblems] = useState<any[]>(
+    ssrProblems.map((p: any) => ({ id: p.id, title: p.title, slug: p.slug, label: p.label, score: p.score }))
+  );
   const [searching, setSearching] = useState(false);
 
   // Load existing contest data for editing
   useEffect(() => {
     if (!isEditing) return;
+    // SSR 已注入比赛数据则跳过首次拉取
+    if (ssr?.contest && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     const fetchContest = async () => {
       setLoading(true);
       try {

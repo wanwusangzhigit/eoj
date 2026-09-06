@@ -1,8 +1,10 @@
 backend/public
+backend/ssr
 frontend/dist
 backend/node_modules
 frontend/node_modules
 .wrangler/
+backend/.wrangler
 frontend/pnpm-lock.yaml
 backend/.env
 .env
@@ -11,6 +13,5 @@ __pycache__/
 .claude
 .vscode
 .idea
-backend/.wrangler
 *.tsbuildinfo
 tmp.txt

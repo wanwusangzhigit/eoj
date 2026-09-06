@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/auth';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useContestNotifications } from '../hooks/useContestNotifications';
 import { api } from '../api/client';
+import { getSSRGlobal } from '../ssr/hydrate';
 import DOMPurify from 'dompurify';
 import { t } from '../i18n';
 import './Layout.css';
@@ -26,21 +27,24 @@ export default function Layout({ children }: { children: ReactNode }) {
   const fetchSettings = useSettingsStore((s) => s.fetchSettings);
   const { user } = useAuthStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadMsg, setUnreadMsg] = useState(0);
+  // SSR 已经注入的全局数据优先:friendLinks / pages / unreadMessages
+  const ssrGlobal = getSSRGlobal();
+  const [unreadMsg, setUnreadMsg] = useState<number>(ssrGlobal?.unreadMessages ?? 0);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [friendLinks, setFriendLinks] = useState<{ id: number; name: string; url: string; description: string; icon: string }[]>([]);
-  const [footerPages, setFooterPages] = useState<{ id: number; slug: string; title: string }[]>([]);
+  const [friendLinks, setFriendLinks] = useState<{ id: number; name: string; url: string; description: string; icon: string }[]>(ssrGlobal?.friendLinks ?? []);
+  const [footerPages, setFooterPages] = useState<{ id: number; slug: string; title: string }[]>(ssrGlobal?.pages ?? []);
   const isLuogu = config.site.theme === 'luogu';
 
-  // 页脚友情链接 + 自定义页面导航
+  // 页脚友情链接 + 自定义页面导航:SSR 命中时无需再请求
   useEffect(() => {
+    if (ssrGlobal?.friendLinks && ssrGlobal?.pages) return;
     api.getFriendLinks()
       .then((data) => setFriendLinks(data.links || []))
       .catch(() => { /* ignore */ });
     api.getPages()
       .then((data) => setFooterPages(data.pages || []))
       .catch(() => { /* ignore */ });
-  }, []);
+  }, [ssrGlobal]);
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -48,10 +52,13 @@ export default function Layout({ children }: { children: ReactNode }) {
   }, [theme, config.site.theme]);
 
   useEffect(() => {
+    // 设置已通过 SSR 注入时跳过首次拉取
+    if (ssrGlobal?.settings) return;
     fetchSettings();
-  }, [fetchSettings]);
+  }, [fetchSettings, ssrGlobal?.settings]);
 
   // Poll unread messages (for luogu sidebar + default header)
+  // SSR 已注入首屏 unreadMessages;后续仍定时刷新以反映实时变化。
   useEffect(() => {
     if (!user) return;
     const fetchUnread = async () => {
@@ -60,10 +67,11 @@ export default function Layout({ children }: { children: ReactNode }) {
         setUnreadMsg(data.count || 0);
       } catch { /* ignore */ }
     };
-    fetchUnread();
+    // SSR 已注入过 unread,可以延后首次轮询 30s;无 SSR 时立即拉一次。
+    if (!ssrGlobal?.unreadMessages) fetchUnread();
     const timer = setInterval(fetchUnread, 30000);
     return () => clearInterval(timer);
-  }, [user]);
+  }, [user, ssrGlobal?.unreadMessages]);
 
   // Hide unread count when logged out without a synchronous setState in effect
   const displayUnreadMsg = user ? unreadMsg : 0;

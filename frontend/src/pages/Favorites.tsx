@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -6,14 +6,22 @@ import { Heart, Clock, MemoryStick, AlertCircle } from 'lucide-react';
 import { DIFFICULTY_COLORS } from '../constants';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Favorites.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 favorites loader 的返回:未登录时返回 {})
+interface FavoritesSSRData {
+  favorites?: { problems?: any[]; pagination?: any };
+}
 
 export default function Favorites() {
   const { user } = useAuthStore();
-  const [problems, setProblems] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>({});
+  const ssr = useSSRPage<FavoritesSSRData>('favorites');
+  const firstRunRef = useRef<boolean>(true);
+  const [problems, setProblems] = useState<any[]>(ssr?.favorites?.problems ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.favorites?.pagination ?? {});
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   useDocumentTitle(t('favorites.title'));
 
@@ -33,11 +41,17 @@ export default function Favorites() {
   }, [page]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     if (user) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchFavorites();
     }
-  }, [user, fetchFavorites]);
+  }, [user, fetchFavorites, ssr]);;
 
   if (!user) {
     return (

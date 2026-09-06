@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -16,14 +16,22 @@ import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import FollowButton from '../components/FollowButton';
 import { useNow } from '../hooks/useNow';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Profile.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 profile loader 的返回)
+interface ProfileSSRData {
+  profile?: any;
+}
 
 export default function Profile() {
   const { username } = useParams<{ username?: string }>();
   const { user: currentUser, fetchUser } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<ProfileSSRData>('profile');
+  const firstRunRef = useRef<boolean>(true);
+  const [data, setData] = useState<any>(ssr?.profile ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [error, setError] = useState<string | null>(null);
   const [allSubmissions, setAllSubmissions] = useState<any[]>([]);
   const [languageStats, setLanguageStats] = useState<{ language: string; total: number; accepted: number }[]>([]);
@@ -57,6 +65,12 @@ export default function Profile() {
   const now = useNow();
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     const fetchData = async () => {
       try {
         if (isOwnProfile) {
@@ -73,7 +87,7 @@ export default function Profile() {
       }
     };
     fetchData();
-  }, [username, isOwnProfile]);
+  }, [username, isOwnProfile, ssr]);
 
   useEffect(() => {
     const fetchExtraData = async () => {

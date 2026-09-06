@@ -1,16 +1,24 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
+import { useSSRPage } from '../ssr/useSSRPage';
 import { Save, Settings, Bell, Code2 } from 'lucide-react';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 userSettingsPage loader 的返回:未登录时返回 {})
+interface UserSettingsSSRData {
+  settings?: { settings?: Record<string, string> };
+}
 
 export default function UserSettings() {
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   useDocumentTitle('用户设置');
-  const [settings, setSettings] = useState<Record<string, string>>({});
+  const ssr = useSSRPage<UserSettingsSSRData>('userSettingsPage');
+  const firstRunRef = useRef<boolean>(true);
+  const [settings, setSettings] = useState<Record<string, string>>(ssr?.settings?.settings ?? {});
   const [saving, setSaving] = useState(false);
   const [notifyPrefs, setNotifyPrefs] = useState<Record<string, string>>({});
   const [templates, setTemplates] = useState<any[]>([]);
@@ -48,12 +56,18 @@ export default function UserSettings() {
   }, []);
 
   useEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect */
-    fetchSettings();
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)。
+    // 仅 settings 由 SSR 提供;通知偏好与模板仍需拉取。
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+    } else {
+      /* eslint-disable react-hooks/set-state-in-effect */
+      fetchSettings();
+    }
     fetchNotifyPrefs();
     fetchTemplates();
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [fetchSettings, fetchNotifyPrefs, fetchTemplates]);
+  }, [fetchSettings, fetchNotifyPrefs, fetchTemplates, ssr]);
 
   const handleSaveTemplate = async () => {
     try {

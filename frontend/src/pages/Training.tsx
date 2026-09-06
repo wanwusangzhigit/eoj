@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState';
 import { BookOpen, Search, GraduationCap, AlertCircle, Layers } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Training.css';
 
 const DIFFICULTY_COLORS: Record<string, string> = {
@@ -14,9 +15,16 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   advanced: '#fe2c55',
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 training loader 的返回)
+interface TrainingSSRData {
+  plans?: any[];
+}
+
 export default function Training() {
-  const [plans, setPlans] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TrainingSSRData>('training');
+  const firstRunRef = useRef<boolean>(true);
+  const [plans, setPlans] = useState<any[]>(ssr?.plans ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
@@ -37,9 +45,15 @@ export default function Training() {
   }, [search]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPlans();
-  }, [fetchPlans]);
+  }, [fetchPlans, ssr]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

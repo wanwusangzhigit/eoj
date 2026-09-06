@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api, type ProblemCollection, type CollectionItem } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -10,14 +10,22 @@ import {
 import { DIFFICULTY_COLORS } from '../constants';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Collections.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 collections loader 的返回:未登录时返回 {})
+interface CollectionsSSRData {
+  collections?: { collections?: ProblemCollection[] };
+}
 
 export default function Collections() {
   const { user } = useAuthStore();
   const { addToast } = useToastStore();
   const navigate = useNavigate();
-  const [collections, setCollections] = useState<ProblemCollection[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<CollectionsSSRData>('collections');
+  const firstRunRef = useRef<boolean>(true);
+  const [collections, setCollections] = useState<ProblemCollection[]>(ssr?.collections?.collections ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
 
   // Create/edit modal state
@@ -52,9 +60,15 @@ export default function Collections() {
   }, []);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (user) fetchCollections();
-  }, [user, fetchCollections]);
+  }, [user, fetchCollections, ssr]);
 
   const openCreateModal = () => {
     setEditingCollection(null);

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../api/client';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useToastStore } from '../../store/toast';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { ChevronLeft, ChevronRight, Search, FileText, Shield, RefreshCw, Download } from 'lucide-react';
 import '../Admin.css';
@@ -9,10 +10,12 @@ import '../Admin.css';
 export default function AdminAuditLogs() {
   useDocumentTitle(t('admin.auditLogs'));
   const addToast = useToastStore((s) => s.addToast);
-  const [logs, setLogs] = useState<any[]>([]);
+  const ssr = useSSRPage<{ logs?: { logs?: any[]; pagination?: any } }>('adminAuditLogs');
+  const firstRunRef = useRef(true);
+  const [logs, setLogs] = useState<any[]>(ssr?.logs?.logs ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(ssr?.logs?.pagination?.totalPages ?? 1);
+  const [total, setTotal] = useState(ssr?.logs?.pagination?.total ?? 0);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [ipFilter, setIpFilter] = useState('');
@@ -47,9 +50,15 @@ export default function AdminAuditLogs() {
   }, [page, debouncedSearch, ipFilter, actionFilter]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.logs && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchLogs();
-  }, [fetchLogs]);
+  }, [fetchLogs, ssr]);
 
   const [banTarget, setBanTarget] = useState<{ type: 'ip' | 'device'; value: string } | null>(null);
   const [banReason, setBanReason] = useState('');

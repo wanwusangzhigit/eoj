@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Trash2, ChevronLeft, ChevronRight, ExternalLink, Plus, GraduationCap, BookPlus, FilePlus,
@@ -14,11 +15,13 @@ const DIFFICULTIES = ['beginner', 'intermediate', 'advanced'];
 export default function AdminTraining() {
   useDocumentTitle(t('training.title'));
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<{ plans?: { plans?: any[]; pagination?: any } }>('adminTraining');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey((k) => k + 1);
 
-  const [plans, setPlans] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
+  const [plans, setPlans] = useState<any[]>(ssr?.plans?.plans ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.plans?.pagination ?? null);
   const [page, setPage] = useState(1);
 
   // Create plan form
@@ -51,9 +54,15 @@ export default function AdminTraining() {
   }, [page]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.plans && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPlans();
-  }, [fetchPlans, refreshKey]);
+  }, [fetchPlans, refreshKey, ssr]);
 
   const handleCreatePlan = async () => {
     if (!newPlan.title.trim()) {

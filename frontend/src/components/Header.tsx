@@ -150,9 +150,10 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
     // Try SSE first (faster, real-time). EventSource 无法携带 Authorization 头,
     // 因此先请求短时效(5 分钟)的 stream-token,避免把长期有效的登录 JWT
     // 拼进 URL 查询参数(会进入浏览器历史/代理日志)。
-    const token = useAuthStore.getState().token;
+    // SSR 时代 token 不再在内存里持久化,改用 user 是否存在判断是否启动 SSE。
+    const hasAuth = !!useAuthStore.getState().user;
     let disposed = false;
-    if (token) {
+    if (hasAuth) {
       api.getSSEStreamToken()
         .then(({ token: streamToken }) => {
           if (disposed) return;

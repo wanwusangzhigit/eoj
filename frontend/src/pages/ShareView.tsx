@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -6,18 +6,26 @@ import { useToastStore } from '../store/toast';
 import { Code2, User, Clock, AlertCircle, Calendar, ImageIcon, Lock, Unlock, Trash2 } from 'lucide-react';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './ShareView.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 shareView loader 的返回)
+interface ShareViewSSRData {
+  share?: { share?: any; requires_password?: boolean } | null;
+}
 
 export default function ShareView() {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [share, setShare] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<ShareViewSSRData>('shareView');
+  const firstRunRef = useRef<boolean>(true);
+  const [share, setShare] = useState<any>(ssr?.share?.share ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [error, setError] = useState('');
   const [copyDone, setCopyDone] = useState(false);
-  const [requiresPassword, setRequiresPassword] = useState(false);
+  const [requiresPassword, setRequiresPassword] = useState(!!ssr?.share?.requires_password);
   const [password, setPassword] = useState('');
   const [unlocking, setUnlocking] = useState(false);
   const [wrongPassword, setWrongPassword] = useState(false);
@@ -57,6 +65,12 @@ export default function ShareView() {
   };
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     loadShare();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);

@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Trash2, ChevronLeft, ChevronRight, ExternalLink,
@@ -11,11 +12,13 @@ import '../Admin.css';
 export default function AdminLists() {
   useDocumentTitle(t('admin.listManagement'));
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<{ lists?: { lists?: any[]; pagination?: any } }>('adminLists');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [adminLists, setAdminLists] = useState<any[]>([]);
-  const [listPagination, setListPagination] = useState<any>(null);
+  const [adminLists, setAdminLists] = useState<any[]>(ssr?.lists?.lists ?? []);
+  const [listPagination, setListPagination] = useState<any>(ssr?.lists?.pagination ?? null);
   const [listPage, setListPage] = useState(1);
 
   const fetchAdminLists = useCallback(async () => {
@@ -27,9 +30,15 @@ export default function AdminLists() {
   }, [listPage]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.lists && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdminLists();
-  }, [fetchAdminLists, refreshKey]);
+  }, [fetchAdminLists, refreshKey, ssr]);
 
   const handleDeleteList = async (id: number) => {
     if (!window.confirm(t('admin.deleteConfirm'))) return;

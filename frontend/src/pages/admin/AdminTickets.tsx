@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   ChevronLeft, ChevronRight, ExternalLink,
@@ -11,11 +12,13 @@ import '../Admin.css';
 export default function AdminTickets() {
   useDocumentTitle(t('admin.ticketManagement'));
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<{ tickets?: { tickets?: any[]; pagination?: any } }>('adminTickets');
+  const firstRunRef = useRef(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => setRefreshKey(k => k + 1);
 
-  const [adminTickets, setAdminTickets] = useState<any[]>([]);
-  const [ticketPagination, setTicketPagination] = useState<any>(null);
+  const [adminTickets, setAdminTickets] = useState<any[]>(ssr?.tickets?.tickets ?? []);
+  const [ticketPagination, setTicketPagination] = useState<any>(ssr?.tickets?.pagination ?? null);
   const [ticketPage, setTicketPage] = useState(1);
   const [ticketStatusFilter, setTicketStatusFilter] = useState('');
 
@@ -28,9 +31,15 @@ export default function AdminTickets() {
   }, [ticketPage, ticketStatusFilter]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.tickets && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdminTickets();
-  }, [fetchAdminTickets, refreshKey]);
+  }, [fetchAdminTickets, refreshKey, ssr]);
 
   const handleTicketStatusChange = async (id: number, status: string) => {
     try {

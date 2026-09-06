@@ -11,16 +11,24 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { renderMarkdown } from '../utils/markdown';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Blogs.css';
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 blogDetail loader 的返回)
+interface BlogDetailSSRData {
+  blog?: { blog: any } | null;
+}
 
 export default function BlogDetail() {
   const { id } = useParams<{ id: string }>();
   const blogId = parseInt(id || '0');
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
-  const [blog, setBlog] = useState<any>(null);
+  const ssr = useSSRPage<BlogDetailSSRData>('blogDetail');
+  const firstRunRef = useRef<boolean>(true);
+  const [blog, setBlog] = useState<any>(ssr?.blog?.blog ?? null);
   const [comments, setComments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr);
   const [liked, setLiked] = useState(false);
   const [commentInput, setCommentInput] = useState('');
   const [postingComment, setPostingComment] = useState(false);
@@ -57,11 +65,14 @@ export default function BlogDetail() {
   }, [blogId]);
 
   useEffect(() => {
+    // SSR 已注入 blog 数据则跳过 fetchBlog 首次拉取(comments 仍需客户端拉取)
+    const skipBlogFetch = ssr && firstRunRef.current;
+    firstRunRef.current = false;
     /* eslint-disable react-hooks/set-state-in-effect */
-    fetchBlog();
+    if (!skipBlogFetch) fetchBlog();
     fetchComments();
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [fetchBlog, fetchComments]);
+  }, [fetchBlog, fetchComments, ssr]);
 
   const handleLike = async () => {
     try {

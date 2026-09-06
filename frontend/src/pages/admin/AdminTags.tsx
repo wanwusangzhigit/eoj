@@ -1,14 +1,17 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Plus, Edit3, Trash2, X, Tag as TagIcon, FolderOpen, Save } from 'lucide-react';
 import { t } from '../../i18n';
+import { useSSRPage } from '../../ssr/useSSRPage';
 
 export default function AdminTags() {
   const addToast = useToastStore((s) => s.addToast);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<{ categories?: { categories?: any[] } }>('adminTags');
+  const firstRunRef = useRef(true);
+  const [categories, setCategories] = useState<any[]>(ssr?.categories?.categories ?? []);
+  const [loading, setLoading] = useState(!ssr?.categories);
 
   // 分类表单
   const [catFormOpen, setCatFormOpen] = useState(false);
@@ -43,8 +46,14 @@ export default function AdminTags() {
   }, [addToast]);
 
   useEffect(() => {
+    // SSR 已注入分类数据则跳过首次拉取
+    if (ssr?.categories && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     refresh();
-  }, [refresh]);
+  }, [refresh, ssr]);
 
   // ── 分类操作 ──
   const openCatCreate = () => {

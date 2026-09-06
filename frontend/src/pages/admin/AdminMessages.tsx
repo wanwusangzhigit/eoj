@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { Search, Trash2, ChevronLeft, ChevronRight, X, MessageSquare, Eye, Send } from 'lucide-react';
 import '../Admin.css';
@@ -10,12 +11,14 @@ export default function AdminMessages() {
   useDocumentTitle(t('admin.messageManagement'));
   const addToast = useToastStore((s) => s.addToast);
 
-  const [conversations, setConversations] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
+  const ssr = useSSRPage<{ conversations?: { conversations?: any[]; pagination?: any } }>('adminMessages');
+  const firstRunRef = useRef(true);
+  const [conversations, setConversations] = useState<any[]>(ssr?.conversations?.conversations ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.conversations?.pagination ?? null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!ssr?.conversations);
 
   // Detail view state
   const [selectedConv, setSelectedConv] = useState<any>(null);
@@ -73,9 +76,15 @@ export default function AdminMessages() {
   }, [page, debouncedSearch, addToast]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (ssr?.conversations && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchConversations();
-  }, [fetchConversations]);
+  }, [fetchConversations, ssr]);
 
   const fetchMessages = async (convId: number, targetPage = 1) => {
     setLoadingMessages(true);

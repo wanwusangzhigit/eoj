@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,6 +6,7 @@ import EmptyState from '../components/EmptyState';
 import { Ticket, Filter, PlusCircle, Clock, AlertCircle } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Tickets.css';
 
 const STATUS_OPTIONS = ['all', 'open', 'in_progress', 'resolved', 'closed'] as const;
@@ -25,9 +26,16 @@ const CATEGORY_BADGE_CLASS: Record<string, string> = {
   other: 'badge badge-category-other',
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 tickets loader 的返回)
+interface TicketsSSRData {
+  tickets?: any[];
+}
+
 export default function Tickets() {
-  const [tickets, setTickets] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TicketsSSRData>('tickets');
+  const firstRunRef = useRef<boolean>(true);
+  const [tickets, setTickets] = useState<any[]>(ssr?.tickets ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -51,9 +59,15 @@ export default function Tickets() {
   }, [statusFilter, categoryFilter]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTickets();
-  }, [fetchTickets]);
+  }, [fetchTickets, ssr]);
 
   const getStatusLabel = (status: string) => {
     if (status === 'open') return t('tickets.open');

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import {
   Send, Plus, ChevronLeft, ChevronRight,
@@ -9,6 +10,9 @@ import '../Admin.css';
 
 export default function AdminSql() {
   useDocumentTitle(t('admin.sqlEditor'));
+  const ssr = useSSRPage<{ tables?: { tables?: string[] } }>('adminSql');
+  const ssrTables = ssr?.tables?.tables ?? [];
+  const firstRunRef = useRef(true);
   const [sqlMode, setSqlMode] = useState<'command' | 'visual'>('visual');
   const [sqlQuery, setSqlQuery] = useState('SELECT * FROM users LIMIT 10');
   const [sqlResult, setSqlResult] = useState<any>(null);
@@ -19,8 +23,8 @@ export default function AdminSql() {
   const [pendingDeleteAction, setPendingDeleteAction] = useState<(() => void) | null>(null);
 
   // Visual editor state
-  const [sqlTables, setSqlTables] = useState<string[]>([]);
-  const [selectedTable, setSelectedTable] = useState('');
+  const [sqlTables, setSqlTables] = useState<string[]>(ssrTables);
+  const [selectedTable, setSelectedTable] = useState(ssrTables[0] ?? '');
   const [tableSchema, setTableSchema] = useState<any[]>([]);
   const [tableData, setTableData] = useState<any[]>([]);
   const [tablePagination, setTablePagination] = useState<any>(null);
@@ -55,10 +59,16 @@ export default function AdminSql() {
 
   useEffect(() => {
     if (sqlMode === 'visual') {
+      // SSR 已注入表清单则跳过首次拉取
+      if (ssrTables.length > 0 && firstRunRef.current) {
+        firstRunRef.current = false;
+        return;
+      }
+      firstRunRef.current = false;
       // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchSqlTables();
     }
-  }, [sqlMode, fetchSqlTables]);
+  }, [sqlMode, fetchSqlTables, ssrTables]);
 
   useEffect(() => {
     if (selectedTable) {

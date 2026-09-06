@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { api } from '../api/client';
+import { getSSRGlobal } from '../ssr/hydrate';
 
 const CACHE_KEY = 'oj_site_settings';
 const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
@@ -10,6 +11,7 @@ interface CachedSettings {
 }
 
 function loadFromCache(): Record<string, string> | null {
+  if (typeof localStorage === 'undefined') return null;
   try {
     const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
@@ -25,6 +27,7 @@ function loadFromCache(): Record<string, string> | null {
 }
 
 function saveToCache(data: Record<string, string>) {
+  if (typeof localStorage === 'undefined') return;
   try {
     const cached: CachedSettings = { data, timestamp: Date.now() };
     localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
@@ -52,13 +55,18 @@ interface SettingsState {
   };
 }
 
+// SSR 时直接从注入的全局数据初始化,免去一次客户端 fetch
+const ssrSettings = getSSRGlobal()?.settings;
+const cachedSettings = ssrSettings ?? loadFromCache();
+const initialSettings = cachedSettings ?? {};
+
 export const useSettingsStore = create<SettingsState>((set, get) => ({
-  settings: {},
-  loaded: false,
+  settings: initialSettings,
+  loaded: !!cachedSettings,
 
   fetchSettings: async (force = false) => {
     // Try localStorage cache first (unless forced)
-    if (!force) {
+    if (!force && Object.keys(get().settings).length === 0) {
       const cached = loadFromCache();
       if (cached) {
         set({ settings: cached, loaded: true });

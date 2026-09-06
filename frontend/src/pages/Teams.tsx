@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import LoadingSpinner from '../components/LoadingSpinner';
@@ -6,11 +6,20 @@ import { Users, Search, Plus } from 'lucide-react';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Teams.css';
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 teams loader 的返回:直接是 /teams 接口结果)
+interface TeamsSSRData {
+  teams: any[];
+  pagination: any;
+}
+
 export default function Teams() {
-  const [teams, setTeams] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<TeamsSSRData>('teams');
+  const firstRunRef = useRef<boolean>(true);
+  const [teams, setTeams] = useState<any[]>(ssr?.teams ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const { user } = useAuthStore();
@@ -29,9 +38,15 @@ export default function Teams() {
   }, [search]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchTeams();
-  }, [fetchTeams]);
+  }, [fetchTeams, ssr]);
 
   return (
     <div className="teams-page">

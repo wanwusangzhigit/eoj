@@ -38,6 +38,7 @@ import friendLinks from './routes/friendLinks';
 import customPages from './routes/customPages';
 import { seedDatabase } from './seed';
 import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
+import { renderSSR, shouldSSR } from './ssr';
 
 const app = new Hono<AppType>();
 
@@ -335,6 +336,13 @@ app.get('/__seed', async (c) => {
 app.all('*', async (c) => {
   const request = c.req.raw;
   const assets = (c.env as any).ASSETS;
+
+  // SSR 优先:对浏览器导航(GET + Accept: text/html)尝试服务端渲染。
+  // SSR 失败时静默回退到下面的 SPA 壳子逻辑,保证页面始终可访问。
+  if (shouldSSR(c)) {
+    const ssrResponse = await renderSSR(c, app);
+    if (ssrResponse) return ssrResponse;
+  }
 
   if (assets && typeof assets.fetch === 'function') {
     const assetResponse = await assets.fetch(request);

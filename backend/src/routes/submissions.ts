@@ -36,7 +36,6 @@ function hideSubmissionResult(sub: any): void {
   sub.score = null;
   sub.time_used = null;
   sub.memory_used = null;
-  sub.judge_message = null;
 }
 
 submissions.post('/', authMiddleware, captchaMiddleware('submit'), rateLimitMiddleware, async (c) => {
@@ -485,7 +484,7 @@ submissions.post('/:id/rejudge', authMiddleware, adminMiddleware, async (c) => {
 
   // Reset submission status to pending
   await c.env.DB.prepare(
-    "UPDATE submissions SET status = 'pending', score = NULL, time_used = NULL, memory_used = NULL, judge_message = NULL WHERE id = ?"
+    "UPDATE submissions SET status = 'pending', score = NULL, time_used = NULL, memory_used = NULL WHERE id = ?"
   ).bind(id).run();
 
   // Re-push source code to GitHub to trigger judging

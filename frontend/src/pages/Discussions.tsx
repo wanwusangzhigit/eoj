@@ -9,10 +9,17 @@ import type { CaptchaHandle } from '../components/Captcha';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useToastStore } from '../store/toast';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Discussions.css';
 
 const CATEGORY_OPTIONS = ['all', 'question', 'share', 'general'] as const;
 const SORT_OPTIONS = ['newest', 'active'] as const;
+
+// SSR 注入数据(对应 backend/src/loaders.ts 中 discussions loader 的返回)
+interface DiscussionsSSRData {
+  discussions?: any[];
+  pagination?: any;
+}
 
 const CATEGORY_BADGE_CLASS: Record<string, string> = {
   question: 'discussion-category-badge question',
@@ -38,10 +45,12 @@ export default function Discussions() {
 
   const problemId = searchParams.get('problem_id');
   const problemTitle = searchParams.get('problem_title');
+  const ssr = useSSRPage<DiscussionsSSRData>('discussions');
+  const firstRunRef = useRef<boolean>(true);
 
-  const [discussions, setDiscussions] = useState<any[]>([]);
-  const [pagination, setPagination] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [discussions, setDiscussions] = useState<any[]>(ssr?.discussions ?? []);
+  const [pagination, setPagination] = useState<any>(ssr?.pagination ?? null);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('newest');
@@ -84,9 +93,15 @@ export default function Discussions() {
   }, [page, sortBy, categoryFilter, problemId]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDiscussions();
-  }, [fetchDiscussions]);
+  }, [fetchDiscussions, ssr]);
 
   const handleCreateDiscussion = async () => {
     if (!formTitle.trim() || !formContent.trim() || submitting) return;

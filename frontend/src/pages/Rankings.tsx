@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { Trophy, Medal, Award, Crown, Target, TrendingUp, AlertCircle, Star, Search } from 'lucide-react';
@@ -7,13 +7,21 @@ import RatingBadge from '../components/RatingBadge';
 import { getRatingColor } from '../utils/rating';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Rankings.css';
 
 type Mode = 'solved' | 'rating';
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 rankings loader 的返回)
+interface RankingsSSRData {
+  rankings?: any[];
+}
+
 export default function Rankings() {
-  const [rankings, setRankings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const ssr = useSSRPage<RankingsSSRData>('rankings');
+  const firstRunRef = useRef<boolean>(true);
+  const [rankings, setRankings] = useState<any[]>(ssr?.rankings ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState(false);
   const [timeRange, setTimeRange] = useState<'all' | 'week' | 'month'>('all');
   const [mode, setMode] = useState<Mode>('solved');
@@ -49,9 +57,15 @@ export default function Rankings() {
   }, [mode, timeRange, page]);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchRankings();
-  }, [fetchRankings]);
+  }, [fetchRankings, ssr]);
 
   // Reset to the first page when switching mode or time range.
   useEffect(() => {

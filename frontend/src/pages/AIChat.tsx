@@ -6,6 +6,7 @@ import { useThemeStore } from '../store/theme';
 import { renderMarkdown } from '../utils/markdown';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSSRPage } from '../ssr/useSSRPage';
 import { Send, Trash2, Copy, Check, Bot, User, AlertCircle, Wrench, ChevronDown, ChevronUp } from 'lucide-react';
 import './AIChat.css';
 
@@ -34,15 +35,22 @@ export default function AIChat() {
   const { user } = useAuthStore();
   const { addToast } = useToastStore();
   const { theme } = useThemeStore();
+  // SSR 注入的 AI 状态(backend loader: /api/v1/ai/status)
+  const ssr = useSSRPage<{ status?: AiStatus }>('ai');
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<AiStatus | null>(null);
-  const [statusLoading, setStatusLoading] = useState(true);
+  const [status, setStatus] = useState<AiStatus | null>(ssr?.status ?? null);
+  const [statusLoading, setStatusLoading] = useState(!ssr?.status);
   const [statusError, setStatusError] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [selectedModel, setSelectedModel] = useState<string>(() => {
+    const m = (ssr?.status as AiStatus | undefined)?.allowed_models?.[0]?.model
+      || (ssr?.status as AiStatus | undefined)?.model
+      || '';
+    return m;
+  });
   const [expandedTools, setExpandedTools] = useState<Set<number>>(new Set());
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -50,8 +58,9 @@ export default function AIChat() {
 
   useDocumentTitle(t('ai.title'));
 
-  // Check AI availability on mount
+  // Check AI availability on mount(SSR 命中时跳过首次拉取)
   useEffect(() => {
+    if (ssr?.status) return;
     let cancelled = false;
     const checkStatus = async () => {
       setStatusLoading(true);
@@ -81,7 +90,7 @@ export default function AIChat() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [ssr?.status]);
 
   // Auto-scroll to bottom on new messages / loading state
   const scrollToBottom = useCallback(() => {

@@ -8,6 +8,7 @@ import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import ImageUploadButton from '../components/ImageUploadButton';
 import EmojiPicker from '../components/EmojiPicker';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './DiscussionDetail.css';
 
 const CATEGORY_BADGE_CLASS: Record<string, string> = {
@@ -26,15 +27,22 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString();
 };
 
+// SSR 注入数据(对应 backend/src/loaders.ts 中 discussionDetail loader 的返回)
+interface DiscussionDetailSSRData {
+  discussion?: { discussion: any; replies: any[] } | null;
+}
+
 export default function DiscussionDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
+  const ssr = useSSRPage<DiscussionDetailSSRData>('discussionDetail');
+  const firstRunRef = useRef<boolean>(true);
 
-  const [discussion, setDiscussion] = useState<any>(null);
-  const [replies, setReplies] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [discussion, setDiscussion] = useState<any>(ssr?.discussion?.discussion ?? null);
+  const [replies, setReplies] = useState<any[]>(ssr?.discussion?.replies ?? []);
+  const [loading, setLoading] = useState(!ssr);
   const [replyContent, setReplyContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   // 回复目标: { id, username }
@@ -64,9 +72,15 @@ export default function DiscussionDetail() {
 
   useEffect(() => {
     if (!id) return;
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDiscussion();
-  }, [id, fetchDiscussion]);
+  }, [id, fetchDiscussion, ssr]);
 
   const handleReply = async () => {
     if (!id || !replyContent.trim() || submitting) return;

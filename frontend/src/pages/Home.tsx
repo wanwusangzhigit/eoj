@@ -15,6 +15,7 @@ import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useNow } from '../hooks/useNow';
 import { parseContestTimeToMs } from '../utils/contestTime';
 import AdSlot from '../components/AdSlot';
+import { useSSRPage } from '../ssr/useSSRPage';
 import './Home.css';
 
 interface Hitokoto {
@@ -25,22 +26,37 @@ interface Hitokoto {
   from_who: string;
 }
 
+// SSR 注入的数据形态(对应 backend/src/loaders.ts 中 home loader 的返回)
+interface HomeSSRData {
+  problems?: { problems?: ProblemListItem[] };
+  contests?: { contests?: Contest[] };
+  lists?: { lists?: ProblemList[] };
+  discussions?: { discussions?: Discussion[] };
+  rankings?: { rankings?: RatingChange[] };
+  dailyProblem?: { problem?: { id: number; title: string; slug: string; difficulty: string; tags: string } };
+  recommendations?: { recommendations?: RecommendedProblem[] };
+  route?: { routes?: { id: number; title: string; slug: string; tags: string; difficulty: string; reason: string }[] };
+}
+
 export default function Home() {
   const { user } = useAuthStore();
   const config = useSiteConfig();
   const rawAnnouncement = useSettingsStore((s) => s.settings.announcement || '');
   const [dismissedAnnouncement, setDismissedAnnouncement] = useState(false);
   const announcement = dismissedAnnouncement ? '' : rawAnnouncement;
+  const ssr = useSSRPage<HomeSSRData>('home');
+
   const [hitokoto, setHitokoto] = useState<Hitokoto | null>(null);
   const [hitokotoError, setHitokotoError] = useState(false);
-  const [recentProblems, setRecentProblems] = useState<ProblemListItem[]>([]);
-  const [recentContests, setRecentContests] = useState<Contest[]>([]);
-  const [recentLists, setRecentLists] = useState<ProblemList[]>([]);
-  const [recentDiscussions, setRecentDiscussions] = useState<Discussion[]>([]);
-  const [recommendations, setRecommendations] = useState<RecommendedProblem[]>([]);
-  const [topUsers, setTopUsers] = useState<RatingChange[]>([]);
-  const [dailyProblem, setDailyProblem] = useState<{ id: number; title: string; slug: string; difficulty: string; tags: string } | null>(null);
-  const [routes, setRoutes] = useState<{ id: number; title: string; slug: string; tags: string; difficulty: string; reason: string }[]>([]);
+  // SSR 命中时用注入数据初始化,否则空数组(后续由 effect 拉取)
+  const [recentProblems, setRecentProblems] = useState<ProblemListItem[]>(ssr?.problems?.problems ?? []);
+  const [recentContests, setRecentContests] = useState<Contest[]>(ssr?.contests?.contests ?? []);
+  const [recentLists, setRecentLists] = useState<ProblemList[]>(ssr?.lists?.lists ?? []);
+  const [recentDiscussions, setRecentDiscussions] = useState<Discussion[]>(ssr?.discussions?.discussions ?? []);
+  const [recommendations, setRecommendations] = useState<RecommendedProblem[]>(ssr?.recommendations?.recommendations ?? []);
+  const [topUsers, setTopUsers] = useState<RatingChange[]>(ssr?.rankings?.rankings ?? []);
+  const [dailyProblem, setDailyProblem] = useState<{ id: number; title: string; slug: string; difficulty: string; tags: string } | null>(ssr?.dailyProblem?.problem ?? null);
+  const [routes, setRoutes] = useState<{ id: number; title: string; slug: string; tags: string; difficulty: string; reason: string }[]>(ssr?.route?.routes ?? []);
   const [currentDate] = useState(() => {
     const d = new Date();
     const weekdays = [t('home.sunday'), t('home.monday'), t('home.tuesday'), t('home.wednesday'), t('home.thursday'), t('home.friday'), t('home.saturday')];
@@ -130,6 +146,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // SSR 已注入数据则跳过首次拉取(避免重复请求与首屏闪烁)
+    if (ssr) return;
     /* eslint-disable react-hooks/set-state-in-effect */
     fetchAll();
     fetchHitokoto();
@@ -138,7 +156,7 @@ export default function Home() {
     fetchTopUsers();
     fetchDailyProblem();
     /* eslint-enable react-hooks/set-state-in-effect */
-  }, [user, fetchAll, fetchHitokoto, fetchRecommendations, fetchRoute, fetchTopUsers, fetchDailyProblem]);
+  }, [user, ssr, fetchAll, fetchHitokoto, fetchRecommendations, fetchRoute, fetchTopUsers, fetchDailyProblem]);
 
   const getContestStatus = (contest: any) => {
     const start = parseContestTimeToMs(contest.start_time);

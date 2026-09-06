@@ -1,13 +1,15 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api/client';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { useToastStore } from '../../store/toast';
+import { useSSRPage } from '../../ssr/useSSRPage';
 import { t } from '../../i18n';
 import { Shield, Trash2, Plus, ChevronLeft, ChevronRight, Smartphone, Globe } from 'lucide-react';
 import '../Admin.css';
 
 export default function AdminBans() {
   useDocumentTitle(t('admin.banManagement'));
+  const ssr = useSSRPage<{ bannedIPs?: any; bannedDevices?: any }>('adminBans');
   const [tab, setTab] = useState<'ips' | 'devices'>('ips');
 
   return (
@@ -31,18 +33,21 @@ export default function AdminBans() {
         </button>
       </div>
 
-      {tab === 'ips' ? <BannedIPsList /> : <BannedDevicesList />}
+      {tab === 'ips'
+        ? <BannedIPsList initialData={ssr?.bannedIPs} />
+        : <BannedDevicesList initialData={ssr?.bannedDevices} />}
     </div>
   );
 }
 
-function BannedIPsList() {
+function BannedIPsList({ initialData }: { initialData?: any }) {
   const addToast = useToastStore((s) => s.addToast);
-  const [bans, setBans] = useState<any[]>([]);
+  const firstRunRef = useRef(true);
+  const [bans, setBans] = useState<any[]>(initialData?.bans ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(initialData?.pagination?.totalPages ?? 1);
+  const [total, setTotal] = useState(initialData?.pagination?.total ?? 0);
+  const [loading, setLoading] = useState(!initialData);
   const [newIP, setNewIP] = useState('');
   const [newReason, setNewReason] = useState('');
 
@@ -57,9 +62,15 @@ function BannedIPsList() {
   }, [page]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (initialData && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBans();
-  }, [fetchBans]);
+  }, [fetchBans, initialData]);
 
   const handleBan = async () => {
     if (!newIP.trim()) return;
@@ -163,13 +174,14 @@ function BannedIPsList() {
   );
 }
 
-function BannedDevicesList() {
+function BannedDevicesList({ initialData }: { initialData?: any }) {
   const addToast = useToastStore((s) => s.addToast);
-  const [bans, setBans] = useState<any[]>([]);
+  const firstRunRef = useRef(true);
+  const [bans, setBans] = useState<any[]>(initialData?.bans ?? []);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [totalPages, setTotalPages] = useState(initialData?.pagination?.totalPages ?? 1);
+  const [total, setTotal] = useState(initialData?.pagination?.total ?? 0);
+  const [loading, setLoading] = useState(!initialData);
   const [newFP, setNewFP] = useState('');
   const [newReason, setNewReason] = useState('');
 
@@ -184,9 +196,15 @@ function BannedDevicesList() {
   }, [page]);
 
   useEffect(() => {
+    // SSR 已注入则跳过首次拉取
+    if (initialData && firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    firstRunRef.current = false;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchBans();
-  }, [fetchBans]);
+  }, [fetchBans, initialData]);
 
   const handleBan = async () => {
     if (!newFP.trim()) return;
