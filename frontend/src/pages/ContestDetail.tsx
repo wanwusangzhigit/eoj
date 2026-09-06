@@ -729,10 +729,6 @@ export default function ContestDetail() {
             </div>
           </div>
 
-          {contest.description && (
-            <p className="contest-description">{contest.description}</p>
-          )}
-
           <div className="contest-meta">
             <span className="meta-item">
               <Calendar size={14} />
@@ -752,54 +748,6 @@ export default function ContestDetail() {
                 {isRunning ? t('contests.remaining') : ''} {countdown}
               </span>
             )}
-          </div>
-
-          {/* 比赛规则 + 参赛须知 */}
-          <div className="contest-info-panel">
-            <div className="contest-info-panel-section">
-              <h4 className="contest-info-panel-title">
-                <BookOpen size={14} /> {t('contests.contestRules')}
-              </h4>
-              <ul className="contest-info-panel-list">
-                <li>
-                  <span className="info-item-label">{t('contests.scoringRule')}:</span>
-                  {contest.scoring_type === 'oi'
-                    ? t('contests.ruleOi')
-                    : contest.scoring_type === 'ioi'
-                      ? t('contests.ruleIoi')
-                      : t('contests.ruleIcpc')}
-                </li>
-                <li>
-                  <span className="info-item-label">{t('contests.ratedContest')}:</span>
-                  {contest.is_rated ? t('contests.yes') : t('contests.no')}
-                </li>
-                {contest.duration_minutes > 0 && (
-                  <li>
-                    <span className="info-item-label">{t('contests.durationMinutes')}:</span>
-                    {contest.duration_minutes} {t('contests.minutes')}
-                  </li>
-                )}
-                <li>
-                  <span className="info-item-label">{t('contests.freezeMinutes')}:</span>
-                  {contest.freeze_minutes > 0 ? `${contest.freeze_minutes} ${t('contests.minutes')}` : t('contests.noFreeze')}
-                </li>
-                <li>
-                  <span className="info-item-label">{t('contests.allowVirtual')}:</span>
-                  {contest.allow_virtual ? t('contests.yes') : t('contests.virtualDisabled')}
-                </li>
-              </ul>
-            </div>
-            <div className="contest-info-panel-section">
-              <h4 className="contest-info-panel-title">
-                <AlertCircle size={14} /> {t('contests.noticeTitle')}
-              </h4>
-              <ul className="contest-info-panel-list">
-                <li>{t('contests.noticeRegister')}</li>
-                <li>{t('contests.noticeTimeWindow')}</li>
-                <li>{t('contests.noticeClarify')}</li>
-                <li>{t('contests.noticeRanking')}</li>
-              </ul>
-            </div>
           </div>
 
           {user && (

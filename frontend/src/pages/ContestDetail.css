@@ -181,13 +181,6 @@
   margin: 0;
 }
 
-.contest-description {
-  font-size: 15px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin-bottom: 16px;
-}
-
 .contest-meta {
   display: flex;
   flex-wrap: wrap;
