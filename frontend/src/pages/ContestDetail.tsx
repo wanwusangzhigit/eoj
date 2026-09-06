@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
@@ -6,6 +6,7 @@ import { useToastStore } from '../store/toast';
 import RatingBadge from '../components/RatingBadge';
 import { SkeletonTable } from '../components/Skeleton';
 import { getRatingColor } from '../utils/rating';
+import { renderMarkdown } from '../utils/markdown';
 import { parseContestTimeToMs, formatContestTime } from '../utils/contestTime';
 import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown, Bell, Plus, Send, X, Download, Copy, Award, Image, Trash2, FileText, UserCheck } from 'lucide-react';
 import { t } from '../i18n';
@@ -81,6 +82,10 @@ export default function ContestDetail() {
   const [loading, setLoading] = useState(!ssr);
   const [loadError, setLoadError] = useState('');
   const [activeTab, setActiveTab] = useState<'overview' | 'problems' | 'rankings' | 'review' | 'announcements' | 'clarifications'>('overview');
+  const overviewHtml = useMemo(
+    () => (contest?.description ? renderMarkdown(contest.description) : ''),
+    [contest?.description],
+  );
   const [registering, setRegistering] = useState(false);
   const [virtualStarting, setVirtualStarting] = useState(false);
   const [ratingChanges, setRatingChanges] = useState<any[]>([]);
@@ -916,7 +921,10 @@ export default function ContestDetail() {
               </h3>
 
               {contest.description ? (
-                <p className="contest-overview-desc">{contest.description}</p>
+                <div
+                  className="contest-overview-desc contest-overview-markdown"
+                  dangerouslySetInnerHTML={{ __html: overviewHtml }}
+                />
               ) : (
                 <p className="contest-overview-desc muted">{t('contests.noDescription')}</p>
               )}
