@@ -19,6 +19,10 @@
 
 基于 **Cloudflare Workers + GitHub Actions** 的现代在线判题系统（Online Judge），覆盖题目管理、用户认证、提交评测、竞赛、讨论、题单、后台管理与可选广告位配置。
 
+## 说明
+
+本项目同一份代码同时支持 **服务端渲染（SSR，默认开启）** 与 **客户端渲染（CSR，可配置）** 两种模式，统一在 `main` 分支维护，功能完全等价。SSR 适配层本身是「SSR 可选」的双模式内核——`useSSRPage()` 在无 SSR 数据时返回 `null`，页面自动退化成 CSR；`renderSSR()` 失败也会静默回退到 SPA 壳子，任意环节挂掉都不会白屏。切换部署模式只需调整 `backend/wrangler.toml` 的 `[assets]` 配置（`run_worker_first` 与 `not_found_handling` 两行），无需改动业务代码。
+
 ## ✨ 功能特性
 
 | 功能模块 | 说明 |
