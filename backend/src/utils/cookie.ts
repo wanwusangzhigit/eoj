@@ -30,14 +30,20 @@ export function getCookie(c: Context<AppType>, name: string): string | null {
 export function getAuthTokenFromRequest(c: Context<AppType>): string | null;
 export function getAuthTokenFromRequest(req: { header: (name: string) => string | undefined | null }): string | null;
 export function getAuthTokenFromRequest(input: any): string | null {
-  // 优先 cookie
+  // 优先 cookie。兼容三种输入:Hono Context(req.header)、Hono Request(header())、
+  // 标准 Web Request(headers.get)——SSR loader 持有的是标准 Request。
   const cookieHeader: string =
-    (input?.req?.header?.('Cookie') as string) ?? (input?.header?.('Cookie') as string) ?? '';
+    (input?.req?.header?.('Cookie') as string) ??
+    (input?.header?.('Cookie') as string) ??
+    (input?.headers?.get?.('Cookie') as string) ??
+    '';
   const cookieToken = readCookieFromHeader(cookieHeader, 'token');
   if (cookieToken) return cookieToken;
   // 回退 Authorization 头
   const authHeader: string | undefined =
-    (input?.req?.header?.('Authorization') as string) ?? (input?.header?.('Authorization') as string);
+    (input?.req?.header?.('Authorization') as string) ??
+    (input?.header?.('Authorization') as string) ??
+    input?.headers?.get?.('Authorization') as string | undefined;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7);
   }

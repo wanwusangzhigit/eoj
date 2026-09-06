@@ -67,9 +67,12 @@ export async function render(
         <App ssrLocation={location} />
       </StrictMode>,
       {
-        onError(err: unknown) {
+        onError(err: unknown, info?: { componentStack?: string }) {
           status = 500;
           console.error('[SSR] render error:', err);
+          if (info?.componentStack) {
+            console.error('[SSR] componentStack:', String(info.componentStack).slice(0, 600));
+          }
         },
       },
     );
