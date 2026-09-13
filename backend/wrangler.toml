@@ -1,15 +1,12 @@
 name = "oj-backend"
 main = "src/index.ts"
-compatibility_date = "2024-01-01"
+compatibility_date = "2024-09-25"
 compatibility_flags = ["nodejs_compat"]
-# 本地开发:用 wrangler dev 启动,真实密钥由 .env(已 gitignore)注入。
-# 远端部署:在 Cloudflare Dashboard 或 wrangler secret put 配置真值,这里保持非空占位以避免本地 dev 启动校验失败。
 account_id = "local"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "oj-database"
-# 占位符:本地 wrangler dev 会用它定位 sqlite 文件;远端部署需替换为真实 database_id。
 database_id = "local-dev-db"
 
 [assets]
@@ -28,7 +25,6 @@ GITHUB_TOKEN = "local"
 CPOAUTH_CLIENT_ID = "local"
 CPOAUTH_CLIENT_SECRET = "local"
 CALLBACK_SECRET = "local"
-# 本地开发默认占位;真实值由 .env 覆盖(优先级:.env > wrangler.toml [vars])。
 JWT_SECRET = "local-dev-secret"
 JUDGE_REPO = "your-username/oj-judge"
 FRONTEND_URL = "https://your-frontend-url"
