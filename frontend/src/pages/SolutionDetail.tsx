@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { ThumbsUp, Eye, Clock, ChevronRight, ArrowLeft, Trash2, Edit3, Code, CheckCircle } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { useToastStore } from '../store/toast';
 import { t } from '../i18n';
 import ImageUploadButton from '../components/ImageUploadButton';
@@ -309,9 +310,9 @@ export default function SolutionDetail() {
             )}
 
             <div className="solution-content">
-              <div
+              <SafeHTML
                 className="markdown-content"
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(solution.content || '') }}
+                html={renderMarkdown(solution.content || '')}
               />
             </div>
           </>

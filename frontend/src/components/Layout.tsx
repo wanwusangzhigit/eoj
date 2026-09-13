@@ -11,7 +11,7 @@ import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useContestNotifications } from '../hooks/useContestNotifications';
 import { api } from '../api/client';
 import { getSSRGlobal } from '../ssr/hydrate';
-import DOMPurify from 'dompurify';
+import SafeHTML from './SafeHTML';
 import { t } from '../i18n';
 import './Layout.css';
 
@@ -138,7 +138,7 @@ export default function Layout({ children }: { children: ReactNode }) {
               </span>
             )}
             {config.footer.text && (
-              <span className="footer-custom-text" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(config.footer.text) }} />
+              <SafeHTML as="span" className="footer-custom-text" html={config.footer.text} sanitize />
             )}
             {!config.footer.text && (
               <span>

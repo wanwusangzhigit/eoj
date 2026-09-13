@@ -20,6 +20,7 @@ import { LANGUAGES, LANGUAGE_TEMPLATES } from '../constants';
 import { getSiteConfig } from '../hooks/useSiteConfig';
 import RatingBadge from '../components/RatingBadge';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSSRPage } from '../ssr/useSSRPage';
@@ -964,19 +965,19 @@ export default function ProblemDetail() {
 
         <div className="problem-description">
           <h3>{t('problemDetail.description')}</h3>
-          <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(problem.description) }} />
+          <SafeHTML className="markdown-content" html={renderMarkdown(problem.description)} />
 
           {problem.input_format && (
             <>
               <h3>{t('problemDetail.inputFormat')}</h3>
-              <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(problem.input_format) }} />
+              <SafeHTML className="markdown-content" html={renderMarkdown(problem.input_format)} />
             </>
           )}
 
           {problem.output_format && (
             <>
               <h3>{t('problemDetail.outputFormat')}</h3>
-              <div className="markdown-content" dangerouslySetInnerHTML={{ __html: renderMarkdown(problem.output_format) }} />
+              <SafeHTML className="markdown-content" html={renderMarkdown(problem.output_format)} />
             </>
           )}
 

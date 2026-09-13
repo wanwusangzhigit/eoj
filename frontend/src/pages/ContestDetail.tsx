@@ -7,6 +7,7 @@ import RatingBadge from '../components/RatingBadge';
 import { SkeletonTable } from '../components/Skeleton';
 import { getRatingColor } from '../utils/rating';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { parseContestTimeToMs, formatContestTime } from '../utils/contestTime';
 import { Trophy, Calendar, Users, ChevronRight, UserPlus, CheckCircle, Clock, Eye, MessageSquare, BookOpen, Timer, Edit3, XCircle, AlertCircle, Play, Sparkles, TrendingUp, TrendingDown, Bell, Plus, Send, X, Download, Copy, Award, Image, Trash2, FileText, UserCheck } from 'lucide-react';
 import { t } from '../i18n';
@@ -869,9 +870,9 @@ export default function ContestDetail() {
               </h3>
 
               {contest.description ? (
-                <div
+                <SafeHTML
                   className="contest-overview-desc contest-overview-markdown"
-                  dangerouslySetInnerHTML={{ __html: overviewHtml }}
+                  html={overviewHtml}
                 />
               ) : (
                 <p className="contest-overview-desc muted">{t('contests.noDescription')}</p>

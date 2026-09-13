@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { DIFFICULTY_COLORS } from '../constants';
 import { t } from '../i18n';
-import DOMPurify from 'dompurify';
+import SafeHTML from '../components/SafeHTML';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { useNow } from '../hooks/useNow';
@@ -216,7 +216,7 @@ export default function Home() {
       {announcement && !dismissedAnnouncement && (
         <div className="home-announcement">
           <Megaphone size={16} className="announcement-icon" />
-          <div className="announcement-content" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(announcement) }} />
+          <SafeHTML className="announcement-content" html={announcement} sanitize />
           <button className="announcement-close" onClick={() => setDismissedAnnouncement(true)}>
             <X size={14} />
           </button>

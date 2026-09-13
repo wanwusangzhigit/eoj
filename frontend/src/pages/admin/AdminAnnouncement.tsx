@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import DOMPurify from 'dompurify';
+import SafeHTML from '../../components/SafeHTML';
 import { api } from '../../api/client';
 import { useToastStore } from '../../store/toast';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
@@ -90,9 +90,10 @@ export default function AdminAnnouncement() {
       {announcementContent && (
         <div className="form-group">
           <label>{t('admin.announcementPreview')}</label>
-          <div
+          <SafeHTML
             className="announcement-preview"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(announcementContent) }}
+            html={announcementContent}
+            sanitize
           />
         </div>
       )}

@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { useThemeStore } from '../store/theme';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSSRPage } from '../ssr/useSSRPage';
@@ -470,12 +471,10 @@ export default function AIChat() {
                 <div className="ai-message-content">
                   {msg.role === 'assistant' ? (
                     msg.content ? (
-                      <div
+                      <SafeHTML
                         className={`markdown-content ai-markdown markdown-theme-${theme}${loading && idx === messages.length - 1 ? ' ai-streaming' : ''}`}
                         data-code-theme={theme}
-                        dangerouslySetInnerHTML={{
-                          __html: renderMarkdown(msg.content),
-                        }}
+                        html={renderMarkdown(msg.content)}
                       />
                     ) : loading && idx === messages.length - 1 ? (
                       <div className="ai-thinking">

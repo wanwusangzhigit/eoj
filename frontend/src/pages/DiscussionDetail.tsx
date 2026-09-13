@@ -4,6 +4,7 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { MessageSquare, Eye, Clock, ChevronRight, Trash2, Edit3, Send, Pin, CornerUpLeft, CornerUpRight, ThumbsUp, X } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 import ImageUploadButton from '../components/ImageUploadButton';
@@ -234,9 +235,9 @@ export default function DiscussionDetail() {
 
         {!isEditing ? (
           <>
-            <div
+            <SafeHTML
               className="discussion-content"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(discussion.content) }}
+              html={renderMarkdown(discussion.content)}
             />
 
             {(isOwner || isAdmin) && (
@@ -345,9 +346,9 @@ export default function DiscussionDetail() {
                       <span>{t('blogs.replyingTo').replace('{0}', `@${reply.parent_username || ''}`)}</span>
                     </div>
                   )}
-                  <div
+                  <SafeHTML
                     className="reply-content"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(reply.content) }}
+                    html={renderMarkdown(reply.content)}
                   />
                   <div className="comment-actions">
                     {user && (

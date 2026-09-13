@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Megaphone, Pin, Calendar, ChevronLeft, ChevronRight, Search } from 'lucide-react';
 import { renderMarkdown } from '../utils/markdown';
+import SafeHTML from '../components/SafeHTML';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
 import { useSSRPage } from '../ssr/useSSRPage';
@@ -91,7 +92,7 @@ export default function Announcements() {
                 <span className="announcement-date"><Calendar size={12} /> {new Date(a.created_at).toLocaleString()}</span>
               </div>
               {expandedId === a.id && (
-                <div className="announcement-card-body" dangerouslySetInnerHTML={{ __html: renderMarkdown(a.content || '') }} />
+                <SafeHTML className="announcement-card-body" html={renderMarkdown(a.content || '')} />
               )}
             </div>
           ))}
