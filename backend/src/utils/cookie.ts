@@ -75,19 +75,26 @@ export function readCookie(cookieHeader: string, name: string): string | null {
 
 /**
  * 设置认证 Cookie。HttpOnly + Secure + SameSite=Lax + Path=/
- * 让 SSR 与同源 fetch 都能读到。生产用 Secure,本地 http 调试时通过
- * `wrangler dev --local` 的 localhost 不强制 Secure。
+ * 让 SSR 与同源 fetch 都能读到。
+ *
+ * 审计 #H-4: 旧实现基于 `x-forwarded-proto` 决定是否下发 `Secure`,
+ * 该 header 在某些代理拓扑下可被客户端伪造,导致 MITM 攻击者可让
+ * Workers 不下发 `Secure`,后续在 HTTP 上窃取 cookie。
+ *
+ * 新策略:无条件下发 `Secure`。理由:
+ * 1. Cloudflare Workers 生产部署始终在 TLS 上对外服务;
+ * 2. RFC 6265bis (Chrome/Firefox/Safari 已实现) 规定 `Secure` cookie
+ *    仍会被发送到 `localhost`,因此本地 `wrangler dev` 不受影响;
+ * 3. 即使部署在自定义反代后,若反代到 Worker 不是 TLS,那本身就是
+ *    红线配置,不应通过 cookie 标志来"自适应"。
  */
 export function setAuthCookie(c: Context<AppType>, token: string): void {
-  const isHttps = new URL(c.req.url).protocol === 'https:'
-    || c.req.header('x-forwarded-proto') === 'https';
-  const secure = isHttps ? '; Secure' : '';
   // 注意:SameSite=Lax 让 OAuth 跨域回跳后落地 cookie 到目标域时仍可用,
   // 同时阻止跨站 POST 自动携带 cookie(抵御大部分 CSRF)。
   // 实际 CSRF 由 API 仅接受 application/json + 校验自定义头来兜底。
   c.header(
     'Set-Cookie',
-    `token=${encodeURIComponent(token)}; Path=/; Max-Age=604800; SameSite=Lax${secure}; HttpOnly`,
+    `token=${encodeURIComponent(token)}; Path=/; Max-Age=604800; SameSite=Lax; Secure; HttpOnly`,
     { append: true },
   );
 }
@@ -96,12 +103,9 @@ export function setAuthCookie(c: Context<AppType>, token: string): void {
  * 清除认证 Cookie。用于 logout 与 401 自动登出场景。
  */
 export function clearAuthCookie(c: Context<AppType>): void {
-  const isHttps = new URL(c.req.url).protocol === 'https:'
-    || c.req.header('x-forwarded-proto') === 'https';
-  const secure = isHttps ? '; Secure' : '';
   c.header(
     'Set-Cookie',
-    `token=; Path=/; Max-Age=0; SameSite=Lax${secure}; HttpOnly`,
+    `token=; Path=/; Max-Age=0; SameSite=Lax; Secure; HttpOnly`,
     { append: true },
   );
 }

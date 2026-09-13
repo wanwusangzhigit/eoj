@@ -5,10 +5,21 @@ on:
     paths:
       - 'submissions/*'
 
+# 审计 #H-16: 之前未声明 permissions,默认继承仓库默认权限(通常 contents: write),
+# 对于一个跑用户提交代码 + 调外部网络的工作流来说权限过大。
+# 这里把整个工作流的默认权限收窄到只读;后续每个 job 仍可单独放开需要的权限。
+permissions:
+  contents: read
+
 jobs:
   judge:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # 工作流跑用户提交的源代码(nsjsil 沙箱内)+ 调外部下载脚本(nodesource 等),
+    # 严格遵循最小权限原则:仅需读取本仓库触发文件的权限。
+    # 不需要:pull-requests / packages / deployments / statuses / actions / checks。
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:

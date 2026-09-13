@@ -1309,6 +1309,19 @@ teams.get('/:id/contests/:contestId/problems/:problemId', authMiddleware, async 
     return c.json({ success: false, error: { message: 'You are not a member of this team', code: 'FORBIDDEN' } }, 403);
   }
 
+  // 审计 #C-8: 团队比赛单题详情此前只校验团队成员身份,但团队成员未必
+  // 报名了 *这一场* 比赛。攻击者加入团队后即可获取进行中比赛的题目与
+  // (关键!)SPJ 答案源码。这里增加"必须报名该比赛"校验,与全局比赛
+  // submissions.ts:128-134 的访问控制对齐。
+  if (status === 'running' && !isManager) {
+    const registered = await c.env.DB.prepare(
+      'SELECT 1 FROM team_contest_participants WHERE team_contest_id = ? AND user_id = ?'
+    ).bind(contestId, currentUser.userId).first();
+    if (!registered) {
+      return c.json({ success: false, error: { message: 'You are not registered for this contest', code: 'FORBIDDEN' } }, 403);
+    }
+  }
+
   const problem: any = await c.env.DB.prepare(
     `SELECT tcp.id as contest_problem_id, tcp.sort_order, tcp.score, p.*
      FROM team_contest_problems tcp
@@ -1328,7 +1341,20 @@ teams.get('/:id/contests/:contestId/problems/:problemId', authMiddleware, async 
   } catch { /* ignore */ }
 
   const responseData: any = { problem, sampleTestcases };
-  if (problem.judge_type === 'spj' && problem.spj_language) {
+  // 审计 #C-8: SPJ 源码是题目的标准答案,绝对不能让任意参赛者读取,
+  // 否则可在比赛中硬编码 verdict。这里仅对以下身份返回 spj_code:
+  //   1. 团队管理员(isManager:owner / 全站 admin / super_admin)
+  //   2. 题目作者(团队私有题的 added_by 或全局题的创建者)
+  // 普通参赛者即便报名了比赛,也只能拿到题面与样例数据。
+  const addedBy: number | null = await (async () => {
+    const tpRow: any = await c.env.DB.prepare(
+      'SELECT added_by FROM team_problems WHERE team_id = ? AND problem_id = ?'
+    ).bind(id, problemId).first();
+    return tpRow?.added_by ?? null;
+  })();
+  const isProblemAuthor = addedBy !== null && addedBy === currentUser.userId;
+  const canSeeSpj = isManager || isProblemAuthor || isAdmin(currentUser);
+  if (canSeeSpj && problem.judge_type === 'spj' && problem.spj_language) {
     responseData.spj_code = await fetchSpjCode(c.env, problem.slug, problem.spj_language);
   }
 
@@ -1899,7 +1925,13 @@ teams.get('/:id/problems/:problemId', authMiddleware, async (c) => {
   if (!currentUser) {
     return c.json({ success: false, error: { message: 'Unauthorized', code: 'UNAUTHORIZED' } }, 401);
   }
-  if (!await isTeamMember(c.env.DB, id, currentUser.userId)) {
+
+  const team: any = await c.env.DB.prepare('SELECT owner_id FROM teams WHERE id = ?').bind(id).first();
+  if (!team) {
+    return c.json({ success: false, error: { message: 'Team not found', code: 'NOT_FOUND' } }, 404);
+  }
+  const isManager = isTeamOwnerOrAdmin(team, currentUser.userId, currentUser);
+  if (!isManager && !await isTeamMember(c.env.DB, id, currentUser.userId)) {
     return c.json({ success: false, error: { message: 'You are not a member of this team', code: 'FORBIDDEN' } }, 403);
   }
 
@@ -1922,7 +1954,13 @@ teams.get('/:id/problems/:problemId', authMiddleware, async (c) => {
     problem,
     sampleTestcases,
   };
-  if (problem.judge_type === 'spj' && problem.spj_language) {
+  // 审计 #C-8: SPJ 源码是题目的标准答案。团队任意成员此前都能读取,
+  // 攻击者只需加入团队即可获得 SPJ 源码。修复后仅题目作者与具备
+  // 题目管理权限(canManageProblems)/团队管理员/全站 admin 可见。
+  const isProblemAuthor = problem.added_by === currentUser.userId;
+  const canManageProb = await canManageProblems(c.env.DB, id, currentUser.userId);
+  const canSeeSpj = isProblemAuthor || canManageProb || isManager || isAdmin(currentUser);
+  if (canSeeSpj && problem.judge_type === 'spj' && problem.spj_language) {
     responseData.spj_code = await fetchSpjCode(c.env, problem.slug, problem.spj_language);
   }
 

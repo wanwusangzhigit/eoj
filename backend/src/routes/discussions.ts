@@ -307,16 +307,21 @@ discussions.post('/:id/replies/:replyId/like', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Reply not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const existing = await c.env.DB.prepare(
-    'SELECT id FROM discussion_reply_likes WHERE reply_id = ? AND user_id = ?'
-  ).bind(replyId, user.userId).first();
-
-  if (existing) {
-    await c.env.DB.prepare('DELETE FROM discussion_reply_likes WHERE reply_id = ? AND user_id = ?').bind(replyId, user.userId).run();
+  // 审计 #H-10: 原子切换单条点赞记录,避免并发下计数漂移。
+  const deleteResult = await c.env.DB.prepare(
+    'DELETE FROM discussion_reply_likes WHERE reply_id = ? AND user_id = ?'
+  ).bind(replyId, user.userId).run();
+  const deleted = (deleteResult as any)?.meta?.changes ?? 0;
+  if (deleted > 0) {
     return c.json({ success: true, data: { liked: false, message: 'Unliked' } });
   }
 
-  await c.env.DB.prepare('INSERT INTO discussion_reply_likes (reply_id, user_id) VALUES (?, ?)').bind(replyId, user.userId).run();
+  const insertResult = await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO discussion_reply_likes (reply_id, user_id) VALUES (?, ?)'
+  ).bind(replyId, user.userId).run();
+  if (((insertResult as any)?.meta?.changes ?? 0) === 0) {
+    return c.json({ success: true, data: { liked: true, message: 'Liked' } });
+  }
 
   if ((reply as any).user_id !== user.userId) {
     await sendNotification(

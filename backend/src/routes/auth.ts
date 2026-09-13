@@ -411,6 +411,19 @@ auth.get('/github/callback', async (c) => {
     .first();
 
   if (!user) {
+    // 审计 #H-1: GitHub OAuth 之前直接用 GitHub login 作为用户名插入,无任何查重,
+    // 叠加 users.username 之前缺少 UNIQUE 约束,攻击者只需在 GitHub 注册一个
+    // login 与受害者相同的账号,即可获得一个同名 EOJ 账号,利用任何按 username
+    // 查询的逻辑(消息、@提及、个人主页)实施影子冒充。这里与 CP OAuth 对齐:
+    // 用户名冲突时拒绝自动创建,要求先登录原账号再显式绑定 GitHub。
+    const existing: any = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?')
+      .bind(githubUser.login)
+      .first();
+    if (existing) {
+      console.error('GitHub OAuth login refused: username already exists with different github_id', { existingId: existing.id });
+      return c.redirect(`${returnOrigin}/auth/callback?error=username_conflict`);
+    }
+
     const result = await c.env.DB.prepare(
       'INSERT INTO users (github_id, username, avatar_url, role) VALUES (?, ?, ?, ?)'
     )

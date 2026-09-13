@@ -113,8 +113,15 @@ uploads.post('/image', authMiddleware, async (c) => {
 
   const body = await c.req.parseBody();
   const file = body['file'];
-  // 是否公开(默认公开):false/0 表示私有,仅本人或 upload_admin 可下载
-  const isPublic = body['is_public'] === undefined ? 1 : (body['is_public'] === 'false' || body['is_public'] === '0' ? 0 : 1);
+  // 是否公开(默认私有)。审计 #H-13:之前默认 1,用户上传截图忘记勾"私有"
+  // 即全网可见,且文件最终通过 GitHub 公开 CDN 提供。改为默认私有:用户必须
+  // 显式声明 is_public=true/1/'true'/'1' 才会上传为公开资源。
+  const rawIsPublic: unknown = body['is_public'];
+  const isPublic = (() => {
+    if (rawIsPublic === true || rawIsPublic === 1) return 1;
+    if (typeof rawIsPublic === 'string' && (rawIsPublic === 'true' || rawIsPublic === '1')) return 1;
+    return 0;
+  })();
 
   if (!file || !(file instanceof File)) {
     return c.json({ success: false, error: { message: 'No file provided', code: 'BAD_REQUEST' } }, 400);
@@ -208,8 +215,15 @@ uploads.post('/file', authMiddleware, async (c) => {
 
   const body = await c.req.parseBody();
   const file = body['file'];
-  // 是否公开(默认公开,保持与已上传文件一致);false/0 表示私有,仅本人或 upload_admin 可下载
-  const isPublic = body['is_public'] === undefined ? 1 : (body['is_public'] === 'false' || body['is_public'] === '0' ? 0 : 1);
+  // 是否公开(默认私有)。审计 #H-13:之前默认 1,用户上传文件忘记勾"私有"
+  // 即全网可见,且文件最终通过 GitHub 公开 CDN 提供。改为默认私有:用户必须
+  // 显式声明 is_public=true/1/'true'/'1' 才会上传为公开资源。
+  const rawIsPublic: unknown = body['is_public'];
+  const isPublic = (() => {
+    if (rawIsPublic === true || rawIsPublic === 1) return 1;
+    if (typeof rawIsPublic === 'string' && (rawIsPublic === 'true' || rawIsPublic === '1')) return 1;
+    return 0;
+  })();
 
   if (!file || !(file instanceof File)) {
     return c.json({ success: false, error: { message: 'No file provided', code: 'BAD_REQUEST' } }, 400);

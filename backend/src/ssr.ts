@@ -110,6 +110,29 @@ export async function renderSSR(c: Context<AppType>, app: any): Promise<Response
         'Content-Type': 'text/html; charset=utf-8',
         // SSR 内容含个性化数据(用户名/未读消息等),禁止共享缓存
         'Cache-Control': 'private, no-store',
+        // 审计 #3.1/#I-3: 之前 SSR HTML 输出无 CSP 头,前端虽然通过 <meta> 注入了
+        // 生产 CSP,但 <meta> 不如响应头可靠(被某些中间盒剥离、被 SVG 子资源绕过等)。
+        // 这里在源头下发与 frontend/vite.config.ts 同源策略的 CSP:
+        //   - default-src 'self'
+        //   - script-src 'self' + 广告/分析域名
+        //   - style-src 'self' 'unsafe-inline'(打包产物内联 style 属性需要)
+        //   - img-src 'self' data: https:(头像/图床)
+        //   - font-src 'self' data:
+        //   - connect-src 'self' + 一言外部接口
+        //   - frame-ancestors 'self'(等效于已有的 X-Frame-Options: SAMEORIGIN)
+        //   - base-uri 'self'(防止 <base> 注入)
+        'Content-Security-Policy': [
+          "default-src 'self'",
+          "script-src 'self' https://pagead2.googlesyndication.com https://static.cloudflareinsights.com",
+          "style-src 'self' 'unsafe-inline'",
+          "img-src 'self' data: https:",
+          "font-src 'self' data:",
+          "connect-src 'self' https://v1.hitokoto.cn",
+          "frame-ancestors 'self'",
+          "base-uri 'self'",
+          "form-action 'self'",
+          "object-src 'none'",
+        ].join('; '),
       },
     });
   } catch (e: unknown) {

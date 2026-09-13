@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { recordAuditLog } from '../middleware/audit';
-import { escapeLikeWildcard } from '../utils/helpers';
+import { escapeLikeWildcard, hashPii } from '../utils/helpers';
 
 const audit = new Hono<AppType>();
 
@@ -38,10 +38,14 @@ audit.get('/logs', authMiddleware, adminMiddleware, async (c) => {
   }
 
   if (ipFilter) {
+    // 审计 #H-14: ip 列现在存哈希值。这里把查询参数同样哈希后再做精确比对,
+    // 让管理员仍能"输入原始 IP → 找到对应审计行"。注意 LIKE 模糊匹配在哈希
+    // 上不可用(哈希没有原始 IP 的子串结构),所以仅支持精确匹配。
+    const ipHash = await hashPii(ipFilter, { prefixLen: 2 });
     countQuery += ' AND ip = ?';
     dataQuery += ' AND ip = ?';
-    binds.push(ipFilter);
-    countBinds.push(ipFilter);
+    binds.push(ipHash);
+    countBinds.push(ipHash);
   }
 
   dataQuery += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
@@ -79,8 +83,10 @@ audit.get('/logs/export', authMiddleware, adminMiddleware, async (c) => {
     binds.push(`%${escapeLikeWildcard(action)}%`);
   }
   if (ipFilter) {
+    // 审计 #H-14: ip 已存哈希,精确匹配前同样哈希查询参数。
+    const ipHash = await hashPii(ipFilter, { prefixLen: 2 });
     query += ' AND ip = ?';
-    binds.push(ipFilter);
+    binds.push(ipHash);
   }
 
   query += ' ORDER BY created_at DESC LIMIT 5000';
@@ -135,12 +141,15 @@ audit.post('/banned-ips', authMiddleware, adminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'IP address is required', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-14: 入库哈希化。维护与 audit_logs.ip 相同的 prefix 长度(2)。
+  const ipHash = await hashPii(ip.trim(), { prefixLen: 2 });
+
   try {
     await c.env.DB.prepare(
       'INSERT INTO banned_ips (ip, reason, banned_by) VALUES (?, ?, ?)'
-    ).bind(ip.trim(), reason || '', user.userId).run();
+    ).bind(ipHash, reason || '', user.userId).run();
 
-    await recordAuditLog(c, `ban_ip: ${ip}`, user.userId, user.username);
+    await recordAuditLog(c, `ban_ip: ${ip.substring(0, 20)}`, user.userId, user.username);
     return c.json({ success: true, data: { message: 'IP banned' } }, 201);
   } catch (e: any) {
     if (e.message?.includes('UNIQUE constraint')) {
@@ -199,10 +208,13 @@ audit.post('/banned-devices', authMiddleware, adminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Device fingerprint is required', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-14: 入库哈希化。
+  const fpHash = await hashPii(device_fingerprint.trim(), { prefixLen: 0 });
+
   try {
     await c.env.DB.prepare(
       'INSERT INTO banned_devices (device_fingerprint, reason, banned_by) VALUES (?, ?, ?)'
-    ).bind(device_fingerprint.trim(), reason || '', user.userId).run();
+    ).bind(fpHash, reason || '', user.userId).run();
 
     await recordAuditLog(c, `ban_device: ${device_fingerprint.substring(0, 20)}`, user.userId, user.username);
     return c.json({ success: true, data: { message: 'Device banned' } }, 201);

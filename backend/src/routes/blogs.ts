@@ -181,19 +181,29 @@ blogs.post('/:id/like', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Blog not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const existing = await c.env.DB.prepare(
-    'SELECT 1 FROM blog_likes WHERE blog_id = ? AND user_id = ?'
-  ).bind(id, user.userId).first();
-
-  if (existing) {
-    await c.env.DB.prepare('DELETE FROM blog_likes WHERE blog_id = ? AND user_id = ?').bind(id, user.userId).run();
-    await c.env.DB.prepare('UPDATE blogs SET like_count = like_count - 1 WHERE id = ?').bind(id).run();
+  // 审计 #H-10: 旧实现先 SELECT、再 DELETE/INSERT、再 UPDATE like_count,
+  // 并发下计数会与 blog_likes 表实际行数漂移。改用单语句原子操作:
+  //   - 取消点赞:先 DELETE,再用 changes() 判断是否真的删了 → 仅当删了才 -1
+  //   - 点赞:INSERT OR IGNORE 防止重复插入,再用 changes() 判断是否新增 → 仅当新增才 +1
+  const deleteResult = await c.env.DB.prepare(
+    'DELETE FROM blog_likes WHERE blog_id = ? AND user_id = ?'
+  ).bind(id, user.userId).run();
+  const deleted = (deleteResult as any)?.meta?.changes ?? 0;
+  if (deleted > 0) {
+    await c.env.DB.prepare('UPDATE blogs SET like_count = like_count - 1 WHERE id = ? AND like_count > 0').bind(id).run();
     return c.json({ success: true, data: { liked: false, message: 'Unliked' } });
-  } else {
-    await c.env.DB.prepare('INSERT INTO blog_likes (blog_id, user_id) VALUES (?, ?)').bind(id, user.userId).run();
+  }
+
+  const insertResult = await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO blog_likes (blog_id, user_id) VALUES (?, ?)'
+  ).bind(id, user.userId).run();
+  const inserted = (insertResult as any)?.meta?.changes ?? 0;
+  if (inserted > 0) {
     await c.env.DB.prepare('UPDATE blogs SET like_count = like_count + 1 WHERE id = ?').bind(id).run();
     return c.json({ success: true, data: { liked: true, message: 'Liked' } });
   }
+  // 极端并发:刚刚还是未点赞状态,这一刻被另一个请求抢着点上了 → 视为已点赞
+  return c.json({ success: true, data: { liked: true, message: 'Liked' } });
 });
 
 // GET /blogs/:id/like-status — 当前用户是否已点赞
@@ -344,21 +354,28 @@ blogs.post('/comments/:commentId/like', authMiddleware, async (c) => {
   const user = c.get('user');
   const commentId = parseInt(c.req.param('commentId') || '0');
 
-  const comment = await c.env.DB.prepare('SELECT id, user_id FROM blog_comments WHERE id = ?').bind(commentId).first();
+  const comment = await c.env.DB.prepare('SELECT id, user_id, blog_id FROM blog_comments WHERE id = ?').bind(commentId).first();
   if (!comment) {
     return c.json({ success: false, error: { message: 'Comment not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const existing = await c.env.DB.prepare(
-    'SELECT id FROM blog_comment_likes WHERE comment_id = ? AND user_id = ?'
-  ).bind(commentId, user.userId).first();
-
-  if (existing) {
-    await c.env.DB.prepare('DELETE FROM blog_comment_likes WHERE comment_id = ? AND user_id = ?').bind(commentId, user.userId).run();
+  // 审计 #H-10: 原子切换单条点赞记录,避免并发下计数漂移。
+  const deleteResult = await c.env.DB.prepare(
+    'DELETE FROM blog_comment_likes WHERE comment_id = ? AND user_id = ?'
+  ).bind(commentId, user.userId).run();
+  const deleted = (deleteResult as any)?.meta?.changes ?? 0;
+  if (deleted > 0) {
     return c.json({ success: true, data: { liked: false, message: 'Unliked' } });
   }
 
-  await c.env.DB.prepare('INSERT INTO blog_comment_likes (comment_id, user_id) VALUES (?, ?)').bind(commentId, user.userId).run();
+  const insertResult = await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO blog_comment_likes (comment_id, user_id) VALUES (?, ?)'
+  ).bind(commentId, user.userId).run();
+  const inserted = (insertResult as any)?.meta?.changes ?? 0;
+  if (inserted === 0) {
+    // 并发:刚刚已被另一请求点赞
+    return c.json({ success: true, data: { liked: true, message: 'Liked' } });
+  }
 
   // 通知评论作者(非本人)
   if ((comment as any).user_id !== user.userId) {

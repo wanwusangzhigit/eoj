@@ -5,7 +5,7 @@ import { rateLimitMiddleware } from '../middleware/rateLimit';
 import { getLanguageExt } from '../utils/helpers';
 import { validateSourceCode, validateLanguage } from '../utils/validator';
 import { captchaMiddleware } from '../middleware/captcha';
-import { parseContestTimeToMs, effectiveContestStatus, isContestAdmin } from '../utils/contest-time';
+import { parseContestTimeToMs, effectiveContestStatus, isContestAdmin, isSiteAdmin } from '../utils/contest-time';
 import { fetchWithTimeout } from '../utils/fetch-timeout';
 
 const submissions = new Hono<AppType>();
@@ -36,6 +36,23 @@ function hideSubmissionResult(sub: any): void {
   sub.score = null;
   sub.time_used = null;
   sub.memory_used = null;
+}
+
+/**
+ * 判定用户能否"越权"查看他人提交(用于 /submissions 列表 / 详情 / 测试点 /
+ * 日志 / 对比接口)。
+ *
+ * 审计 #H-7: 此前 isContestAdmin(user) 被用作"可以读全站他人源代码"的开关,
+ * 意味着任何 contest_admin 权限持有者都能查看全站任意用户的私人提交。这严重
+ * 超出 contest_admin 应有的语义(运营 *自己* 的比赛)。
+ *
+ * 修复后的策略:
+ *   - isSiteAdmin (role=admin/super_admin/userId=1)        → 可读全站
+ *   - contest_admin: 仅对自己创建的比赛(contests.created_by = userId)内的提交可读
+ *   - 其他用户                                                → 只能读自己
+ */
+function canCrossUserViewSubmissions(user: any): boolean {
+  return isSiteAdmin(user);
 }
 
 submissions.post('/', authMiddleware, captchaMiddleware('submit'), rateLimitMiddleware, async (c) => {
@@ -231,7 +248,11 @@ submissions.get('/', authMiddleware, async (c) => {
   const language = c.req.query('language');
   const offset = (page - 1) * pageSize;
 
-  const isAdmin = isContestAdmin(user);
+  // 审计 #H-7: 不再让 contest_admin 直接读全站提交。
+  // - 全站 admin/super_admin(userId=1): 可读全站,可按 user_id 过滤
+  // - 其他用户(含 contest_admin): 只能读自己;contest_admin 的"看自己负责比赛内提交"
+  //   能力放在 GET /:id(具体提交)里按 contest_id 精细化判断,列表接口保持简单。
+  const isSiteWideAdmin = canCrossUserViewSubmissions(user);
 
   let query = 'SELECT s.id, s.user_id, s.problem_id, s.language, s.status, s.score, s.time_used, s.memory_used, s.created_at, s.contest_id, p.title as problem_title, p.slug as problem_slug, u.username FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id WHERE 1=1';
   let countQuery = 'SELECT COUNT(*) as total FROM submissions WHERE 1=1';
@@ -239,7 +260,7 @@ submissions.get('/', authMiddleware, async (c) => {
   const countBinds: any[] = [];
 
   // Non-admin users can only see their own submissions
-  if (!isAdmin) {
+  if (!isSiteWideAdmin) {
     query += ' AND s.user_id = ?';
     countQuery += ' AND user_id = ?';
     binds.push(user.userId);
@@ -308,17 +329,28 @@ submissions.get('/', authMiddleware, async (c) => {
 submissions.get('/:id', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = isContestAdmin(user);
+  const isSiteWideAdmin = canCrossUserViewSubmissions(user);
 
   let query = `SELECT s.*, p.title as problem_title, p.slug as problem_slug, u.username
      FROM submissions s JOIN problems p ON s.problem_id = p.id JOIN users u ON s.user_id = u.id
      WHERE s.id = ?`;
   const binds: any[] = [id];
 
-  // Non-admin users can only see their own submissions
-  if (!isAdmin) {
-    query += ' AND s.user_id = ?';
-    binds.push(user.userId);
+  // 审计 #H-7: 收窄 contest_admin 越权范围。
+  // - 全站 admin: 不加 user_id 过滤,可读全站
+  // - contest_admin: 只能读 *自己负责的比赛*(contests.created_by = userId) 内的提交
+  // - 普通用户: 只能读自己
+  if (!isSiteWideAdmin) {
+    if (isContestAdmin(user)) {
+      // contest_admin: 允许读"自己创建的比赛内的他人提交" 或 "自己的提交"
+      query += ` AND (s.user_id = ? OR s.contest_id IN (
+        SELECT id FROM contests WHERE created_by = ?
+      ))`;
+      binds.push(user.userId, user.userId);
+    } else {
+      query += ' AND s.user_id = ?';
+      binds.push(user.userId);
+    }
   }
 
   const submission = await c.env.DB.prepare(query).bind(...binds).first();
@@ -353,7 +385,8 @@ submissions.get('/:id', authMiddleware, async (c) => {
 submissions.get('/:id/history', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = isContestAdmin(user);
+  // 审计 #H-7: 用 isSiteAdmin 替代 isContestAdmin,避免 contest_admin 越权读他人提交历史
+  const isAdmin = canCrossUserViewSubmissions(user);
 
   const sub: any = await c.env.DB.prepare('SELECT id, user_id, problem_id FROM submissions WHERE id = ?')
     .bind(id).first();
@@ -376,7 +409,8 @@ submissions.get('/:id/history', authMiddleware, async (c) => {
 submissions.get('/:id/testcases', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = isContestAdmin(user);
+  // 审计 #H-7: 收窄到 isSiteAdmin,避免 contest_admin 越权读测试点详情
+  const isAdmin = canCrossUserViewSubmissions(user);
 
   // Verify the submission belongs to the user (or user is admin)
   const submission = await c.env.DB.prepare('SELECT id, user_id, contest_id FROM submissions WHERE id = ?')
@@ -388,7 +422,17 @@ submissions.get('/:id/testcases', authMiddleware, async (c) => {
   }
 
   if (!isAdmin && (submission as any).user_id !== user.userId) {
-    return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+    // contest_admin 额外放行:他自己创建的比赛内的提交
+    if (isContestAdmin(user) && (submission as any).contest_id) {
+      const contest: any = await c.env.DB.prepare(
+        'SELECT created_by FROM contests WHERE id = ?'
+      ).bind((submission as any).contest_id).first();
+      if (!contest || contest.created_by !== user.userId) {
+        return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+      }
+    } else {
+      return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+    }
   }
 
   // OI 赛制赛时:隐藏测试点详情
@@ -412,10 +456,11 @@ submissions.get('/:id/testcases', authMiddleware, async (c) => {
 submissions.get('/:id/logs', authMiddleware, async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
-  const isAdmin = isContestAdmin(user);
+  // 审计 #H-7: 用 isSiteAdmin 收窄,避免 contest_admin 越权读评测日志
+  const isAdmin = canCrossUserViewSubmissions(user);
 
   // Verify the submission belongs to the user (or user is admin)
-  const submission = await c.env.DB.prepare('SELECT id, user_id FROM submissions WHERE id = ?')
+  const submission = await c.env.DB.prepare('SELECT id, user_id, contest_id FROM submissions WHERE id = ?')
     .bind(id)
     .first();
 
@@ -424,7 +469,17 @@ submissions.get('/:id/logs', authMiddleware, async (c) => {
   }
 
   if (!isAdmin && (submission as any).user_id !== user.userId) {
-    return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+    // contest_admin 额外放行:他自己创建的比赛内的提交
+    if (isContestAdmin(user) && (submission as any).contest_id) {
+      const contest: any = await c.env.DB.prepare(
+        'SELECT created_by FROM contests WHERE id = ?'
+      ).bind((submission as any).contest_id).first();
+      if (!contest || contest.created_by !== user.userId) {
+        return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+      }
+    } else {
+      return c.json({ success: false, error: { message: 'Forbidden', code: 'FORBIDDEN' } }, 403);
+    }
   }
 
   const results = await c.env.DB.prepare(
@@ -441,7 +496,8 @@ submissions.get('/compare/:id1/:id2', authMiddleware, async (c) => {
   const user = c.get('user');
   const id1 = parseInt(c.req.param('id1') || '0');
   const id2 = parseInt(c.req.param('id2') || '0');
-  const isAdmin = isContestAdmin(user);
+  // 审计 #H-7: 用 isSiteAdmin 收窄,避免 contest_admin 越权读他人提交对比
+  const isAdmin = canCrossUserViewSubmissions(user);
 
   const [s1, s2] = await Promise.all([
     c.env.DB.prepare(

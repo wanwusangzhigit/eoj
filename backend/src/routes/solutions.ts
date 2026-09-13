@@ -374,41 +374,37 @@ solutions.post('/:id/vote', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Solution not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  const existingVote = await c.env.DB.prepare(
-    'SELECT id FROM solution_votes WHERE solution_id = ? AND user_id = ?'
-  ).bind(id, user.userId).first();
-
-  let is_voted: boolean;
-  let vote_count: number;
-
-  if (existingVote) {
-    // Remove vote
+  // 审计 #H-10: 旧实现先 SELECT 再 DELETE/INSERT 再 UPDATE 计数,且 API 返回
+  // 的 vote_count 取自更新前的内存值,与 DB 实际不一致。改用单语句原子操作 +
+  // 用 changes() 判定真实状态切换,再回查 DB 取权威的 vote_count 返回。
+  const deleteResult = await c.env.DB.prepare(
+    'DELETE FROM solution_votes WHERE solution_id = ? AND user_id = ?'
+  ).bind(id, user.userId).run();
+  const deleted = (deleteResult as any)?.meta?.changes ?? 0;
+  if (deleted > 0) {
     await c.env.DB.prepare(
-      'DELETE FROM solution_votes WHERE solution_id = ? AND user_id = ?'
-    ).bind(id, user.userId).run();
-    await c.env.DB.prepare(
-      'UPDATE solutions SET vote_count = vote_count - 1 WHERE id = ?'
+      'UPDATE solutions SET vote_count = vote_count - 1 WHERE id = ? AND vote_count > 0'
     ).bind(id).run();
-    is_voted = false;
-    vote_count = (solution as any).vote_count - 1;
-  } else {
-    // Add vote
-    await c.env.DB.prepare(
-      'INSERT INTO solution_votes (solution_id, user_id) VALUES (?, ?)'
-    ).bind(id, user.userId).run();
+    const fresh = await c.env.DB.prepare('SELECT vote_count FROM solutions WHERE id = ?').bind(id).first();
+    return c.json({
+      success: true,
+      data: { vote_count: (fresh as any)?.vote_count ?? 0, is_voted: false },
+    });
+  }
+
+  const insertResult = await c.env.DB.prepare(
+    'INSERT OR IGNORE INTO solution_votes (solution_id, user_id) VALUES (?, ?)'
+  ).bind(id, user.userId).run();
+  const inserted = (insertResult as any)?.meta?.changes ?? 0;
+  if (inserted > 0) {
     await c.env.DB.prepare(
       'UPDATE solutions SET vote_count = vote_count + 1 WHERE id = ?'
     ).bind(id).run();
-    is_voted = true;
-    vote_count = (solution as any).vote_count + 1;
   }
-
+  const fresh = await c.env.DB.prepare('SELECT vote_count FROM solutions WHERE id = ?').bind(id).first();
   return c.json({
     success: true,
-    data: {
-      vote_count,
-      is_voted,
-    },
+    data: { vote_count: (fresh as any)?.vote_count ?? 0, is_voted: true },
   });
 });
 
