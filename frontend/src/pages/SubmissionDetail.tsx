@@ -240,7 +240,7 @@ export default function SubmissionDetail() {
         {submission.username && (
           <div className="info-card">
             <label>{t('submissionDetail.user')}</label>
-            <Link to={`/users/${submission.username}`}>{submission.username}</Link>
+            <Link to={`/users/${submission.user_id}`}>{submission.username}</Link>
           </div>
         )}
         <div className="info-card">

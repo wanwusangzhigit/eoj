@@ -440,7 +440,7 @@ export default function Home() {
             </div>
             <div className="home-card-body">
               {topUsers.map((u: any, idx: number) => (
-                <Link key={u.user_id || idx} to={`/users/${u.username}`} className="home-item">
+                <Link key={u.user_id || idx} to={`/users/${u.user_id}`} className="home-item">
                   <span className="home-item-rank" style={{ fontWeight: 700, color: idx < 3 ? 'var(--gold)' : 'var(--text-muted)', width: 24 }}>
                     {idx + 1}
                   </span>

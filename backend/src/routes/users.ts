@@ -558,14 +558,55 @@ users.get('/annual-report', authMiddleware, async (c) => {
   });
 });
 
-users.get('/:username', async (c) => {
-  const username = c.req.param('username');
+// GET /users/export — 导出当前用户全部数据(隐私合规:用户可下载自己的数据)
+// 注意:此路由必须注册在 /:username 之前,否则 Hono 按注册顺序匹配时会
+// 把 "export" 误当作 username 参数,导致查询不到用户而返回 404。
+users.get('/export', authMiddleware, async (c) => {
+  const user = c.get('user');
+  const uid = user.userId;
+
+  const [profile, submissions, notes, blogs, solutions, discussions, favorites, collections, tickets, follows] = await Promise.all([
+    c.env.DB.prepare('SELECT id, username, email, avatar_url, bio, signature, role, created_at FROM users WHERE id = ?').bind(uid).first(),
+    c.env.DB.prepare('SELECT id, problem_id, language, source_code, status, score, time_used, memory_used, created_at FROM submissions WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT problem_id, content, is_public, created_at, updated_at FROM problem_notes WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT id, title, content, tags, status, created_at, updated_at FROM blogs WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT id, problem_id, title, content, language, review_status, created_at FROM solutions WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT id, problem_id, title, content, category, created_at FROM discussions WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT f.problem_id, f.created_at, p.title as problem_title FROM favorites f JOIN problems p ON f.problem_id = p.id WHERE f.user_id = ? ORDER BY f.id').bind(uid).all(),
+    c.env.DB.prepare('SELECT pc.id, pc.name, pc.description, pc.is_public, pc.created_at FROM problem_collections pc WHERE pc.user_id = ? ORDER BY pc.id').bind(uid).all(),
+    c.env.DB.prepare('SELECT id, title, content, category, priority, status, created_at FROM tickets WHERE user_id = ? ORDER BY id').bind(uid).all(),
+    c.env.DB.prepare('SELECT u.username as following_username, uf.created_at FROM user_follows uf JOIN users u ON uf.following_id = u.id WHERE uf.follower_id = ? ORDER BY uf.id').bind(uid).all(),
+  ]);
+
+  const data = {
+    exported_at: new Date().toISOString(),
+    profile: profile,
+    submissions: submissions.results,
+    notes: notes.results,
+    blogs: blogs.results,
+    solutions: solutions.results,
+    discussions: discussions.results,
+    favorites: favorites.results,
+    collections: collections.results,
+    tickets: tickets.results,
+    following: follows.results,
+  };
+
+  const json = JSON.stringify(data, null, 2);
+  c.header('Content-Type', 'application/json; charset=utf-8');
+  c.header('Content-Disposition', `attachment; filename="user-${uid}-data.json"`);
+  c.header('Cache-Control', 'no-store');
+  return c.body(json);
+});
+
+users.get('/:id', async (c) => {
+  const id = c.req.param('id');
   const currentUser = c.get('user');
 
   const user = await c.env.DB.prepare(`
     SELECT id, username, avatar_url, bio, created_at
-    FROM users WHERE username = ?
-  `).bind(username).first();
+    FROM users WHERE id = ?
+  `).bind(id).first();
 
   if (!user) {
     return c.json({
@@ -669,16 +710,18 @@ users.get('/:username', async (c) => {
   });
 });
 
-// POST /users/:username/follow — 关注
-users.post('/:username/follow', authMiddleware, async (c) => {
+// POST /users/:id/follow — 关注
+users.post('/:id/follow', authMiddleware, async (c) => {
   const currentUser = c.get('user');
-  const username = c.req.param('username');
+  const targetId = parseInt(c.req.param('id') || '0', 10);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return c.json({ success: false, error: { message: 'Invalid user id', code: 'BAD_REQUEST' } }, 400);
+  }
 
-  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  const target = await c.env.DB.prepare('SELECT id, username FROM users WHERE id = ?').bind(targetId).first();
   if (!target) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
-  const targetId = (target as any).id;
   if (targetId === currentUser.userId) {
     return c.json({ success: false, error: { message: 'Cannot follow yourself', code: 'BAD_REQUEST' } }, 400);
   }
@@ -696,7 +739,7 @@ users.post('/:username/follow', authMiddleware, async (c) => {
       NotificationType.FOLLOW,
       '你有新的粉丝',
       `${currentUser.username} 关注了你`,
-      `/users/${currentUser.username}`
+      `/users/${currentUser.userId}`
     );
 
     return c.json({ success: true, data: { following: true, message: 'Followed' } }, 201);
@@ -708,46 +751,52 @@ users.post('/:username/follow', authMiddleware, async (c) => {
   }
 });
 
-// DELETE /users/:username/follow — 取关
-users.delete('/:username/follow', authMiddleware, async (c) => {
+// DELETE /users/:id/follow — 取关
+users.delete('/:id/follow', authMiddleware, async (c) => {
   const currentUser = c.get('user');
-  const username = c.req.param('username');
+  const targetId = parseInt(c.req.param('id') || '0', 10);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return c.json({ success: false, error: { message: 'Invalid user id', code: 'BAD_REQUEST' } }, 400);
+  }
 
-  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(targetId).first();
   if (!target) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
 
   await c.env.DB.prepare(
     'DELETE FROM user_follows WHERE follower_id = ? AND following_id = ?'
-  ).bind(currentUser.userId, (target as any).id).run();
+  ).bind(currentUser.userId, targetId).run();
 
   return c.json({ success: true, data: { following: false, message: 'Unfollowed' } });
 });
 
-// GET /users/:username/followers — 粉丝列表
-users.get('/:username/followers', async (c) => {
-  const username = c.req.param('username');
+// GET /users/:id/followers — 粉丝列表
+users.get('/:id/followers', async (c) => {
+  const targetId = parseInt(c.req.param('id') || '0', 10);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return c.json({ success: false, error: { message: 'Invalid user id', code: 'BAD_REQUEST' } }, 400);
+  }
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
   const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
   const offset = (page - 1) * pageSize;
 
-  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(targetId).first();
   if (!target) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
 
   const countResult = await c.env.DB.prepare(
     'SELECT COUNT(*) as total FROM user_follows WHERE following_id = ?'
-  ).bind((target as any).id).first();
+  ).bind(targetId).first();
   const total = (countResult as any)?.total || 0;
 
   const results = await c.env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
+    `SELECT u.id as user_id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
      FROM user_follows uf JOIN users u ON uf.follower_id = u.id
      WHERE uf.following_id = ?
      ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`
-  ).bind((target as any).id, pageSize, offset).all();
+  ).bind(targetId, pageSize, offset).all();
 
   return c.json({
     success: true,
@@ -758,29 +807,32 @@ users.get('/:username/followers', async (c) => {
   });
 });
 
-// GET /users/:username/following — 关注列表
-users.get('/:username/following', async (c) => {
-  const username = c.req.param('username');
+// GET /users/:id/following — 关注列表
+users.get('/:id/following', async (c) => {
+  const targetId = parseInt(c.req.param('id') || '0', 10);
+  if (!Number.isInteger(targetId) || targetId <= 0) {
+    return c.json({ success: false, error: { message: 'Invalid user id', code: 'BAD_REQUEST' } }, 400);
+  }
   const page = Math.max(1, parseInt(c.req.query('page') || '1'));
   const pageSize = Math.min(100, Math.max(1, parseInt(c.req.query('pageSize') || '20')));
   const offset = (page - 1) * pageSize;
 
-  const target = await c.env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first();
+  const target = await c.env.DB.prepare('SELECT id FROM users WHERE id = ?').bind(targetId).first();
   if (!target) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
 
   const countResult = await c.env.DB.prepare(
     'SELECT COUNT(*) as total FROM user_follows WHERE follower_id = ?'
-  ).bind((target as any).id).first();
+  ).bind(targetId).first();
   const total = (countResult as any)?.total || 0;
 
   const results = await c.env.DB.prepare(
-    `SELECT u.id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
+    `SELECT u.id as user_id, u.username, u.avatar_url, u.bio, uf.created_at as followed_at
      FROM user_follows uf JOIN users u ON uf.following_id = u.id
      WHERE uf.follower_id = ?
      ORDER BY uf.created_at DESC LIMIT ? OFFSET ?`
-  ).bind((target as any).id, pageSize, offset).all();
+  ).bind(targetId, pageSize, offset).all();
 
   return c.json({
     success: true,
@@ -857,45 +909,6 @@ users.put('/change-password', authMiddleware, async (c) => {
   const hash = bcrypt.hashSync(newPassword, 10);
   await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.userId).run();
   return c.json({ success: true, data: { message: 'Password changed successfully' } });
-});
-
-// GET /users/export — 导出当前用户全部数据(隐私合规:用户可下载自己的数据)
-users.get('/export', authMiddleware, async (c) => {
-  const user = c.get('user');
-  const uid = user.userId;
-
-  const [profile, submissions, notes, blogs, solutions, discussions, favorites, collections, tickets, follows] = await Promise.all([
-    c.env.DB.prepare('SELECT id, username, email, avatar_url, bio, signature, role, created_at FROM users WHERE id = ?').bind(uid).first(),
-    c.env.DB.prepare('SELECT id, problem_id, language, source_code, status, score, time_used, memory_used, created_at FROM submissions WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT problem_id, content, is_public, created_at, updated_at FROM problem_notes WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT id, title, content, tags, status, created_at, updated_at FROM blogs WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT id, problem_id, title, content, language, review_status, created_at FROM solutions WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT id, problem_id, title, content, category, created_at FROM discussions WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT f.problem_id, f.created_at, p.title as problem_title FROM favorites f JOIN problems p ON f.problem_id = p.id WHERE f.user_id = ? ORDER BY f.id').bind(uid).all(),
-    c.env.DB.prepare('SELECT pc.id, pc.name, pc.description, pc.is_public, pc.created_at FROM problem_collections pc WHERE pc.user_id = ? ORDER BY pc.id').bind(uid).all(),
-    c.env.DB.prepare('SELECT id, title, content, category, priority, status, created_at FROM tickets WHERE user_id = ? ORDER BY id').bind(uid).all(),
-    c.env.DB.prepare('SELECT u.username as following_username, uf.created_at FROM user_follows uf JOIN users u ON uf.following_id = u.id WHERE uf.follower_id = ? ORDER BY uf.id').bind(uid).all(),
-  ]);
-
-  const data = {
-    exported_at: new Date().toISOString(),
-    profile: profile,
-    submissions: submissions.results,
-    notes: notes.results,
-    blogs: blogs.results,
-    solutions: solutions.results,
-    discussions: discussions.results,
-    favorites: favorites.results,
-    collections: collections.results,
-    tickets: tickets.results,
-    following: follows.results,
-  };
-
-  const json = JSON.stringify(data, null, 2);
-  c.header('Content-Type', 'application/json; charset=utf-8');
-  c.header('Content-Disposition', `attachment; filename="user-${uid}-data.json"`);
-  c.header('Cache-Control', 'no-store');
-  return c.body(json);
 });
 
 export default users;

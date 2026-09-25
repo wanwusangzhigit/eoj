@@ -1185,7 +1185,7 @@ export default function ContestDetail() {
                       {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                     </span>
                     <span className="col-user">
-                      <Link to={`/users/${entry.username}`} className="user-link">
+                      <Link to={`/users/${entry.user_id}`} className="user-link">
                         {entry.username}
                         {!!entry.is_virtual && <span className="virtual-flag" title="Virtual">V</span>}
                       </Link>
@@ -1298,7 +1298,7 @@ export default function ContestDetail() {
                         {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : idx + 1}
                       </span>
                       <span className="col-user">
-                        <Link to={`/users/${entry.username}`} className="user-link">{entry.username}</Link>
+                        <Link to={`/users/${entry.user_id}`} className="user-link">{entry.username}</Link>
                       </span>
                       <span className="col-score">{rankingsMeta.result_hidden ? '-' : (entry.total_score ?? 0)}</span>
                       {rankingsMeta.scoring_type === 'icpc' && <span className="col-penalty">{rankingsMeta.result_hidden ? '-' : formatPenalty(entry.total_penalty ?? 0)}</span>}
@@ -1347,7 +1347,7 @@ export default function ContestDetail() {
                         <div key={ch.user_id ?? idx} className="rating-change-row">
                           <span className="rc-rank">{ch.rank ?? idx + 1}</span>
                           <span className="rc-user">
-                            <Link to={`/users/${ch.username}`} className="user-link">{ch.username}</Link>
+                            <Link to={`/users/${ch.user_id}`} className="user-link">{ch.username}</Link>
                           </span>
                           <span className="rc-old" style={{ color: oldColor }}>{ch.old_rating ?? 0}</span>
                           <span className="rc-arrow">→</span>

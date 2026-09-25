@@ -1713,7 +1713,7 @@ function MembersTab({ teamId, members, isOwner, isSiteAdmin, onRemove, onRefresh
           <h3><UserPlus size={16} /> {t('teams.joinRequestPending')} ({joinRequests.length})</h3>
           {joinRequests.map((req: any) => (
             <div key={req.id} className="card request-row">
-              <Link to={`/users/${req.username}`}>{req.username}</Link>
+              <Link to={`/users/${req.user_id}`}>{req.username}</Link>
               {req.message && <span className="req-msg">"{req.message}"</span>}
               <div className="req-actions">
                 <button className="btn btn-sm btn-success" onClick={() => handleApprove(req.id)}><Check size={12} /> {t('teams.approveRequest')}</button>
@@ -1734,7 +1734,7 @@ function MembersTab({ teamId, members, isOwner, isSiteAdmin, onRemove, onRefresh
             ) : (
               <div className="member-avatar placeholder">{m.username.charAt(0).toUpperCase()}</div>
             )}
-            <Link to={`/users/${m.username}`} className="member-name">{m.username}</Link>
+            <Link to={`/users/${m.user_id}`} className="member-name">{m.username}</Link>
             <span className={`member-role ${m.role}`}>
               {m.role === 'owner' ? t('teams.owner') : m.role === 'admin' ? t('teams.admin') : t('teams.member')}
             </span>
@@ -1843,7 +1843,7 @@ function RankingsTab({ teamId }: { teamId: number }) {
             {r.avatar_url ? <img src={r.avatar_url} alt={r.username} className="member-avatar" /> : (
               <div className="member-avatar placeholder">{r.username.charAt(0).toUpperCase()}</div>
             )}
-            <Link to={`/users/${r.username}`} className="member-name">{r.username}</Link>
+            <Link to={`/users/${r.user_id}`} className="member-name">{r.username}</Link>
             <span className="member-stats">{t('teams.solvedCount')}: {r.solved_count || 0}</span>
           </div>
         ))

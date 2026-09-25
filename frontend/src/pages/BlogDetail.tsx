@@ -159,7 +159,7 @@ export default function BlogDetail() {
             ) : (
               <div className="blog-avatar sm placeholder">{blog.username?.charAt(0).toUpperCase()}</div>
             )}
-            <Link to={`/users/${blog.username}`} className="article-author">{blog.username}</Link>
+            <Link to={`/users/${blog.user_id}`} className="article-author">{blog.username}</Link>
             <span className="meta-sep">·</span>
             <span>{new Date(blog.created_at).toLocaleString()}</span>
             {blog.status === 'draft' && <span className="draft-badge">{t('blogs.draft')}</span>}
@@ -247,7 +247,7 @@ export default function BlogDetail() {
                 )}
                 <div className="comment-body">
                   <div className="comment-header">
-                    <Link to={`/users/${c.username}`} className="comment-author">{c.username}</Link>
+                    <Link to={`/users/${c.user_id}`} className="comment-author">{c.username}</Link>
                     {c.user_title && <span className="user-title-badge">{c.user_title}</span>}
                     <span className="comment-time">{new Date(c.created_at).toLocaleString()}</span>
                   </div>

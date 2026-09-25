@@ -25,57 +25,8 @@
 
 ## ✨ 功能特性
 
-| 功能模块 | 说明 |
-|---------|------|
-| 题目管理 | CRUD、测试用例管理、SPJ、难度标签、通过率统计 |
-| 提交评测 | 代码提交、GitHub Actions 异步判题（nsjail 沙箱）、SPJ 支持、判题详情 |
-| 竞赛系统 | ACM/IOI 计分、虚拟参赛、Rating 计算、排行榜(15s轮询)、封榜 |
-| 用户系统 | GitHub/CpOAuth/密码登录、个人资料编辑、用户关注、封禁系统 |
-| 题单 | 题目集合 CRUD、排序、分享 |
-| 题解 | 发布、投票(赞/踩)、审核工作流 |
-| 讨论区 | 题目关联讨论、全局讨论、回复 |
-| 工单系统 | 分类工单、处理状态流转、管理员处理 |
-| 团队功能 | 团队管理、团队竞赛、题目集 |
-| 博客 | 发布/编辑、标签、评论、状态管理 |
-| 代码模板 | 多语言模板保存/加载、题目编辑器集成 |
-| 笔记 | 题目笔记、公开/私有 |
-| 收藏集 | 题目收藏夹、自定义集合 |
-| 训练计划 | 章节化训练、进度追踪 |
-| AI 助手 | 流式对话、工具调用、多模型支持 |
-| 通知系统 | SSE 实时推送 + 轮询回退、邮件通知 |
-| 消息系统 | 站内私信、会话管理 |
-| 成就系统 | 成就解锁、展示 |
-| 全站搜索 | 题目/用户/博客/讨论多类型搜索、关键词高亮、搜索建议 |
-| 管理后台 | 仪表盘(图表统计)、用户/题目/竞赛/工单/封禁管理、SQL 编辑器 |
-| 权限体系 | 细粒度权限(problem_admin/contest_admin 等) + 超级管理员 |
-| 审计日志 | 操作记录、IP/设备封禁、审计搜索 |
-| 站点设置 | 注册开关、邮箱限制、OAuth 配置、广告位配置 |
-| 广告位 | Adsense 集成、多位置配置 |
-| 安全防护 | JWT 认证、bcrypt 密码、验证码、Rate Limit、CORS、安全响应头 |
-| 多主题 | Default(暗色)/Luogu(洛谷复刻)/Hydro(HydroOJ) 三套风格 |
-| 国际化 | 中英文双语 i18n |
-| 密码重置 | 邮箱验证码、忘记密码/重置密码流程 |
-
 ## 🛠 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 前端 | React 19 + TypeScript + Vite |
-| 后端 | Hono (Cloudflare Workers) |
-| 数据库 | Cloudflare D1 (SQLite) |
-| 认证 | GitHub OAuth + CpOAuth + JWT + bcrypt |
-| 状态管理 | Zustand |
-| 代码编辑器 | CodeMirror 6 |
-| 评测引擎 | GitHub Actions + nsjail 沙箱（seccomp 隔离） |
-| 样式 | CSS Variables + 自定义 CSS |
-
-## 🏗 项目结构
-
-```
-├── backend/     # Cloudflare Workers 后端（Hono + D1）
-├── frontend/    # React 19 + TypeScript + Vite 前端
-└── judge-repo/  # 评测引擎（nsjail 沙箱 + GitHub Actions workflow）
-```
+基于`React`和`cloudflare workers & d1`和`github actions`实现的零成本OJ系统
 
 ## 🎨 主题
 
@@ -287,49 +238,3 @@ npx wrangler d1 migrations apply DB --local
 # 执行 SQL 查询
 npx wrangler d1 execute DB --local --command "SELECT COUNT(*) as cnt FROM users"
 ```
-
-## 🔌 API 概览
-
-所有接口返回统一格式：`{ success: true, data: {...} }` 或 `{ success: false, error: { message, code } }`
-
-| 模块 | 路径前缀 | 说明 |
-|------|----------|------|
-| 认证 | `/api/v1/auth` | GitHub/CpOAuth OAuth、注册、登录 |
-| 题目 | `/api/v1/problems` | 题目 CRUD、收藏、统计 |
-| 提交 | `/api/v1/submissions` | 代码提交、结果查询 |
-| 用户 | `/api/v1/users` | 用户资料、已解决题目 |
-| 排名 | `/api/v1/rankings` | 全站排行榜 |
-| 竞赛 | `/api/v1/contests` | 竞赛管理、参与、排行 |
-| 题单 | `/api/v1/lists` | 题单 CRUD |
-| 题解 | `/api/v1/solutions` | 题解发布、投票 |
-| 讨论 | `/api/v1/discussions` | 讨论区 |
-| 工单 | `/api/v1/tickets` | 工单提交、处理 |
-| 设置 | `/api/v1/settings` | 站点配置读写 |
-| 管理 | `/api/v1/admin` | 管理员专用接口 |
-| 内部 | `/api/v1/internal` | 评测回调（GitHub Actions 调用） |
-
-## 🗄 数据库表
-
-| 表名 | 说明 |
-|------|------|
-| users | 用户（GitHub/CpOAuth/密码认证） |
-| problems | 题目 |
-| testcases | 测试用例 |
-| submissions | 提交记录 |
-| favorites | 收藏 |
-| contests | 竞赛 |
-| contest_problems | 竞赛题目关联 |
-| contest_participants | 竞赛参与者 |
-| tickets | 工单 |
-| ticket_replies | 工单回复 |
-| problem_lists | 题单 |
-| problem_list_items | 题单题目关联 |
-| solutions | 题解 |
-| solution_votes | 题解投票 |
-| discussions | 讨论 |
-| discussion_replies | 讨论回复 |
-| rate_limits | 限流记录 |
-| settings | 站点设置（键值对） |
-
-
-

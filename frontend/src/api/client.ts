@@ -936,8 +936,8 @@ class ApiClient {
   }
 
   // User rating info
-  async getUserRating(username: string) {
-    return this.request<{ rating: number; max_rating: number; history: RatingHistoryEntry[] }>(`/ratings/users/${username}/rating`);
+  async getUserRating(userId: number | string) {
+    return this.request<{ rating: number; max_rating: number; history: RatingHistoryEntry[] }>(`/ratings/users/${userId}/rating`);
   }
 
   async getProblem(slug: string) {
@@ -1175,8 +1175,8 @@ class ApiClient {
     return this.request<{ contests: Contest[] }>('/users/contests');
   }
 
-  async getUserByUsername(username: string) {
-    return this.request<{ user: User; stats: UserStats; solved_problems: ProblemListItem[]; recent_submissions: Submission[] }>(`/users/${username}`);
+  async getUserById(userId: number | string) {
+    return this.request<{ user: User; stats: UserStats; solved_problems: ProblemListItem[]; recent_submissions: Submission[] }>(`/users/${userId}`);
   }
 
   async getProblemStatus(problemId: number) {
@@ -2148,26 +2148,26 @@ class ApiClient {
   }
 
   // Follows
-  async followUser(username: string) {
-    return this.request<{ following: boolean; message: string }>(`/users/${username}/follow`, { method: 'POST' });
+  async followUser(userId: number | string) {
+    return this.request<{ following: boolean; message: string }>(`/users/${userId}/follow`, { method: 'POST' });
   }
 
-  async unfollowUser(username: string) {
-    return this.request<{ following: boolean; message: string }>(`/users/${username}/follow`, { method: 'DELETE' });
+  async unfollowUser(userId: number | string) {
+    return this.request<{ following: boolean; message: string }>(`/users/${userId}/follow`, { method: 'DELETE' });
   }
 
-  async getFollowers(username: string, params?: { page?: number; pageSize?: number }) {
+  async getFollowers(userId: number | string, params?: { page?: number; pageSize?: number }) {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
-    return this.request<{ users: User[]; pagination: Pagination }>(`/users/${username}/followers?${query.toString()}`);
+    return this.request<{ users: User[]; pagination: Pagination }>(`/users/${userId}/followers?${query.toString()}`);
   }
 
-  async getFollowing(username: string, params?: { page?: number; pageSize?: number }) {
+  async getFollowing(userId: number | string, params?: { page?: number; pageSize?: number }) {
     const query = new URLSearchParams();
     if (params?.page) query.set('page', String(params.page));
     if (params?.pageSize) query.set('pageSize', String(params.pageSize));
-    return this.request<{ users: User[]; pagination: Pagination }>(`/users/${username}/following?${query.toString()}`);
+    return this.request<{ users: User[]; pagination: Pagination }>(`/users/${userId}/following?${query.toString()}`);
   }
 
   // Messages

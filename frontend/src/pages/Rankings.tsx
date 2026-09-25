@@ -178,8 +178,8 @@ export default function Rankings() {
             const rank = mode === 'rating' ? user.rank : user.rank;
             return (
               <Link
-                key={`${user.id}-${mode}`}
-                to={`/users/${user.username}`}
+                key={`${user.user_id ?? user.id}-${mode}`}
+                to={`/users/${user.user_id ?? user.id}`}
                 className={`rankings-row ${mode === 'rating' ? 'rating-mode' : ''} ${getRankClass(rank)}`}
               >
                 <div className="rank-cell">{getRankIcon(rank)}</div>

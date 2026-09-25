@@ -43,21 +43,24 @@ ratings.get('/leaderboard', async (c) => {
   });
 });
 
-// GET /users/:username/rating — 获取用户 Rating 信息
-ratings.get('/users/:username/rating', async (c) => {
-  const username = c.req.param('username');
+// GET /users/:id/rating — 获取用户 Rating 信息
+ratings.get('/users/:id/rating', async (c) => {
+  const paramId = c.req.param('id');
+  const userId = parseInt(paramId, 10);
+
+  if (!Number.isInteger(userId)) {
+    return c.json({ success: false, error: { message: 'Invalid user id', code: 'BAD_REQUEST' } }, 400);
+  }
 
   const user = await c.env.DB.prepare(
-    'SELECT id, username FROM users WHERE username = ?'
+    'SELECT id, username FROM users WHERE id = ?'
   )
-    .bind(username)
+    .bind(userId)
     .first();
 
   if (!user) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
-
-  const userId = (user as any).id;
 
   const ratingInfo = await c.env.DB.prepare(
     'SELECT rating, max_rating FROM user_ratings WHERE user_id = ?'

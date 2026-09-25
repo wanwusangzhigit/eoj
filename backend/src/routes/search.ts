@@ -45,13 +45,13 @@ search.get('/suggestions', async (c) => {
       title: u.username,
       subtitle: '用户',
       avatar_url: u.avatar_url,
-      url: `/users/${u.username}`,
+      url: `/users/${u.id}`,
     });
   }
 
   // Top blogs
   const blogs = await c.env.DB.prepare(
-    `SELECT b.id, b.title, 'blog' as type, u.username
+    `SELECT b.id, b.title, 'blog' as type, u.id as user_id, u.username
      FROM blogs b JOIN users u ON b.user_id = u.id
      WHERE b.status = 'published' AND b.title LIKE ? ESCAPE '\\' LIMIT ?`
   ).bind(like, limit).all();
@@ -67,7 +67,7 @@ search.get('/suggestions', async (c) => {
 
   // Top discussions
   const discussions = await c.env.DB.prepare(
-    `SELECT d.id, d.title, 'discussion' as type, u.username
+    `SELECT d.id, d.title, 'discussion' as type, u.id as user_id, u.username
      FROM discussions d JOIN users u ON d.user_id = u.id
      WHERE d.title LIKE ? ESCAPE '\\' LIMIT ?`
   ).bind(like, limit).all();
@@ -146,10 +146,11 @@ search.get('/', async (c) => {
       results.push({
         type: 'user',
         id: u.id,
+        user_id: u.id,
         title: u.username,
         username: u.username,
         avatar_url: u.avatar_url,
-        url: `/users/${u.username}`,
+        url: `/users/${u.id}`,
       });
     }
     if (type === 'users') {
@@ -162,7 +163,7 @@ search.get('/', async (c) => {
   if (type === 'all' || type === 'blogs') {
     const blogs = await c.env.DB.prepare(
       `SELECT b.id, b.title, b.tags, b.status, b.created_at, 'blog' as type,
-              u.username
+              u.id as user_id, u.username
        FROM blogs b JOIN users u ON b.user_id = u.id
        WHERE b.status = 'published' AND (b.title LIKE ? ESCAPE '\\' OR b.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
@@ -172,6 +173,7 @@ search.get('/', async (c) => {
         type: 'blog',
         id: b.id,
         title: b.title,
+        user_id: b.user_id,
         username: b.username,
         created_at: b.created_at,
         url: `/blogs/${b.id}`,
@@ -189,7 +191,7 @@ search.get('/', async (c) => {
   if (type === 'all' || type === 'discussions') {
     const discussions = await c.env.DB.prepare(
       `SELECT d.id, d.title, d.reply_count, d.created_at, 'discussion' as type,
-              u.username
+              u.id as user_id, u.username
        FROM discussions d JOIN users u ON d.user_id = u.id
        WHERE (d.title LIKE ? ESCAPE '\\' OR d.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
@@ -199,6 +201,7 @@ search.get('/', async (c) => {
         type: 'discussion',
         id: d.id,
         title: d.title,
+        user_id: d.user_id,
         username: d.username,
         reply_count: d.reply_count,
         created_at: d.created_at,
@@ -217,7 +220,7 @@ search.get('/', async (c) => {
   if (type === 'all' || type === 'solutions') {
     const solutions = await c.env.DB.prepare(
       `SELECT s.id, s.title, s.language, s.created_at, 'solution' as type,
-              u.username, p.title as problem_title, p.slug as problem_slug
+              u.id as user_id, u.username, p.title as problem_title, p.slug as problem_slug
        FROM solutions s JOIN users u ON s.user_id = u.id JOIN problems p ON s.problem_id = p.id
        WHERE s.review_status = 'approved' AND (s.title LIKE ? ESCAPE '\\' OR s.content LIKE ? ESCAPE '\\')
        LIMIT ? OFFSET ?`
@@ -227,6 +230,7 @@ search.get('/', async (c) => {
         type: 'solution',
         id: s.id,
         title: s.title,
+        user_id: s.user_id,
         username: s.username,
         language: s.language,
         problem_title: s.problem_title,

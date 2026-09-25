@@ -211,11 +211,11 @@ export default function AdminMessages() {
             <div key={conv.id} className="pm-table-row">
               <span className="pm-col pm-col-id">{conv.id}</span>
               <span className="pm-col pm-col-title">
-                <a href={`/users/${conv.user_a_name}`} target="_blank" rel="noopener" className="link">
+                <a href={`/users/${conv.user_a_id}`} target="_blank" rel="noopener" className="link">
                   {conv.user_a_name}
                 </a>
                 <span style={{ margin: '0 6px', color: 'var(--text-muted)' }}>↔</span>
-                <a href={`/users/${conv.user_b_name}`} target="_blank" rel="noopener" className="link">
+                <a href={`/users/${conv.user_b_id}`} target="_blank" rel="noopener" className="link">
                   {conv.user_b_name}
                 </a>
               </span>
@@ -289,11 +289,11 @@ export default function AdminMessages() {
               <div className="conv-detail-meta">
                 <div>
                   <strong>{t('admin.participants')}:</strong>{' '}
-                  <a href={`/users/${selectedConv.user_a_name}`} target="_blank" rel="noopener" className="link">
+                  <a href={`/users/${selectedConv.user_a_id}`} target="_blank" rel="noopener" className="link">
                     {selectedConv.user_a_name}
                   </a>
                   {' ↔ '}
-                  <a href={`/users/${selectedConv.user_b_name}`} target="_blank" rel="noopener" className="link">
+                  <a href={`/users/${selectedConv.user_b_id}`} target="_blank" rel="noopener" className="link">
                     {selectedConv.user_b_name}
                   </a>
                 </div>
@@ -311,7 +311,7 @@ export default function AdminMessages() {
                   [...messages].reverse().map((m) => (
                     <div key={m.id} className={`msg-row-admin ${m.sender_name === selectedConv.user_a_name ? 'own-a' : 'own-b'}`}>
                       <div className="msg-row-header">
-                        <a href={`/users/${m.sender_name}`} target="_blank" rel="noopener" className="link">
+                        <a href={`/users/${m.sender_id}`} target="_blank" rel="noopener" className="link">
                           {m.sender_name}
                         </a>
                         <span className="msg-row-time">{formatTime(m.created_at)}</span>

@@ -25,7 +25,7 @@ rankings.get('/', async (c) => {
 
   const rankings = results.results.map((user: any, index: number) => ({
     rank: index + 1,
-    id: user.id,
+    user_id: user.id,
     username: user.username,
     avatar_url: user.avatar_url,
     solved_count: user.solved_count || 0,

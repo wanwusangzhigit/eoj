@@ -198,18 +198,24 @@ const ENTRIES: LoaderEntry[] = [
   },
 
   // ──── 用户主页 / profile ────
+  // 注意:loader 返回值会被 runPageLoader 按 pageKey 包装一层,
+  // 即 envelope.page = { profile: <本 loader 返回值> }。
+  // 因此前端 Profile.tsx 通过 useSSRPage('profile') 拿到本 loader 返回值,
+  // 用 ssr?.profile 访问其中的 profile 字段。
   {
     match: (p) => p === '/profile' || /^\/users\/[^/]+$/.test(p),
     pageKey: 'profile',
     load: async (ctx) => {
-      const username = ctx.url.pathname.startsWith('/users/')
-        ? decodeURIComponent(ctx.url.pathname.split('/')[2])
+      // /users/:id 他人主页用公开端点;/profile(本人主页)用鉴权端点
+      const userId = ctx.url.pathname.startsWith('/users/')
+        ? ctx.url.pathname.split('/')[2]
         : undefined;
-      const path = username ? `/api/v1/users/${encodeURIComponent(username)}` : '/api/v1/users/me';
-      const data: Record<string, unknown> = {
+      const path = userId
+        ? `/api/v1/users/${encodeURIComponent(userId)}`
+        : '/api/v1/users/profile';
+      return {
         profile: await callApi(ctx, path),
       };
-      return data;
     },
   },
 
@@ -574,10 +580,10 @@ const ENTRIES: LoaderEntry[] = [
     pageKey: 'followList',
     load: async (ctx) => {
       const parts = ctx.url.pathname.split('/').filter(Boolean);
-      const username = parts[1];
+      const userId = parts[1];
       const tab = parts[2];
       const data: Record<string, unknown> = {};
-      data[tab] = await callApi(ctx, `/api/v1/users/${encodeURIComponent(username)}/${tab}?page=1&pageSize=20`);
+      data[tab] = await callApi(ctx, `/api/v1/users/${encodeURIComponent(userId)}/${tab}?page=1&pageSize=20`);
       return data;
     },
   },
@@ -950,7 +956,18 @@ export async function runPageLoader(
   const entry = findLoader(url.pathname);
 
   const global = await buildGlobalData(ctx);
-  const page: Record<string, unknown> = (entry ? (await entry.load(ctx)) : null) ?? {};
+  // 关键:按 pageKey 包装 loader 返回值,使 envelope.page 结构为
+  //   { [pageKey]: <loader 返回值> }
+  // 这样前端 useSSRPage(pageKey) 才能正确取出对应数据。
+  // 之前直接把 loader 返回值赋给 page,导致 envelope.page 结构与 pageKey 解耦,
+  // 前端 useSSRPage(pageKey) 总是返回 null,SSR 数据从未真正被消费过。
+  const page: Record<string, unknown> = {};
+  if (entry) {
+    const loadData = await entry.load(ctx);
+    if (loadData) {
+      page[entry.pageKey] = loadData;
+    }
+  }
 
   return {
     envelope: {
