@@ -259,7 +259,7 @@ export default function SolutionDetail() {
                   </span>
                   {solution.username && (
                     <span className="meta-item">
-                      <Link to={`/users/${solution.username}`}>{solution.username}</Link>
+                      <Link to={`/users/${solution.user_id}`}>{solution.username}</Link>
                     </span>
                   )}
                   <span className="meta-item">

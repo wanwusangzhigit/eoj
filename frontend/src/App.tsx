@@ -164,7 +164,7 @@ function App({ ssrLocation }: { ssrLocation?: string } = {}) {
             <Route path="/submissions/compare/:id1/:id2" element={<SubmissionCompare />} />
             <Route path="/rankings" element={<Rankings />} />
             <Route path="/profile" element={<Profile />} />
-            <Route path="/users/:username" element={<Profile />} />
+            <Route path="/users/:id" element={<Profile />} />
             <Route path="/favorites" element={<Favorites />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Login />} />
@@ -232,8 +232,8 @@ function App({ ssrLocation }: { ssrLocation?: string } = {}) {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/messages" element={<Messages />} />
             <Route path="/messages/:id" element={<Messages />} />
-            <Route path="/users/:username/followers" element={<FollowList />} />
-            <Route path="/users/:username/following" element={<FollowList />} />
+            <Route path="/users/:id/followers" element={<FollowList />} />
+            <Route path="/users/:id/following" element={<FollowList />} />
             <Route path="/teams" element={<Teams />} />
             <Route path="/teams/new" element={<CreateTeam />} />
             <Route path="/team/:teamId" element={<TeamDetail />} />

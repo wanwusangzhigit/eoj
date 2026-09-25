@@ -14,7 +14,7 @@ interface FollowListSSRData {
 }
 
 export default function FollowList() {
-  const { username, type } = useParams<{ username: string; type: string }>();
+  const { id, type } = useParams<{ id: string; type: string }>();
   const isFollowers = type === 'followers';
   const ssr = useSSRPage<FollowListSSRData>('followList');
   const firstRunRef = useRef(true);
@@ -24,15 +24,16 @@ export default function FollowList() {
   const [pagination, setPagination] = useState<any>(ssrList?.pagination ?? null);
   const [loading, setLoading] = useState(!ssrList);
   const [page, setPage] = useState(1);
+  const [profileUser, setProfileUser] = useState<{ id: number; username: string } | null>(null);
   useDocumentTitle(isFollowers ? t('follow.followers') : t('follow.followingList'));
 
   const fetchUsers = useCallback(async () => {
-    if (!username) return;
+    if (!id) return;
     setLoading(true);
     try {
       const data = isFollowers
-        ? await api.getFollowers(username, { page, pageSize: 20 })
-        : await api.getFollowing(username, { page, pageSize: 20 });
+        ? await api.getFollowers(id, { page, pageSize: 20 })
+        : await api.getFollowing(id, { page, pageSize: 20 });
       setUsers(data.users);
       setPagination(data.pagination);
     } catch (e) {
@@ -40,7 +41,7 @@ export default function FollowList() {
     } finally {
       setLoading(false);
     }
-  }, [username, isFollowers, page]);
+  }, [id, isFollowers, page]);
 
   useEffect(() => {
     // SSR 已注入对应 tab 数据则跳过首次拉取
@@ -53,14 +54,31 @@ export default function FollowList() {
     fetchUsers();
   }, [fetchUsers, ssrList]);
 
+  // 拉一次目标用户的资料以渲染标题中的 username(SSR 没有专门注入此信息)
+  useEffect(() => {
+    if (!id) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.getUserById(id);
+        if (!cancelled && data?.user) {
+          setProfileUser({ id: data.user.id, username: data.user.username });
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [id]);
+
   return (
     <div className="follow-list-page">
       <div className="follow-list-header">
         <h1>
           <Users size={22} />
-          {isFollowers ? t('follow.followers') : t('follow.followingList')} — {username}
+          {isFollowers ? t('follow.followers') : t('follow.followingList')}{profileUser ? ` — ${profileUser.username}` : ''}
         </h1>
-        <Link to={`/users/${username}`} className="btn btn-secondary btn-sm">
+        <Link to={`/users/${id}`} className="btn btn-secondary btn-sm">
           {t('follow.backToProfile')}
         </Link>
       </div>
@@ -74,7 +92,7 @@ export default function FollowList() {
       ) : (
         <div className="follow-grid">
           {users.map((u) => (
-            <Link key={u.id} to={`/users/${u.username}`} className="follow-card">
+            <Link key={u.user_id ?? u.id} to={`/users/${u.user_id ?? u.id}`} className="follow-card">
               {u.avatar_url ? (
                 <img src={u.avatar_url} alt={u.username} className="follow-avatar" />
               ) : (

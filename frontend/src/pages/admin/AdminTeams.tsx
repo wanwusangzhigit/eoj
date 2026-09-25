@@ -120,7 +120,7 @@ export default function AdminTeams() {
                 )}
               </span>
               <span className="pm-col" style={{ width: '120px' }}>
-                <a href={`/users/${team.owner_name}`} target="_blank" rel="noopener" className="link">
+                <a href={`/users/${team.owner_id}`} target="_blank" rel="noopener" className="link">
                   {team.owner_name}
                 </a>
               </span>

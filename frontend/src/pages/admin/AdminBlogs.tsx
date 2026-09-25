@@ -164,7 +164,7 @@ export default function AdminBlogs() {
                 </a>
               </span>
               <span className="pm-col" style={{ width: '120px' }}>
-                <a href={`/users/${b.username}`} target="_blank" rel="noopener" className="link">
+                <a href={`/users/${b.user_id}`} target="_blank" rel="noopener" className="link">
                   {b.username}
                 </a>
               </span>

@@ -5,12 +5,12 @@ import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
 
 interface FollowButtonProps {
-  username: string;
+  userId: number | string;
   initialFollowing: boolean;
   onChange?: (following: boolean) => void;
 }
 
-export default function FollowButton({ username, initialFollowing, onChange }: FollowButtonProps) {
+export default function FollowButton({ userId, initialFollowing, onChange }: FollowButtonProps) {
   const [following, setFollowing] = useState(initialFollowing);
   const [loading, setLoading] = useState(false);
   const addToast = useToastStore((s) => s.addToast);
@@ -19,11 +19,11 @@ export default function FollowButton({ username, initialFollowing, onChange }: F
     setLoading(true);
     try {
       if (following) {
-        await api.unfollowUser(username);
+        await api.unfollowUser(userId);
         setFollowing(false);
         onChange?.(false);
       } else {
-        await api.followUser(username);
+        await api.followUser(userId);
         setFollowing(true);
         onChange?.(true);
         addToast('success', t('follow.follow'));

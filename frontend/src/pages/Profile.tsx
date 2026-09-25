@@ -25,7 +25,7 @@ interface ProfileSSRData {
 }
 
 export default function Profile() {
-  const { username } = useParams<{ username?: string }>();
+  const { id } = useParams<{ id?: string }>();
   const { user: currentUser, fetchUser } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
   const ssr = useSSRPage<ProfileSSRData>('profile');
@@ -61,7 +61,7 @@ export default function Profile() {
   const profileUser = data?.user;
   useDocumentTitle(profileUser?.username ? `${profileUser.username}'s Profile` : t('profile.title'));
 
-  const isOwnProfile = !username || username === currentUser?.username;
+  const isOwnProfile = !id || Number(id) === currentUser?.id;
   const now = useNow();
 
   useEffect(() => {
@@ -76,8 +76,8 @@ export default function Profile() {
         if (isOwnProfile) {
           const profileData = await api.getUserProfile();
           setData(profileData);
-        } else if (username) {
-          const userData = await api.getUserByUsername(username);
+        } else if (id) {
+          const userData = await api.getUserById(id);
           setData(userData);
         }
       } catch (err: any) {
@@ -87,7 +87,7 @@ export default function Profile() {
       }
     };
     fetchData();
-  }, [username, isOwnProfile, ssr]);
+  }, [id, isOwnProfile, ssr]);
 
   useEffect(() => {
     const fetchExtraData = async () => {
@@ -130,9 +130,9 @@ export default function Profile() {
 
       // Fetch rating history for the profile subject (works for both own and others')
       try {
-        const targetUsername = isOwnProfile ? currentUser?.username : username;
-        if (targetUsername) {
-          const ratingData = await api.getUserRating(targetUsername);
+        const targetId = isOwnProfile ? currentUser?.id : Number(id);
+        if (targetId) {
+          const ratingData = await api.getUserRating(targetId);
           setRatingInfo({ rating: ratingData.rating, max_rating: ratingData.max_rating });
           setRatingHistory(ratingData.history || []);
         }
@@ -148,7 +148,7 @@ export default function Profile() {
       }
     };
     if (data?.user) fetchExtraData();
-  }, [data?.user, isOwnProfile, currentUser, username]);
+  }, [data?.user, isOwnProfile, currentUser, id]);
 
   // ── 重新检查成就解锁状态(仅本人) ──
   const handleCheckAchievements = async () => {
@@ -272,7 +272,7 @@ export default function Profile() {
         )}
         {!isOwnProfile && currentUser && profileUser && (
           <div className="profile-actions">
-            <FollowButton username={profileUser.username} initialFollowing={!!data?.is_following} />
+            <FollowButton userId={profileUser.id} initialFollowing={!!data?.is_following} />
             <Link to={`/messages?target=${profileUser.id}`} className="btn btn-secondary btn-sm">
               <Mail size={14} />
               {t('messages.sendMessage')}
@@ -383,12 +383,12 @@ export default function Profile() {
               </div>
               {(data?.followers_count !== undefined || data?.following_count !== undefined) && (
                 <div className="profile-follow-stats">
-                  <Link to={`/users/${user.username}/followers`} className="follow-stat">
+                  <Link to={`/users/${user.id}/followers`} className="follow-stat">
                     <Users size={14} />
                     <strong>{data?.followers_count ?? 0}</strong>
                     <span>{t('follow.followers')}</span>
                   </Link>
-                  <Link to={`/users/${user.username}/following`} className="follow-stat">
+                  <Link to={`/users/${user.id}/following`} className="follow-stat">
                     <Users size={14} />
                     <strong>{data?.following_count ?? 0}</strong>
                     <span>{t('follow.followingList')}</span>
