@@ -45,6 +45,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isClassic = config.site.theme === 'classic';
   const isFlat = config.site.theme === 'flat';
+  const isAurora = config.site.theme === 'aurora';
   const headerStyleClass = isFlat ? 'header-flat' : 'header-default';
 
   const showMyFiles = user && (getImageUploadEnabled() || getUploadEnabled() || perms.canManageUploads);
@@ -52,9 +53,9 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
   const getAIChatEnabled = useSettingsStore((s) => s.getAIChatEnabled);
   const showAI = user && (getAIEnabled() || perms.hasAllPermissions) && getAIChatEnabled();
 
-  // Poll unread messages count (only for default theme, classic theme gets it from Layout)
+  // Poll unread messages count (only for default theme; classic/aurora get it from Layout)
   const [localUnread, setLocalUnread] = useState(0);
-  const effectiveUnread = isClassic ? (unreadMsg || 0) : localUnread;
+  const effectiveUnread = (isClassic || isAurora) ? (unreadMsg || 0) : localUnread;
 
   // ── Search suggestions ──
   const [searchQuery, setSearchQuery] = useState('');
@@ -126,7 +127,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!user || isClassic) return;
+    if (!user || isClassic || isAurora) return;
 
     const stopPolling = () => {
       if (pollTimerRef.current) {
@@ -193,7 +194,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
       stopPolling();
       if (sseRef.current) { sseRef.current.close(); sseRef.current = null; }
     };
-  }, [user, isClassic]);
+  }, [user, isClassic, isAurora]);
 
   const handleLogout = () => {
     logout();
@@ -232,6 +233,101 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
               <input
                 name="q"
                 placeholder={t('common.search')}
+                value={searchQuery}
+                onChange={(e) => { handleSearchInput(e.target.value); setShowSuggestions(true); }}
+                onFocus={() => { if (suggestions.length) setShowSuggestions(true); }}
+              />
+            </form>
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="search-suggestions">
+                {suggestions.map((s) => (
+                  <div key={`${s.type}-${s.id}`} className="search-suggestion-item" onClick={() => handleSuggestionClick(s.url)}>
+                    <span className="suggestion-icon"><SuggestionIcon type={s.type} /></span>
+                    <span className="suggestion-title">{highlightText(s.title || '', searchQuery)}</span>
+                    <span className="suggestion-subtitle">{highlightText(s.subtitle || '', searchQuery)}</span>
+                    <ExternalLink size={12} className="suggestion-go" />
+                  </div>
+                ))}
+                <div className="search-suggestion-more" onClick={() => handleSearchSubmit(searchQuery)}>
+                  <Search size={12} />
+                  {t('common.searchAll')} &quot;{searchQuery}&quot;
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="header-actions">
+            <button
+              className="header-action-btn"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+              aria-label={theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
+            >
+              {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            {user && (
+              <Link to="/messages" className="header-action-btn" title={t('nav.messages')} aria-label={t('nav.messages')}>
+                <Mail size={16} />
+                {effectiveUnread > 0 && <span className="header-badge">{effectiveUnread > 99 ? '99+' : effectiveUnread}</span>}
+              </Link>
+            )}
+            {user && <NotificationBell />}
+            {user ? (
+              <div className="user-menu">
+                <Link to="/profile" className="user-info">
+                  {user.avatar_url && (
+                    <img src={user.avatar_url} alt={user.username} className="user-avatar" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  )}
+                  <span className="user-name">{user.username}</span>
+                </Link>
+                <button className="header-action-btn" onClick={handleLogout} title={t('nav.logout')} aria-label={t('nav.logout')}>
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="header-login-btn">
+                <User size={14} />
+                {t('nav.login')}
+              </Link>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
+
+  /* ═══════════════════════════════════════════════════
+     Aurora-style header: glass top bar (logo lives in sidebar)
+     ═══════════════════════════════════════════════════ */
+  if (isAurora) {
+    return (
+      <header className="header header-aurora">
+        <div className="header-inner">
+          <button
+            className="header-menu-btn"
+            onClick={onMenuClick}
+            aria-label={t('nav.openMenu')}
+          >
+            <Menu size={20} />
+          </button>
+
+          <NavLink to="/" className="header-logo header-logo-aurora">
+            {config.site.icon === 'default' ? <Code2 size={20} /> : <img src={config.site.icon} alt={config.site.name} className="header-logo-img" />}
+            <span>{config.site.name}</span>
+          </NavLink>
+
+          <div className="header-search-wrapper" ref={searchRef}>
+            <form
+              className="header-search"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearchSubmit(searchQuery);
+              }}
+            >
+              <Search size={15} />
+              <input
+                name="q"
+                placeholder={t('common.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => { handleSearchInput(e.target.value); setShowSuggestions(true); }}
                 onFocus={() => { if (suggestions.length) setShowSuggestions(true); }}

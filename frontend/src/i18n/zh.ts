@@ -28,6 +28,8 @@ const zh = {
     collections: '收藏夹',
     closeMenu: '关闭菜单',
     openMenu: '打开菜单',
+    collapseSidebar: '收起侧边栏',
+    expandSidebar: '展开侧边栏',
     personal: '个人',
     adminGroup: '管理',
   },

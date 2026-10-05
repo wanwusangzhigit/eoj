@@ -29,6 +29,8 @@ const en: Translations = {
     collections: 'Collections',
     closeMenu: 'Close menu',
     openMenu: 'Open menu',
+    collapseSidebar: 'Collapse sidebar',
+    expandSidebar: 'Expand sidebar',
     personal: 'Personal',
     adminGroup: 'Admin',
   },

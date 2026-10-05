@@ -113,6 +113,12 @@
   box-shadow: var(--shadow-lg), 0 0 20px var(--accent-glow);
 }
 
+/* Aurora theme: hover lift */
+[data-theme-style="aurora"] .team-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg), 0 0 20px var(--accent-glow);
+}
+
 /* Classic theme: subtle lift */
 [data-theme-style="classic"] .team-card:hover {
   box-shadow: 0 2px 8px rgba(0,0,0,0.08);
@@ -144,7 +150,20 @@
 [data-theme-style="default"] .team-avatar {
   border-radius: 12px;
 }
+
+
+/* Aurora theme: rounded avatar */
+[data-theme-style="aurora"] .team-avatar {
+  border-radius: 12px;
+}
 [data-theme-style="default"] .team-avatar.lg {
+  width: 80px;
+  height: 80px;
+  border-radius: 18px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+
+[data-theme-style="aurora"] .team-avatar.lg {
   width: 80px;
   height: 80px;
   border-radius: 18px;
@@ -244,6 +263,12 @@
 
 /* Default theme: gradient background */
 [data-theme-style="default"] .team-detail-header {
+  background: linear-gradient(135deg, var(--bg-card), var(--bg-tertiary));
+  box-shadow: var(--shadow-md);
+}
+
+/* Aurora theme: gradient background */
+[data-theme-style="aurora"] .team-detail-header {
   background: linear-gradient(135deg, var(--bg-card), var(--bg-tertiary));
   box-shadow: var(--shadow-md);
 }
@@ -372,6 +397,19 @@
   border-radius: 1px;
 }
 
+
+/* Aurora theme: animated underline */
+[data-theme-style="aurora"] .team-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), #8b5cf6);
+  border-radius: 1px;
+}
+
 /* ── 标签页内容容器 ── */
 .team-tab-content {
   min-height: 300px;
@@ -444,6 +482,12 @@
 }
 
 [data-theme-style="default"] .stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+
+[data-theme-style="aurora"] .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
@@ -575,6 +619,11 @@
 }
 
 [data-theme-style="default"] .disc-item:hover {
+  transform: translateX(2px);
+}
+
+
+[data-theme-style="aurora"] .disc-item:hover {
   transform: translateX(2px);
 }
 
@@ -780,6 +829,11 @@
 }
 
 [data-theme-style="default"] .member-row:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+
+[data-theme-style="aurora"] .member-row:hover {
   box-shadow: var(--shadow-sm);
 }
 

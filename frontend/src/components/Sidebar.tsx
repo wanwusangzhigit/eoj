@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { useSettingsStore } from '../store/settings';
@@ -6,9 +7,14 @@ import {
   Home, Target, Swords, Trophy, BookOpen, GraduationCap,
   MessageSquare, PenSquare, Users, Mail, ListChecks,
   Ticket, Heart, FolderOpen, Bot, Shield, X, Megaphone,
+  Code2, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { usePermissions } from '../hooks/usePermissions';
+import { useSiteConfig } from '../hooks/useSiteConfig';
 import './Sidebar.css';
+
+const SIDEBAR_COLLAPSED_KEY = 'aurora.sidebar.collapsed';
 
 interface SidebarProps {
   open: boolean;
@@ -19,6 +25,30 @@ interface SidebarProps {
 export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
   const { user } = useAuthStore();
   const perms = usePermissions();
+  const config = useSiteConfig();
+  const isAurora = config.site.theme === 'aurora';
+  // 折叠状态挂载后再读 localStorage,避免 SSR 与客户端首帧不一致
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    if (!isAurora) return;
+    try {
+      // 挂载后再读折叠偏好(首帧保持展开),避免 SSR 与客户端首渲染不一致
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === '1') setCollapsed(true);
+    } catch { /* ignore */ }
+  }, [isAurora]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, next ? '1' : '0');
+      } catch { /* ignore */ }
+      return next;
+    });
+  };
+
   const getImageUploadEnabled = useSettingsStore((s) => s.getImageUploadEnabled);
   const getUploadEnabled = useSettingsStore((s) => s.getUploadEnabled);
   const showMyFiles = user && (getImageUploadEnabled() || getUploadEnabled() || perms.canManageUploads);
@@ -65,7 +95,7 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
     ? [{ to: '/admin/dashboard', icon: Shield, label: t('nav.admin') }]
     : [];
 
-  const renderLink = (item: { to: string; icon: any; label: string; end?: boolean; badge?: number }, onNavigate?: () => void) => {
+  const renderLink = (item: { to: string; icon: LucideIcon; label: string; end?: boolean; badge?: number }, onNavigate?: () => void) => {
     const Icon = item.icon;
     return (
       <NavLink
@@ -74,6 +104,7 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
         end={item.end}
         className={({ isActive }) => isActive ? 'sidebar-link active' : 'sidebar-link'}
         onClick={onNavigate}
+        title={isAurora && collapsed ? item.label : undefined}
       >
         <Icon size={16} />
         <span className="sidebar-link-label">{item.label}</span>
@@ -85,7 +116,24 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
   };
 
   return (
-    <aside className={`sidebar${open ? ' open' : ''}`}>
+    <aside className={`sidebar${open ? ' open' : ''}${isAurora && collapsed ? ' collapsed' : ''}`}>
+      {isAurora && (
+        <div className="sidebar-brand">
+          <NavLink
+            to="/"
+            className="sidebar-brand-link"
+            onClick={onClose}
+            title={collapsed ? config.site.name : undefined}
+          >
+            {config.site.icon === 'default' ? (
+              <span className="sidebar-brand-mark"><Code2 size={17} /></span>
+            ) : (
+              <img src={config.site.icon} alt="" className="sidebar-brand-img" />
+            )}
+            <span className="sidebar-brand-name">{config.site.name}</span>
+          </NavLink>
+        </div>
+      )}
       <div className="sidebar-header">
         <button className="sidebar-close" onClick={onClose} aria-label={t('nav.closeMenu')}>
           <X size={18} />
@@ -108,6 +156,19 @@ export default function Sidebar({ open, onClose, unreadMsg }: SidebarProps) {
           </div>
         )}
       </nav>
+      {isAurora && (
+        <div className="sidebar-footer">
+          <button
+            className="sidebar-collapse-btn"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+            aria-expanded={!collapsed}
+            title={collapsed ? t('nav.expandSidebar') : t('nav.collapseSidebar')}
+          >
+            {collapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
