@@ -222,7 +222,21 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* (decorative background glow removed — kept the surface clean for a more professional look) */
+/* (decorative background glow removed for default — kept the surface clean; aurora keeps a subtle glow) */
+[data-theme-style="aurora"] body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(88, 166, 255, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(163, 113, 247, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(83, 155, 245, 0.02) 0%, transparent 60%);
+  pointer-events: none;
+  z-index: -1;
+}
 
 a {
   color: var(--accent);
@@ -236,7 +250,8 @@ a:hover {
 }
 
 /* Default theme: no underline on hover */
-[data-theme-style="default"] a:hover {
+[data-theme-style="default"] a:hover,
+[data-theme-style="aurora"] a:hover {
   text-decoration: none;
 }
 
@@ -275,7 +290,8 @@ input, textarea, select {
 }
 
 /* Default theme: scrollbar track uses bg-secondary */
-[data-theme-style="default"] ::-webkit-scrollbar-track {
+[data-theme-style="default"] ::-webkit-scrollbar-track,
+[data-theme-style="aurora"] ::-webkit-scrollbar-track {
   background: var(--bg-secondary);
 }
 
@@ -295,14 +311,16 @@ input, textarea, select {
 }
 
 /* Default theme: glass effect */
-[data-theme-style="default"] .glass {
+[data-theme-style="default"] .glass,
+[data-theme-style="aurora"] .glass {
   background: rgba(22, 24, 33, 0.7);
   backdrop-filter: var(--backdrop-blur);
   -webkit-backdrop-filter: var(--backdrop-blur);
   border: 1px solid var(--border);
 }
 
-[data-theme-style="default"][data-theme="light"] .glass {
+[data-theme-style="default"][data-theme="light"] .glass,
+[data-theme-style="aurora"][data-theme="light"] .glass {
   background: rgba(255, 255, 255, 0.8);
 }
 
@@ -311,12 +329,22 @@ input, textarea, select {
   color: var(--accent);
 }
 
+/* Aurora: gradient text */
+[data-theme-style="aurora"] .gradient-text {
+  background: linear-gradient(135deg, var(--accent), #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
 /* Default theme: accent border (was duotone gradient — flattened) */
-[data-theme-style="default"] .gradient-border {
+[data-theme-style="default"] .gradient-border,
+[data-theme-style="aurora"] .gradient-border {
   position: relative;
 }
 
-[data-theme-style="default"] .gradient-border::before {
+[data-theme-style="default"] .gradient-border::before,
+[data-theme-style="aurora"] .gradient-border::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -439,6 +467,19 @@ input, textarea, select {
 
 [data-theme-style="default"] .animate-scale-in {
   animation: scale-in 0.18s ease-out forwards;
+}
+
+/* Aurora: larger animation values */
+[data-theme-style="aurora"] .animate-fade-in-up {
+  animation: fadeInUp 0.4s ease-out forwards;
+}
+
+[data-theme-style="aurora"] .animate-slide-in {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
+[data-theme-style="aurora"] .animate-scale-in {
+  animation: scale-in 0.25s ease-out forwards;
 }
 
 /* ═══════════════════════════════════════════════════
@@ -606,4 +647,147 @@ mark.search-highlight {
   padding: 0 2px;
   border-radius: 2px;
   font-weight: 600;
+}
+
+/* ═══════════════════════════════════════════════════
+   Aurora Theme — 极光风格(深空底 + 靛紫青渐变)
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="aurora"] {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111726;
+  --bg-tertiary: #1a2138;
+  --bg-card: #131a2e;
+  --bg-card-hover: #1b2340;
+  --text-primary: #eef1fb;
+  --text-secondary: #9aa4c4;
+  --text-muted: #6a7396;
+  --text-tertiary: #8892b5;
+  --accent: #7c8cff;
+  --accent-hover: #98a4ff;
+  --accent-light: rgba(124, 140, 255, 0.14);
+  --accent-glow: rgba(124, 140, 255, 0.35);
+  --success: #3ddc97;
+  --success-bg: rgba(61, 220, 151, 0.14);
+  --warning: #fbbf24;
+  --warning-bg: rgba(251, 191, 36, 0.14);
+  --error: #fb7185;
+  --error-bg: rgba(251, 113, 133, 0.14);
+  --info: #22d3ee;
+  --info-bg: rgba(34, 211, 238, 0.12);
+  --border: #232c4a;
+  --border-light: #1a2138;
+  --border-hover: #34406b;
+  --gold: #fbbf24;
+  --gold-bg: rgba(251, 191, 36, 0.14);
+  --silver: #94a3c4;
+  --silver-bg: rgba(148, 163, 196, 0.14);
+  --bronze: #d97706;
+  --bronze-bg: rgba(217, 119, 6, 0.14);
+  --diff-none: #6a7396;
+  --diff-easy: #3ddc97;
+  --diff-easy-mid: #a3e635;
+  --diff-mid: #fbbf24;
+  --diff-hard: #fb7185;
+  --diff-hard-plus: #f43f5e;
+  --diff-province: #22d3ee;
+  --diff-province-plus: #a78bfa;
+  --diff-noi: #818cf8;
+  --header-gradient: linear-gradient(90deg, rgba(17, 23, 38, 0.92) 0%, rgba(26, 22, 60, 0.88) 100%);
+  --radius: 12px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --shadow: 0 1px 2px rgba(4, 7, 20, 0.45);
+  --shadow-sm: 0 1px 3px rgba(4, 7, 20, 0.4);
+  --shadow-md: 0 6px 18px rgba(4, 7, 20, 0.45);
+  --shadow-lg: 0 16px 40px rgba(4, 7, 20, 0.55);
+  --shadow-accent: 0 6px 24px rgba(124, 140, 255, 0.35);
+  --shadow-card: 0 1px 2px rgba(4, 7, 20, 0.45), 0 0 0 1px rgba(124, 140, 255, 0.07);
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --backdrop-blur: blur(14px);
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, system-ui, "Apple Color Emoji", "Segoe UI Emoji";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --aurora-accent-2: #22d3ee;
+  --aurora-accent-3: #a78bfa;
+  --aurora-grad: linear-gradient(135deg, #7c8cff 0%, #a78bfa 45%, #22d3ee 100%);
+  --header-height: 56px;
+  --sidebar-width: 248px;
+  --sidebar-width-collapsed: 72px;
+}
+
+[data-theme-style="aurora"][data-theme="light"] {
+  --bg-primary: #f2f4fc;
+  --bg-secondary: #ffffff;
+  --bg-tertiary: #e9edfb;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f6f8ff;
+  --text-primary: #151a30;
+  --text-secondary: #4c5578;
+  --text-muted: #8b93b3;
+  --text-tertiary: #5d6688;
+  --accent: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-light: rgba(79, 70, 229, 0.1);
+  --accent-glow: rgba(79, 70, 229, 0.18);
+  --success: #0d9f6e;
+  --success-bg: rgba(13, 159, 110, 0.1);
+  --warning: #b45309;
+  --warning-bg: rgba(180, 83, 9, 0.1);
+  --error: #e11d48;
+  --error-bg: rgba(225, 29, 72, 0.09);
+  --info: #0891b2;
+  --info-bg: rgba(8, 145, 178, 0.1);
+  --border: #e2e6f7;
+  --border-light: #eef1fb;
+  --border-hover: #cdd4ec;
+  --gold: #b45309;
+  --gold-bg: rgba(180, 83, 9, 0.09);
+  --silver: #64748b;
+  --silver-bg: rgba(100, 116, 139, 0.08);
+  --bronze: #9a3412;
+  --bronze-bg: rgba(154, 52, 18, 0.09);
+  --shadow: 0 1px 2px rgba(21, 26, 48, 0.06);
+  --shadow-sm: 0 1px 3px rgba(21, 26, 48, 0.08);
+  --shadow-md: 0 6px 18px rgba(21, 26, 48, 0.1);
+  --shadow-lg: 0 16px 40px rgba(21, 26, 48, 0.14);
+  --shadow-accent: 0 6px 24px rgba(79, 70, 229, 0.25);
+  --shadow-card: 0 1px 2px rgba(21, 26, 48, 0.05), 0 0 0 1px rgba(79, 70, 229, 0.06);
+  --header-gradient: linear-gradient(90deg, rgba(255, 255, 255, 0.92) 0%, rgba(248, 247, 255, 0.88) 100%);
+  --aurora-grad: linear-gradient(135deg, #6366f1 0%, #8b5cf6 45%, #06b6d4 100%);
+}
+
+/* Aurora: 分层极光环境光(覆盖 default 同款光效) */
+[data-theme-style="aurora"] body::before {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(124, 140, 255, 0.16) 0%, transparent 55%),
+    radial-gradient(ellipse at 88% 8%, rgba(167, 139, 250, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 65% 100%, rgba(34, 211, 238, 0.1) 0%, transparent 55%);
+}
+
+[data-theme-style="aurora"][data-theme="light"] body::before {
+  background:
+    radial-gradient(ellipse at 12% 0%, rgba(99, 102, 241, 0.1) 0%, transparent 55%),
+    radial-gradient(ellipse at 88% 8%, rgba(139, 92, 246, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 65% 100%, rgba(6, 182, 212, 0.08) 0%, transparent 55%);
+}
+
+/* Aurora: 玻璃面板底色 */
+[data-theme-style="aurora"] .glass {
+  background: rgba(17, 23, 38, 0.66);
+  border-color: rgba(124, 140, 255, 0.14);
+}
+
+[data-theme-style="aurora"][data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(79, 70, 229, 0.12);
+}
+
+/* Aurora: 渐变文本/渐变描边用三色极光渐变 */
+[data-theme-style="aurora"] .gradient-text {
+  background: var(--aurora-grad);
+}
+
+[data-theme-style="aurora"] .gradient-border::before {
+  background: var(--aurora-grad);
 }

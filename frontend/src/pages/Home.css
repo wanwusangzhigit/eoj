@@ -24,6 +24,14 @@
   padding: 28px;
 }
 
+
+/* Aurora theme: hero with gradient background */
+[data-theme-style="aurora"] .home-hero{
+  background: linear-gradient(135deg, var(--accent-light), var(--info-bg));
+  border: 1px solid var(--accent-light);
+  padding: 32px;
+}
+
 .home-hero-left {
   display: flex;
   flex-direction: column;
@@ -43,6 +51,17 @@
   font-size: 26px;
   font-weight: 700;
   color: var(--accent);
+}
+
+
+/* Aurora: larger gradient title */
+[data-theme-style="aurora"] .home-title{
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent), var(--info));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .home-date {
@@ -66,6 +85,14 @@
   font-weight: 500;
 }
 
+
+/* Aurora: larger welcome text */
+[data-theme-style="aurora"] .home-welcome{
+  font-size: 15px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
 .home-stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -76,6 +103,13 @@
 /* Default & Flat: no min-width on stats grid */
 [data-theme-style="default"] .home-stats-grid,
 [data-theme-style="flat"] .home-stats-grid {
+  min-width: auto;
+  gap: 10px;
+}
+
+
+/* Aurora: no min-width on stats grid */
+[data-theme-style="aurora"] .home-stats-grid{
   min-width: auto;
   gap: 10px;
 }
@@ -101,6 +135,12 @@
   background: var(--bg-card);
 }
 
+
+/* Aurora: stat card uses bg-card */
+[data-theme-style="aurora"] .home-stat-card{
+  background: var(--bg-card);
+}
+
 .home-stat-card:hover {
   border-color: var(--accent);
   color: var(--accent);
@@ -109,6 +149,13 @@
 /* Default & Flat: stat card hover changes bg */
 [data-theme-style="default"] .home-stat-card:hover,
 [data-theme-style="flat"] .home-stat-card:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+
+/* Aurora: stat card hover changes bg */
+[data-theme-style="aurora"] .home-stat-card:hover{
   background: var(--bg-secondary);
   color: var(--text-primary);
 }
@@ -142,6 +189,16 @@
 /* Default & Flat: announcement with gradient bg and full border */
 [data-theme-style="default"] .home-announcement,
 [data-theme-style="flat"] .home-announcement {
+  border-left: none;
+  background: var(--accent-light);
+  border: 1px solid var(--accent-light);
+  padding: 12px 16px;
+  font-size: 14px;
+}
+
+
+/* Aurora: announcement with gradient bg and full border */
+[data-theme-style="aurora"] .home-announcement{
   border-left: none;
   background: var(--accent-light);
   border: 1px solid var(--accent-light);
@@ -411,6 +468,13 @@
   padding: 14px 18px;
 }
 
+
+/* Aurora: no tertiary bg on card header */
+[data-theme-style="aurora"] .home-card-header{
+  background: none;
+  padding: 14px 18px;
+}
+
 .home-card-header h2 {
   display: flex;
   align-items: center;
@@ -442,8 +506,20 @@
   font-size: 15px;
 }
 
+
+/* Aurora: no left accent bar on h2 */
+[data-theme-style="aurora"] .home-card-header h2{
+  padding-left: 0;
+  font-size: 15px;
+}
+
 [data-theme-style="default"] .home-card-header h2::before,
 [data-theme-style="flat"] .home-card-header h2::before {
+  display: none;
+}
+
+
+[data-theme-style="aurora"] .home-card-header h2::before{
   display: none;
 }
 
@@ -501,8 +577,21 @@
   padding: 10px 18px;
 }
 
+
+/* Aurora: no left accent bar, larger padding */
+[data-theme-style="aurora"] .home-item{
+  border-left: none;
+  padding: 10px 18px;
+}
+
 [data-theme-style="default"] .home-item:hover,
 [data-theme-style="flat"] .home-item:hover {
+  background: var(--bg-secondary);
+  border-left-color: transparent;
+}
+
+
+[data-theme-style="aurora"] .home-item:hover{
   background: var(--bg-secondary);
   border-left-color: transparent;
 }
@@ -582,13 +671,30 @@
     padding: 20px;
   }
 
+  [data-theme-style="aurora"] .home-hero{
+    text-align: center;
+    align-items: center;
+    padding: 20px;
+  }
+
   [data-theme-style="default"] .home-hero-left,
   [data-theme-style="flat"] .home-hero-left {
     align-items: center;
   }
 
+
+  [data-theme-style="aurora"] .home-hero-left{
+    align-items: center;
+  }
+
   [data-theme-style="default"] .home-stats-grid,
   [data-theme-style="flat"] .home-stats-grid {
+    width: 100%;
+    min-width: 0;
+  }
+
+
+  [data-theme-style="aurora"] .home-stats-grid{
     width: 100%;
     min-width: 0;
   }

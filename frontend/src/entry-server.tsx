@@ -19,6 +19,7 @@ import { renderToReadableStream } from 'react-dom/server';
 import App from './App';
 import { serializeSSRData } from './ssr/hydrate';
 import { setLanguage } from './i18n';
+import { getSiteConfig } from './hooks/useSiteConfig';
 import type { SSRDataEnvelope } from './ssr/hydrate';
 
 export interface RenderResult {
@@ -51,9 +52,19 @@ export async function render(
   // 同时把 #root 替换为渲染结果。
   const inject = (html: string, rootContent: string): string => {
     const ssrDataTag = serializeSSRData(envelope);
-    const withData = html.includes('</head>')
+    let withData = html.includes('</head>')
       ? html.replace('</head>', `${ssrDataTag}\n  </head>`)
       : ssrDataTag + html;
+    // 首屏直接输出主题属性(SSR HTML 默认写死 default/dark),
+    // 避免 hydrate 前闪一下默认主题配色。
+    try {
+      const siteTheme = getSiteConfig().site.theme;
+      withData = withData.replace('data-theme-style="default"', `data-theme-style="${siteTheme}"`);
+    } catch { /* 读不到配置就保持默认 */ }
+    const ssrTheme = envelope.global.theme;
+    if (ssrTheme === 'dark' || ssrTheme === 'light') {
+      withData = withData.replace('data-theme="dark"', `data-theme="${ssrTheme}"`);
+    }
     return withData.replace(
       /<div id="root"[^>]*><\/div>/,
       `<div id="root">${rootContent}</div>`,

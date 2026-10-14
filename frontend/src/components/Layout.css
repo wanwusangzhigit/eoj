@@ -312,3 +312,121 @@
   height: 14px;
   border-radius: 3px;
 }
+
+/* ═══════════════════════════════════════════════════
+   Aurora Theme — 应用壳布局(全高侧边栏 + 内容列)
+   ═══════════════════════════════════════════════════ */
+[data-theme-style="aurora"] .layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-primary);
+  position: relative;
+}
+
+[data-theme-style="aurora"] .layout-body {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+}
+
+[data-theme-style="aurora"] .content-column {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+[data-theme-style="aurora"] .main-content {
+  flex: 1;
+  min-width: 0;
+  max-width: 1440px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 28px 32px;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+[data-theme-style="aurora"] .site-footer {
+  border-top: 1px solid var(--border);
+  background: var(--bg-secondary);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  padding: 26px 32px;
+  margin-top: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme-style="aurora"] .site-footer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(124, 140, 255, 0.65), rgba(34, 211, 238, 0.55), transparent);
+}
+
+[data-theme-style="aurora"][data-theme="light"] .site-footer {
+  background: rgba(255, 255, 255, 0.78);
+}
+
+[data-theme-style="aurora"] .footer-inner {
+  max-width: 1440px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+[data-theme-style="aurora"] .footer-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+[data-theme-style="aurora"] .footer-text-multi {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+[data-theme-style="aurora"] .footer-custom-text {
+  white-space: pre-wrap;
+}
+
+[data-theme-style="aurora"] .footer-links {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+[data-theme-style="aurora"] .footer-links a {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  padding: 6px 12px;
+  border-radius: var(--radius);
+}
+
+[data-theme-style="aurora"] .footer-links a:hover {
+  color: var(--accent);
+  background: var(--accent-light);
+  text-decoration: none;
+}
+
+@media (max-width: 768px) {
+  [data-theme-style="aurora"] .main-content {
+    padding: 20px 16px;
+  }
+
+  [data-theme-style="aurora"] .site-footer {
+    padding: 20px 16px;
+  }
+}

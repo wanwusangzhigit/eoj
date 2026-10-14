@@ -10,6 +10,12 @@
   gap: 20px;
 }
 
+
+/* Aurora: larger gap */
+[data-theme-style="aurora"] .submissions-page{
+  gap: 20px;
+}
+
 .filter-bar {
   display: flex;
   align-items: center;
@@ -37,6 +43,13 @@
 /* Default & Flat: larger filter select */
 [data-theme-style="default"] .filter-select,
 [data-theme-style="flat"] .filter-select {
+  padding: 6px 12px;
+  font-size: 14px;
+}
+
+
+/* Aurora: larger filter select */
+[data-theme-style="aurora"] .filter-select{
   padding: 6px 12px;
   font-size: 14px;
 }
@@ -94,6 +107,13 @@
   letter-spacing: 0.5px;
 }
 
+
+/* Aurora: uppercase header with letter-spacing */
+[data-theme-style="aurora"] .submissions-table-header{
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
 .submission-row {
   display: flex;
   align-items: center;
@@ -120,8 +140,20 @@
   border-top: 1px solid var(--border);
 }
 
+
+/* Aurora: border-top on rows instead of border-bottom */
+[data-theme-style="aurora"] .submission-row{
+  border-bottom: none;
+  border-top: 1px solid var(--border);
+}
+
 [data-theme-style="default"] .submission-row:last-child,
 [data-theme-style="flat"] .submission-row:last-child {
+  border-bottom: none;
+}
+
+
+[data-theme-style="aurora"] .submission-row:last-child{
   border-bottom: none;
 }
 

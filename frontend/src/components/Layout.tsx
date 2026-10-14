@@ -34,6 +34,8 @@ export default function Layout({ children }: { children: ReactNode }) {
   const [friendLinks, setFriendLinks] = useState<{ id: number; name: string; url: string; description: string; icon: string }[]>(ssrGlobal?.friendLinks ?? []);
   const [footerPages, setFooterPages] = useState<{ id: number; slug: string; title: string }[]>(ssrGlobal?.pages ?? []);
   const isClassic = config.site.theme === 'classic';
+  const isAurora = config.site.theme === 'aurora';
+  const usesSidebar = isClassic || isAurora;
 
   // 页脚友情链接 + 自定义页面导航:SSR 命中时无需再请求
   useEffect(() => {
@@ -98,34 +100,9 @@ export default function Layout({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  return (
-    <div className="layout">
-      <Header
-        onMenuClick={() => setSidebarOpen((v) => !v)}
-        unreadMsg={displayUnreadMsg}
-      />
-      {isClassic ? (
-        <div className="layout-body">
-          <Sidebar
-            open={sidebarOpen}
-            onClose={() => setSidebarOpen(false)}
-            unreadMsg={displayUnreadMsg}
-          />
-          {sidebarOpen && (
-            <div
-              className="sidebar-mask"
-              onClick={() => setSidebarOpen(false)}
-            />
-          )}
-          <main className="main-content page-transition">
-            {children}
-          </main>
-        </div>
-      ) : (
-        <main className="main-content page-transition">
-          {children}
-        </main>
-      )}
+  // 页脚:aurora 主题将其放进内容列(与主内容同宽对齐),
+  // 其余主题保持原结构(布局体之外、全宽)。
+  const footerEl = (
       <footer className="site-footer">
         <div className="footer-inner">
           <div className="footer-text footer-text-multi">
@@ -176,6 +153,46 @@ export default function Layout({ children }: { children: ReactNode }) {
           )}
         </div>
       </footer>
+  );
+
+  return (
+    <div className="layout">
+      <Header
+        onMenuClick={() => setSidebarOpen((v) => !v)}
+        unreadMsg={displayUnreadMsg}
+      />
+      {usesSidebar ? (
+        <div className="layout-body">
+          <Sidebar
+            open={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            unreadMsg={displayUnreadMsg}
+          />
+          {sidebarOpen && (
+            <div
+              className="sidebar-mask"
+              onClick={() => setSidebarOpen(false)}
+            />
+          )}
+          {isAurora ? (
+            <div className="content-column">
+              <main className="main-content page-transition">
+                {children}
+              </main>
+              {footerEl}
+            </div>
+          ) : (
+            <main className="main-content page-transition">
+              {children}
+            </main>
+          )}
+        </div>
+      ) : (
+        <main className="main-content page-transition">
+          {children}
+        </main>
+      )}
+      {!isAurora && footerEl}
       <Toast />
 
       {/* Keyboard Shortcuts Dialog */}

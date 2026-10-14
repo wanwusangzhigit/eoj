@@ -5,7 +5,7 @@ export interface SiteConfig {
     description: string;
     icon: string;
     favicon: string;
-    theme: 'default' | 'classic' | 'flat';
+    theme: 'default' | 'classic' | 'flat' | 'aurora';
   };
   footer: {
     enabled: boolean;
