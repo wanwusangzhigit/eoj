@@ -5,6 +5,7 @@ import { getSiteConfig } from './hooks/useSiteConfig';
 import { consumeSSRData, setSSRCache, readBrowserCookie } from './ssr/hydrate';
 import { primeAuthFromSSR } from './store/auth';
 import { setLanguage } from './i18n';
+import { applyThemeAttributes } from './utils/siteTheme';
 
 /**
  * 客户端入口(hydrate 模式)。
@@ -26,9 +27,11 @@ primeAuthFromSSR(ssrEnvelope);
 
 // 3. 应用主题样式(SSR 已在 html 标签上设置 data-theme,这里仅同步 store 状态)
 //    由 store/theme.ts 模块加载时执行 resolveInitialTheme 完成首次同步。
+//    notebook 主题需要同时写入 data-theme-style="default" + data-theme-flavor="notebook"，
+//    以便复用 default 主题的全部组件 CSS 规则。
 const siteTheme = getSiteConfig().site.theme;
 if (typeof document !== 'undefined') {
-  document.documentElement.setAttribute('data-theme-style', siteTheme);
+  applyThemeAttributes(document.documentElement, siteTheme);
 }
 
 // 4. 设置语言(SSR 注入优先,然后查 cookie,默认 zh)

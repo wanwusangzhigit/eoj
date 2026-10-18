@@ -7,11 +7,17 @@ frontend/node_modules
 backend/.wrangler
 frontend/pnpm-lock.yaml
 backend/.env
+backend/wrangler.toml.prod
 .env
 __pycache__/
 .atomcode
 .claude
 .vscode
 .idea
+.agents
 *.tsbuildinfo
 tmp.txt
+CHANGELOG.md
+AGENTS.md
+skills-lock.json
+backend/.wrangler.bak

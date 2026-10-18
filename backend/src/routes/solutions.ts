@@ -3,6 +3,7 @@ import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { sendNotification, NotificationType } from '../utils/notify';
 import { captchaMiddleware } from '../middleware/captcha';
+import { sanitizePlainText, sanitizeRichText } from '../utils/sanitize';
 
 const solutions = new Hono<AppType>();
 
@@ -188,9 +189,13 @@ solutions.post('/', authMiddleware, captchaMiddleware('solution'), async (c) => 
     return c.json({ success: false, error: { message: 'Problem not found', code: 'NOT_FOUND' } }, 404);
   }
 
+  // 审计 #H-18: 服务端净化（保留 Markdown 代码块）。
+  const cleanTitle = sanitizePlainText(title, 200);
+  const cleanContent = sanitizeRichText(content);
+
   const result = await c.env.DB.prepare(
     "INSERT INTO solutions (problem_id, user_id, title, content, language, review_status) VALUES (?, ?, ?, ?, ?, 'pending')"
-  ).bind(problem_id, user.userId, title, content, language || '').run();
+  ).bind(problem_id, user.userId, cleanTitle, cleanContent, language || '').run();
 
   return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Solution created, awaiting review' } }, 201);
 });
@@ -308,16 +313,17 @@ solutions.put('/:id', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'content must be at most 200000 characters', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-18: 服务端净化（保留 Markdown 代码块）。
   const fields: string[] = [];
   const values: any[] = [];
 
   if (body.title !== undefined) {
     fields.push('title = ?');
-    values.push(body.title);
+    values.push(sanitizePlainText(body.title, 200));
   }
   if (body.content !== undefined) {
     fields.push('content = ?');
-    values.push(body.content);
+    values.push(sanitizeRichText(body.content));
   }
   if (body.language !== undefined) {
     fields.push('language = ?');

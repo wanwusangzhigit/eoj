@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, isAdmin } from '../middleware/auth';
 import { escapeLikeWildcard } from '../utils/helpers';
-import { validateSlug } from '../utils/validator';
+import { validateSlug, validateUrl } from '../utils/validator';
 import { fetchTestcases, saveTestcases, deleteTestcases } from '../utils/github-testcases';
 import { fetchSpjCode, saveSpjCode, deleteSpjCode } from '../utils/github-spj';
 import { parseContestTimeToMs } from '../utils/contest-time';
@@ -170,6 +170,15 @@ teams.post('/', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'slug must be alphanumeric with dashes', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-22: avatar_url 必须经过 validateUrl，否则 `javascript:` / `data:image/svg+xml`
+  // 等危险协议会直接写入 DB，前端在 <img src> / <a href> 中渲染即可触发存储型 XSS。
+  if (avatar_url !== undefined && avatar_url !== null && avatar_url !== '') {
+    const urlErr = validateUrl(avatar_url);
+    if (urlErr) {
+      return c.json({ success: false, error: { message: `Invalid avatar_url: ${urlErr}`, code: 'BAD_REQUEST' } }, 400);
+    }
+  }
+
   const validJoinMethods = ['free', 'approval', 'invite'];
   const effectiveJoinMethod = validJoinMethods.includes(join_method) ? join_method : 'free';
 
@@ -208,6 +217,14 @@ teams.put('/:id', authMiddleware, async (c) => {
 
   const body = await c.req.json();
   const { name, description, avatar_url, is_public, join_method } = body;
+
+  // 审计 #H-22: 编辑团队头像同样走 validateUrl，与创建路径保持一致。
+  if (avatar_url !== undefined && avatar_url !== null && avatar_url !== '') {
+    const urlErr = validateUrl(avatar_url);
+    if (urlErr) {
+      return c.json({ success: false, error: { message: `Invalid avatar_url: ${urlErr}`, code: 'BAD_REQUEST' } }, 400);
+    }
+  }
 
   const validJoinMethods = ['free', 'approval', 'invite'];
   const effectiveJoinMethod = validJoinMethods.includes(join_method) ? join_method : null;

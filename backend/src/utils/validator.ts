@@ -73,7 +73,16 @@ export function validateLanguage(language: string): string | null {
  *   - empty / null / undefined (treated as "clear")
  *   - absolute `http://` / `https://` URLs
  *   - site-relative URLs starting with `/` (excluding protocol-relative `//host`)
- *   - protocol-safe data URLs for inline images: `data:image/...`
+ *
+ * Blocked (审计 #H-22):
+ *   - `data:` URLs entirely — including `data:image/png` 与 `data:image/svg+xml`。
+ *     SVG 可内联执行 JS（`<svg onload=...>`）；即便是真实 PNG 也无合理使用场景
+ *     （头像应通过 /uploads/avatar 上传到对象存储）。`data:` 还会被 CORS 拒绝，
+ *     导致下游 CSP / cache 行为异常。
+ *   - `javascript:` / `vbscript:` / 一切非 http(s) 协议
+ *
+ * 历史：此前允许 `data:image/*`，但 `data:image/svg+xml,<svg onload=alert(1)>`
+ * 可作为存储型 XSS 投递面（通过 `<a href=data:...>` / `<iframe src=data:...>` 渲染即触发）。
  */
 export function validateUrl(url: unknown): string | null {
   if (url === undefined || url === null || url === '') return null;
@@ -90,7 +99,6 @@ export function validateUrl(url: unknown): string | null {
   try {
     const u = new URL(trimmed);
     if (u.protocol === 'http:' || u.protocol === 'https:') return null;
-    if (u.protocol === 'data:' && /^data:image\//i.test(trimmed)) return null;
     return `URL scheme "${u.protocol}" not allowed`;
   } catch {
     return 'Invalid URL format';

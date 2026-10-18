@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 import { sendNotification, NotificationType } from '../utils/notify';
 import { captchaMiddleware } from '../middleware/captcha';
 import { escapeLikeWildcard } from '../utils/helpers';
+import { sanitizeRichText, sanitizePlainText } from '../utils/sanitize';
 
 const blogs = new Hono<AppType>();
 
@@ -112,9 +113,14 @@ blogs.post('/', authMiddleware, captchaMiddleware('blog'), async (c) => {
     return c.json({ success: false, error: { message: 'tags must be at most 500 characters', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-18: 服务端净化富文本（保留 Markdown 代码块），剥离 <script>/<iframe>、on* 事件、javascript: 等危险模式。
+  const cleanTitle = sanitizePlainText(title, 200);
+  const cleanContent = sanitizeRichText(content);
+  const cleanTags = tags ? sanitizePlainText(tags, 500) : '';
+
   const result = await c.env.DB.prepare(
     'INSERT INTO blogs (user_id, title, content, tags, status) VALUES (?, ?, ?, ?, ?)'
-  ).bind(user.userId, title, content, tags || '', status || 'published').run();
+  ).bind(user.userId, cleanTitle, cleanContent, cleanTags, status || 'published').run();
 
   return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Blog created' } }, 201);
 });
@@ -145,11 +151,16 @@ blogs.put('/:id', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'tags must be at most 500 characters', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-18: 服务端净化（仅净化提供的字段）
+  const cleanTitle = title !== undefined ? sanitizePlainText(title, 200) : undefined;
+  const cleanContent = content !== undefined ? sanitizeRichText(content) : undefined;
+  const cleanTags = tags !== undefined ? sanitizePlainText(tags, 500) : undefined;
+
   await c.env.DB.prepare(
     `UPDATE blogs SET title = COALESCE(?, title), content = COALESCE(?, content),
        tags = COALESCE(?, tags), status = COALESCE(?, status),
        updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-  ).bind(title ?? null, content ?? null, tags ?? null, status ?? null, id).run();
+  ).bind(cleanTitle ?? null, cleanContent ?? null, cleanTags ?? null, status ?? null, id).run();
 
   return c.json({ success: true, data: { message: 'Blog updated' } });
 });

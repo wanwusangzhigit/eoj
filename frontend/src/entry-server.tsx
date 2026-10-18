@@ -20,6 +20,7 @@ import App from './App';
 import { serializeSSRData } from './ssr/hydrate';
 import { setLanguage } from './i18n';
 import { getSiteConfig } from './hooks/useSiteConfig';
+import { injectThemeAttributesIntoHtml } from './utils/siteTheme';
 import type { SSRDataEnvelope } from './ssr/hydrate';
 
 export interface RenderResult {
@@ -57,9 +58,10 @@ export async function render(
       : ssrDataTag + html;
     // 首屏直接输出主题属性(SSR HTML 默认写死 default/dark),
     // 避免 hydrate 前闪一下默认主题配色。
+    // notebook 主题特殊：保留 data-theme-style="default" 同时注入 data-theme-flavor="notebook"。
     try {
       const siteTheme = getSiteConfig().site.theme;
-      withData = withData.replace('data-theme-style="default"', `data-theme-style="${siteTheme}"`);
+      withData = injectThemeAttributesIntoHtml(withData, siteTheme);
     } catch { /* 读不到配置就保持默认 */ }
     const ssrTheme = envelope.global.theme;
     if (ssrTheme === 'dark' || ssrTheme === 'light') {
@@ -71,36 +73,53 @@ export async function render(
     );
   };
 
-  let responseBody: string;
+  // SSR 渲染。任何 render 抛错都不再静默吞掉——返回空 root 会让客户端
+  // hydrate 时报 #418(因为客户端能正常渲染,但 DOM 与"服务端空 root"不一致)。
+  // 让错误向上抛,后端 ssr.ts 的 catch 会返回 null,触发 SPA 壳子回退。
+  //
+  // 诊断模式:把错误堆栈作为 HTML 注释注入到 root 内,方便排查生产 SSR 故障。
+  // 渲染成功时 root 内容是真实 React DOM,诊断注释只挂在失败路径。
+  const escapeForComment = (s: string): string => s.replace(/-/g, '\\u002d').slice(0, 800);
+  let diagnosticComment = '';
+  let stream;
   try {
-    const stream = await renderToReadableStream(
+    stream = await renderToReadableStream(
       <StrictMode>
         <App ssrLocation={location} />
       </StrictMode>,
       {
         onError(err: unknown, info?: { componentStack?: string }) {
           status = 500;
-          console.error('[SSR] render error:', err);
+          const stack = err instanceof Error ? err.stack || err.message : String(err);
+          console.error('[SSR] render error:', stack);
           if (info?.componentStack) {
             console.error('[SSR] componentStack:', String(info.componentStack).slice(0, 600));
+          }
+          // 累积首个错误的栈,作为 HTML 注释注入到 root
+          if (!diagnosticComment) {
+            const cs = info?.componentStack ? '\\nCOMPONENT_STACK:' + String(info.componentStack).slice(0, 400) : '';
+            diagnosticComment = '<!--SSR_ERROR:' + escapeForComment(stack) + escapeForComment(cs) + '-->';
           }
         },
       },
     );
-
-    await stream.allReady.catch((err: unknown) => {
-      status = 500;
-      console.error('[SSR] stream not ready:', err);
-    });
-
-    const body = await new Response(stream).text();
-    responseBody = inject(indexHtml, body);
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error('[SSR] fatal:', msg);
-    responseBody = inject(indexHtml, '');
-    status = 200;
+    const stack = e instanceof Error ? e.stack || e.message : String(e);
+    console.error('[SSR] renderToReadableStream threw:', stack);
+    return { html: inject(indexHtml, '<!--SSR_INIT_ERROR:' + escapeForComment(stack) + '-->'), status: 200, error: 'SSR init error' };
   }
+
+  await stream.allReady.catch((err: unknown) => {
+    status = 500;
+    const stack = err instanceof Error ? err.stack || err.message : String(err);
+    console.error('[SSR] stream not ready:', stack);
+    if (!diagnosticComment) {
+      diagnosticComment = '<!--SSR_STREAM_ERROR:' + escapeForComment(stack) + '-->';
+    }
+  });
+
+  const body = await new Response(stream).text();
+  const responseBody = inject(indexHtml, body + diagnosticComment);
 
   return { html: responseBody, status, error: status === 500 ? 'SSR partial' : undefined };
 }

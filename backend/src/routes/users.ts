@@ -965,10 +965,29 @@ users.put('/change-password', authMiddleware, async (c) => {
 
   const dbUser: any = await c.env.DB.prepare('SELECT password_hash FROM users WHERE id = ?').bind(user.userId).first();
 
+  // 审计 #H-17: 统一使用 cost=12（与其他路径一致），并在改密后吊销所有旧 JWT。
+  const nowSec = Math.floor(Date.now() / 1000);
+
   if (!dbUser?.password_hash) {
     // OAuth user without password - allow setting initial password
-    const hash = bcrypt.hashSync(newPassword, 10);
-    await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.userId).run();
+    // 同样吊销旧 token（不含本次会话签发的，前端会拿到新 token 重新登录）
+    const hash = bcrypt.hashSync(newPassword, 12);
+    await c.env.DB.prepare(
+      'UPDATE users SET password_hash = ?, token_invalid_before = ? WHERE id = ?'
+    ).bind(hash, nowSec, user.userId).run();
+    // 同步刷新当前响应所用 cookie，避免本次会话立刻失效
+    try {
+      const { signJWT } = await import('../utils/jwt');
+      const freshUser: any = await c.env.DB.prepare('SELECT id, username, role, permissions FROM users WHERE id = ?').bind(user.userId).first();
+      const newToken = await signJWT({
+        userId: freshUser.id,
+        username: freshUser.username,
+        role: freshUser.role,
+        permissions: freshUser.permissions ? JSON.parse(freshUser.permissions) : [],
+      }, c.env.JWT_SECRET);
+      const { setAuthCookie } = await import('../utils/cookie');
+      setAuthCookie(c, newToken);
+    } catch { /* ignore cookie refresh failure */ }
     return c.json({ success: true, data: { message: 'Password set successfully' } });
   }
 
@@ -976,8 +995,23 @@ users.put('/change-password', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Old password is incorrect', code: 'UNAUTHORIZED' } }, 401);
   }
 
-  const hash = bcrypt.hashSync(newPassword, 10);
-  await c.env.DB.prepare('UPDATE users SET password_hash = ? WHERE id = ?').bind(hash, user.userId).run();
+  const hash = bcrypt.hashSync(newPassword, 12);
+  await c.env.DB.prepare(
+    'UPDATE users SET password_hash = ?, token_invalid_before = ? WHERE id = ?'
+  ).bind(hash, nowSec, user.userId).run();
+  // 给当前会话签发一个 iat >= token_invalid_before 的新 token，避免用户改密后立即被踢出。
+  try {
+    const { signJWT } = await import('../utils/jwt');
+    const freshUser: any = await c.env.DB.prepare('SELECT id, username, role, permissions FROM users WHERE id = ?').bind(user.userId).first();
+    const newToken = await signJWT({
+      userId: freshUser.id,
+      username: freshUser.username,
+      role: freshUser.role,
+      permissions: freshUser.permissions ? JSON.parse(freshUser.permissions) : [],
+    }, c.env.JWT_SECRET);
+    const { setAuthCookie } = await import('../utils/cookie');
+    setAuthCookie(c, newToken);
+  } catch { /* ignore cookie refresh failure */ }
   return c.json({ success: true, data: { message: 'Password changed successfully' } });
 });
 

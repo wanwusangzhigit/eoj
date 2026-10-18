@@ -791,3 +791,345 @@ mark.search-highlight {
 [data-theme-style="aurora"] .gradient-border::before {
   background: var(--aurora-grad);
 }
+
+/* ═══════════════════════════════════════════════════
+   Notebook Theme — 算法笔记本（中学信息学奥赛美学）
+   ═══════════════════════════════════════════════════
+
+   设计意图
+   --------
+   给中学信息学奥赛（NOI/NOIP）学生做的算法笔记本风格主题。
+   把 OJ 当作一本精致的算法笔记：温暖纸张色背景、宋体标题、
+   淡淡的虚线卡片边框、批注朱砂红强调色。
+
+   和其他主题的差异
+   ----------------
+   - 与 default（GitHub Dark）：完全反转的明度方向，温暖纸感
+   - 与 classic（粉蓝渐变）：去掉所有渐变，回归纸张本身
+   - 与 aurora（极光深空）：相反的色温与装饰逻辑
+   - 与 Luogu/Codeforces/LeetCode：全部用黑体标题，这里用宋体——
+     这是该主题最显著的视觉差异点，不会被误认为任何竞品
+
+   实现策略
+   --------
+   通过 `data-theme-flavor="notebook"` 选择器做差异化覆盖。
+   组件层面的 .btn / .card / .form-input 等沿用 default 主题的样式
+   （由 html[data-theme-style="default"] 命中），本主题只覆盖：
+     1. CSS 变量（调色板、字体族、圆角、阴影）
+     2. 装饰性元素（hero 下划线、卡片边框风格、链接 hover）
+     3. 排版细节（宋体标题、行高、列表演线）
+*/
+
+[data-theme-flavor="notebook"] {
+  /* ── 调色板（温暖纸张 + 墨色 + 古籍青 + 朱砂批注）── */
+  --bg-primary: #F4EFE2;        /* paper：温暖纸张米色，比 Anthropic 奶油白更黄 */
+  --bg-secondary: #FBF7EB;      /* 浅纸色：卡片底 */
+  --bg-tertiary: #EDE6D2;       /* 深一档纸色：辅助区域 */
+  --bg-card: #FBF7EB;           /* 卡片：浅纸色 */
+  --bg-card-hover: #F4EFE2;     /* 卡片 hover：与主背景同色，柔和过渡 */
+
+  --text-primary: #1F1B16;      /* ink：墨黑，暖色调而非中性黑 */
+  --text-secondary: #6B5F4D;    /* ink-muted：暖墨灰 */
+  --text-muted: #9A8E78;        /* 淡墨：辅助文字 */
+  --text-tertiary: #6B5F4D;
+
+  --accent: #2D5F87;            /* indigo：靛青强调（中文古籍封面青蓝色）*/
+  --accent-hover: #1F4A6E;      /* hover：再深一档 */
+  --accent-light: rgba(45, 95, 135, 0.08);
+  --accent-glow: rgba(45, 95, 135, 0.18);
+  --primary: var(--accent);
+
+  /* ── 状态色：墨水/批注色板（比通用 SaaS 色板更柔和）── */
+  --success: #5E8D5E;           /* 竹绿：AC 通过，像教科书批改的对勾绿 */
+  --success-bg: rgba(94, 141, 94, 0.12);
+  --warning: #B8923D;           /* 茶金：警示，像茶叶渍 */
+  --warning-bg: rgba(184, 146, 61, 0.12);
+  --error: #B84C2C;             /* vermilion：朱砂红，批注色（WA/报错）*/
+  --error-bg: rgba(184, 76, 44, 0.12);
+  --info: #2D5F87;
+  --info-bg: rgba(45, 95, 135, 0.08);
+
+  --border: #D8CFBE;            /* rule：笔记本辅助线色 */
+  --border-light: #E8E0CB;
+  --border-hover: #B8AC95;
+
+  /* ── 奖牌色：调成偏古铜，避免廉价的金色饱和度 ── */
+  --gold: #B8923D;
+  --gold-bg: rgba(184, 146, 61, 0.14);
+  --silver: #8B8579;
+  --silver-bg: rgba(139, 133, 121, 0.14);
+  --bronze: #9C6B3F;
+  --bronze-bg: rgba(156, 107, 63, 0.14);
+
+  /* ── 难度色：保持识别度，但全部降低饱和度 ── */
+  --diff-none: #9A8E78;
+  --diff-easy: #5E8D5E;
+  --diff-easy-mid: #8FA86E;
+  --diff-mid: #B8923D;
+  --diff-hard: #B84C2C;
+  --diff-hard-plus: #9A3B22;
+  --diff-province: #2D5F87;
+  --diff-province-plus: #5A4B7F;
+  --diff-noi: #2E1F5A;
+
+  /* ── 圆角：比 default 略小，更接近书本的硬朗感 ── */
+  --radius: 4px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+
+  /* ── 阴影：几乎不用阴影，靠边框与底色变化分层 ── */
+  --shadow: 0 0 0 1px var(--border);
+  --shadow-sm: 0 0 0 1px var(--border);
+  --shadow-md: 0 1px 2px rgba(31, 27, 22, 0.04);
+  --shadow-lg: 0 2px 6px rgba(31, 27, 22, 0.06);
+  --shadow-accent: none;
+  --shadow-card: 0 0 0 1px var(--border);
+
+  --transition: 0.18s ease;
+  --transition-fast: 0.12s ease;
+
+  /* ── 字体：宋体作为标志性差异 ──
+     中文用思源宋体（也可回退到本地宋体），西文用 Georgia（书卷气），
+     标题尤其出效果。正文用 Noto Sans SC，保证可读性。
+     代码块用 JetBrains Mono（与主字体形成明显对比）。*/
+  --font-sans: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "STSong",
+               Georgia, "Times New Roman", serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", Consolas, Menlo, monospace;
+
+  /* 用于覆盖：正文字体仍用无衬线（保持可读），仅标题走衬线 */
+  --font-body: "Source Han Sans SC", "Noto Sans SC", "PingFang SC",
+               -apple-system, "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  --font-display: var(--font-sans);
+
+  --header-gradient: none;
+}
+
+/* 笔记本暗色模式：夜晚自习室——墨蓝桌面 + 同一套字体逻辑。
+   不做强对比的反转，而是把纸张换成深色草稿纸，保留笔记本质感。 */
+[data-theme-flavor="notebook"][data-theme="dark"] {
+  --bg-primary: #1A1814;        /* 深墨纸：暖黑而非冷黑 */
+  --bg-secondary: #221F1A;
+  --bg-tertiary: #2A2620;
+  --bg-card: #221F1A;
+  --bg-card-hover: #2A2620;
+
+  --text-primary: #E8DFC8;      /* 米色文字，像深色纸上的浅色铅笔 */
+  --text-secondary: #A89B7E;
+  --text-muted: #6E6450;
+  --text-tertiary: #A89B7E;
+
+  --accent: #6BA0C8;            /* 暗色下提亮的古籍青 */
+  --accent-hover: #88B5D8;
+  --accent-light: rgba(107, 160, 200, 0.16);
+  --accent-glow: rgba(107, 160, 200, 0.32);
+
+  --success: #88B688;
+  --success-bg: rgba(136, 182, 136, 0.18);
+  --warning: #D5A958;
+  --warning-bg: rgba(213, 169, 88, 0.18);
+  --error: #D86F50;
+  --error-bg: rgba(216, 111, 80, 0.18);
+  --info: #6BA0C8;
+  --info-bg: rgba(107, 160, 200, 0.16);
+
+  --border: #3A342A;
+  --border-light: #2A2620;
+  --border-hover: #524A3C;
+
+  --gold: #D5A958;
+  --gold-bg: rgba(213, 169, 88, 0.18);
+  --silver: #A89B7E;
+  --silver-bg: rgba(168, 155, 126, 0.18);
+  --bronze: #B58458;
+  --bronze-bg: rgba(181, 132, 88, 0.18);
+
+  --shadow: 0 0 0 1px var(--border);
+  --shadow-sm: 0 0 0 1px var(--border);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 0 0 1px var(--border);
+}
+
+/* ── 全局排版：notebook 用衬线作为标志性差异 ──
+   body 字体保持无衬线（中文连续阅读更舒适），但所有标题、
+   .home-title、卡片标题等走衬线。这是与其他 OJ 最大的视觉差异。 */
+[data-theme-flavor="notebook"] body {
+  font-family: var(--font-body);
+  line-height: 1.75;           /* 略松：中文阅读更舒展，像教科书的行距 */
+  letter-spacing: 0.01em;       /* 微增字距：避免宋体连续阅读时显得太密 */
+}
+
+/* 标题层级全部走宋体（Notebook 的核心识别点） */
+[data-theme-flavor="notebook"] h1,
+[data-theme-flavor="notebook"] h2,
+[data-theme-flavor="notebook"] h3,
+[data-theme-flavor="notebook"] h4,
+[data-theme-flavor="notebook"] h5,
+[data-theme-flavor="notebook"] h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.005em;
+  color: var(--text-primary);
+}
+
+/* 较大标题再加微妙的字距收紧，让宋体的字形特点更突出 */
+[data-theme-flavor="notebook"] h1 {
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+[data-theme-flavor="notebook"] h2 {
+  line-height: 1.35;
+}
+
+/* ── 链接：增加下划线偏移，模仿书本里"指向另一页"的视觉线索 ── */
+[data-theme-flavor="notebook"] a {
+  text-decoration-color: var(--accent-light);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+  transition: color var(--transition-fast), text-decoration-color var(--transition-fast);
+}
+[data-theme-flavor="notebook"] a:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+}
+
+/* ── 卡片：虚线边框，像笔记本的辅助线 ──
+   这是与所有 SaaS 主题最大的差异——没有阴影、没有渐变、
+   只有纸张感的虚线轮廓。 */
+[data-theme-flavor="notebook"] .card,
+[data-theme-flavor="notebook"] .home-card,
+[data-theme-flavor="notebook"] .home-recommend-section {
+  background: var(--bg-card);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+  transition: border-color var(--transition);
+}
+[data-theme-flavor="notebook"] .card:hover,
+[data-theme-flavor="notebook"] .home-card:hover {
+  border-color: var(--border-hover);
+  border-style: dashed;
+}
+
+/* 输入框：同样改成虚线，呼应整体笔记本质感 */
+[data-theme-flavor="notebook"] .form-input,
+[data-theme-flavor="notebook"] .form-textarea,
+[data-theme-flavor="notebook"] .form-select,
+[data-theme-flavor="notebook"] input[type="text"],
+[data-theme-flavor="notebook"] input[type="email"],
+[data-theme-flavor="notebook"] input[type="password"],
+[data-theme-flavor="notebook"] textarea,
+[data-theme-flavor="notebook"] select {
+  font-family: var(--font-body);
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+[data-theme-flavor="notebook"] .form-input:focus,
+[data-theme-flavor="notebook"] .form-textarea:focus,
+[data-theme-flavor="notebook"] input:focus,
+[data-theme-flavor="notebook"] textarea:focus,
+[data-theme-flavor="notebook"] select:focus {
+  border-color: var(--accent);
+  border-style: solid;           /* 聚焦时变为实线，表达"确定写入"状态 */
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-light);
+}
+
+/* ── 按钮：保留 default 的实色按钮逻辑，但去掉所有"光泽感" ──
+   notebook 的按钮是"印章"——坚定、扁平，不像 SaaS 按钮那样想弹出屏幕。 */
+[data-theme-flavor="notebook"] .btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-radius: var(--radius);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast),
+              color var(--transition-fast);
+}
+[data-theme-flavor="notebook"] .btn-primary {
+  background: var(--accent);
+  color: #FBF7EB;                /* 用纸色作为按钮文字色，呼应主体 */
+}
+[data-theme-flavor="notebook"] .btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+[data-theme-flavor="notebook"] .btn-secondary {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+[data-theme-flavor="notebook"] .btn-secondary:hover:not(:disabled) {
+  background: var(--bg-tertiary);
+  border-color: var(--border-hover);
+}
+[data-theme-flavor="notebook"] .btn-outline {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+[data-theme-flavor="notebook"] .btn-outline:hover:not(:disabled) {
+  background: var(--accent-light);
+}
+
+/* ── 列表项：用宋体的破折号"—"取代圆点 ──
+   替换难度圆点、home-item 圆点，统一为破折号。 */
+[data-theme-flavor="notebook"] .difficulty-dot {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+}
+[data-theme-flavor="notebook"] .difficulty-dot::before {
+  content: '—';
+  margin-right: 4px;
+  color: inherit;
+}
+
+/* ── 标记/标签：去掉硬背景色，改成淡淡的批注边框 ── */
+[data-theme-flavor="notebook"] .tag,
+[data-theme-flavor="notebook"] .badge,
+[data-theme-flavor="notebook"] .recommend-tag {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-weight: 500;
+  border-radius: var(--radius);
+}
+
+/* ── 选中态：朱砂红高亮（批注感）── */
+[data-theme-flavor="notebook"] ::selection {
+  background: rgba(184, 76, 44, 0.18);
+  color: var(--text-primary);
+}
+
+/* ── 滚动条：保持极淡，不打扰阅读 ── */
+[data-theme-flavor="notebook"] ::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+[data-theme-flavor="notebook"] ::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+[data-theme-flavor="notebook"] ::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
+}
+
+/* ── mark 高亮：黄色荧光笔效果 ── */
+[data-theme-flavor="notebook"] mark.search-highlight {
+  background: rgba(184, 146, 61, 0.25);
+  color: var(--text-primary);
+  padding: 0 3px;
+  border-radius: 2px;
+  font-weight: 600;
+}
+
+/* ── Reduced motion 支持：notebook 本身动效极少，但同步尊重 ── */
+@media (prefers-reduced-motion: reduce) {
+  [data-theme-flavor="notebook"] * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

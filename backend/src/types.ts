@@ -33,6 +33,12 @@ export interface UserPayload {
   permissions?: string[];
   avatar_url?: string;
   created_at?: string;
+  // JWT 签发时间(Unix 秒)。审计 #H-17:用于服务端吊销比对,
+  // 若 payload.iat < users.token_invalid_before 则拒绝该 token。
+  iat?: number;
+  // 按比赛粒度的 admin 授权 contest_id 列表(/me 与 auth 中间件都会填充)。
+  // 前端 useAuthStore.user.contest_admin_for 与 backend isContestOrganizer() 都依赖此字段。
+  contest_admin_for?: number[];
 }
 
 export type AppType = {

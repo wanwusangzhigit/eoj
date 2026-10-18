@@ -7,6 +7,15 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
 const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 
+// 审计 #H-21: 图片扩展名白名单，禁止包含路径分隔符（防止 `evil.png/sub/exploit` 污染 GitHub 仓库目录）。
+const ALLOWED_IMAGE_EXTENSIONS: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  gif: 'image/gif',
+  webp: 'image/webp',
+};
+
 // 通用文件上传白名单:扩展名 -> 允许的 MIME 类型(以服务端映射为准,不信任客户端声明)
 const ALLOWED_FILE_EXTENSIONS: Record<string, string[]> = {
   pdf: ['application/pdf'],
@@ -71,6 +80,50 @@ function encodeBase64(buffer: ArrayBuffer): string {
   return btoa(chunks.join(''));
 }
 
+/**
+ * 审计 #H-21: 从 Content-Length 头做早期大小预检。
+ *
+ * 背景：之前上传端点先用 `parseBody()` / `formData()` 把整个 multipart body 读入内存,
+ * 再做 size 校验。Workers 单实例内存仅 128MB，攻击者并发上传 100MB 文件即可 OOM。
+ * 现在先检查 Content-Length，给一个略大于实际限制的阈值（4KB 容差用于 form metadata），
+ * 若声明长度已超阈值则直接拒绝，避免进入 multipart 解析。
+ *
+ * 注：Content-Length 可被伪造，但常规客户端/CDN/中间盒都会保留真实值，足以挡住
+ * 大多数粗陋的内存消耗攻击；专业攻击者仍可绕过，配合 Workers 平台的请求体大小限制
+ * （默认 ~100MB）作为兜底。
+ */
+function earlySizeReject(c: any, maxBytes: number): Response | null {
+  const cl = c.req.header('Content-Length');
+  if (!cl) return null;
+  const n = parseInt(cl, 10);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  // 给 4KB 容差（multipart boundary、文本字段、metadata）
+  if (n > maxBytes + 4096) {
+    return c.json({
+      success: false,
+      error: { message: `Upload too large (max ${maxBytes} bytes)`, code: 'BAD_REQUEST' },
+    }, 400);
+  }
+  return null;
+}
+
+/**
+ * 审计 #H-21: 从原始文件名提取并校验扩展名（仅允许白名单内的图片扩展）。
+ * 返回合法的扩展名（小写）。失败返回错误信息字符串。
+ */
+function safeImageExt(originalName: string): { ext: string } | { error: string } {
+  const rawExt = (originalName.split('.').pop() || '').toLowerCase();
+  // 严格校验：必须是白名单中的扩展，且不含路径分隔符（`.` split 后 pop 仅返回最后段，
+  // 但若用户文件名是 `evil.png/sub/exploit`，pop 结果会含 `/`，因此再加一遍正则）。
+  if (!rawExt || !/^[a-z0-9]+$/.test(rawExt)) {
+    return { error: `Invalid image extension. Allowed: ${Object.keys(ALLOWED_IMAGE_EXTENSIONS).join(', ')}` };
+  }
+  if (!ALLOWED_IMAGE_EXTENSIONS[rawExt]) {
+    return { error: `Invalid image extension. Allowed: ${Object.keys(ALLOWED_IMAGE_EXTENSIONS).join(', ')}` };
+  }
+  return { ext: rawExt };
+}
+
 const uploads = new Hono<AppType>();
 
 // Upload image
@@ -88,6 +141,10 @@ uploads.post('/image', authMiddleware, async (c) => {
   if (!imageUploadEnabled && !hasUploadAdmin) {
     return c.json({ success: false, error: { message: 'Image upload is disabled', code: 'FORBIDDEN' } }, 403);
   }
+
+  // 审计 #H-21: Content-Length 早期预检，避免 parseBody() 把超大 body 全量读入内存。
+  const early = earlySizeReject(c, MAX_IMAGE_SIZE);
+  if (early) return early;
 
   const body = await c.req.parseBody();
   const file = body['file'];
@@ -113,6 +170,12 @@ uploads.post('/image', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Image too large (max 5MB)', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-21: 扩展名严格白名单校验，防止路径分隔符污染 GitHub 仓库目录。
+  const extInfo = safeImageExt(file.name);
+  if ('error' in extInfo) {
+    return c.json({ success: false, error: { message: extInfo.error, code: 'BAD_REQUEST' } }, 400);
+  }
+
   // 校验文件真实内容(防止伪造 MIME 上传 SVG 等非白名单图片)
   const sigBuffer = await file.arrayBuffer();
   if (!verifyImageSignature(sigBuffer)) {
@@ -120,13 +183,11 @@ uploads.post('/image', authMiddleware, async (c) => {
   }
 
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const ext = file.name.split('.').pop() || 'png';
-  const filename = `${dateStr}_${user.userId}.${ext}`;
+  const filename = `${dateStr}_${user.userId}.${extInfo.ext}`;
   const githubPath = `uploads/image/${user.userId}/${filename}`;
 
   // Upload to GitHub
-  const arrayBuffer = await file.arrayBuffer();
-  const content = encodeBase64(arrayBuffer);
+  const content = encodeBase64(sigBuffer);
 
   const githubResponse = await fetchWithTimeout(
     `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${githubPath}`,
@@ -147,7 +208,7 @@ uploads.post('/image', authMiddleware, async (c) => {
 
   if (!githubResponse.ok) {
     const errText = await githubResponse.text();
-    console.error('GitHub upload failed:', githubResponse.status, errText);
+    console.error('GitHub upload failed:', githubResponse.status, errText.slice(0, 200));
     return c.json({ success: false, error: { message: 'Failed to upload image', code: 'INTERNAL_ERROR' } }, 500);
   }
 
@@ -191,6 +252,10 @@ uploads.post('/file', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'File upload is disabled', code: 'FORBIDDEN' } }, 403);
   }
 
+  // 审计 #H-21: Content-Length 早期预检。
+  const early = earlySizeReject(c, MAX_FILE_SIZE);
+  if (early) return early;
+
   const body = await c.req.parseBody();
   const file = body['file'];
   // 是否公开(默认私有)。审计 #H-13:之前默认 1,用户上传文件忘记勾"私有"
@@ -212,8 +277,18 @@ uploads.post('/file', authMiddleware, async (c) => {
   }
 
   // 扩展名 + MIME 白名单校验(双重要求),拒绝 HTML/SVG/脚本等可执行内容,
-  // 防止存储型 XSS;存储的 mime 以服务端映射为准,不信任客户端声明
+  // 防止存储型 XSS;存储的 mime 以服务端映射为准,不信任客户端声明。
+  // 审计 #H-21: 扩展名额外校验不允许包含非字母数字字符（防止 `/` 污染路径）。
   const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (!ext || !/^[a-z0-9]+$/.test(ext)) {
+    return c.json({
+      success: false,
+      error: {
+        message: `Invalid file extension. Allowed extensions: ${Object.keys(ALLOWED_FILE_EXTENSIONS).join(', ')}`,
+        code: 'BAD_REQUEST',
+      },
+    }, 400);
+  }
   const allowedMimes = ALLOWED_FILE_EXTENSIONS[ext];
   if (!allowedMimes) {
     return c.json({
@@ -256,7 +331,7 @@ uploads.post('/file', authMiddleware, async (c) => {
 
   if (!githubResponse.ok) {
     const errText = await githubResponse.text();
-    console.error('GitHub upload failed:', githubResponse.status, errText);
+    console.error('GitHub upload failed:', githubResponse.status, errText.slice(0, 200));
     return c.json({ success: false, error: { message: 'Failed to upload file', code: 'INTERNAL_ERROR' } }, 500);
   }
 
@@ -384,7 +459,11 @@ uploads.get('/download/:id', optionalAuthMiddleware, async (c) => {
     const data = await response.arrayBuffer();
     const mime = upload.mime_type || 'application/octet-stream';
     c.header('Content-Type', mime);
-    c.header('Cache-Control', 'public, max-age=86400');
+    // 审计 #H-20: 私有文件必须用 `private, no-store`，否则共享 CDN/反向代理可在 TTL
+    // 窗口内向任意匿名用户回放已通过鉴权的响应——一次 A 下载即可被全网共享。
+    // 公开文件继续走长缓存；历史图片（is_public IS NULL）按旧规则视为公开。
+    const cachePrivate = isPrivate && !isLegacyImage;
+    c.header('Cache-Control', cachePrivate ? 'private, no-store' : 'public, max-age=86400');
     // 仅「图片类型且 MIME 在白名单内」允许内联展示;其余一律 attachment 下载,
     // 防止上传 HTML/SVG 等被同源内联解析造成存储型 XSS
     const inline = upload.file_type === 'image' && isInlineSafeMime(mime);
@@ -454,16 +533,31 @@ uploads.delete('/:id', authMiddleware, async (c) => {
   return c.json({ success: true, data: { message: 'File deleted' } });
 });
 
-// Avatar upload endpoint (reuses image upload logic)
-// 注意(H1/M11):路由必须定义在 export default 之前,虽然 ES 模块顶层执行允许后续代码继续注册,
-// 但这是反模式,容易被代码阅读者误判为死代码,且静态分析工具可能误报。
+/**
+ * Avatar upload endpoint
+ *
+ * 审计 #H-21 重写：
+ *  - Content-Length 早期预检，避免 OOM
+ *  - 强制 `instanceof File` 运行时校验，杜绝 `as File` 类型断言被绕过
+ *  - 扩展名严格白名单（仅 jpg/jpeg/png/gif/webp），防止 `/` 污染仓库目录
+ *  - 写入 `uploads` 表（file_type='avatar'），便于审计/删除/统一管理
+ *  - 返回代理 URL `/api/v1/uploads/download/:id` 而非 GitHub raw `download_url`
+ *    （后者是私有仓库的地址，匿名浏览器无法访问；旧实现直接存 raw URL 会导致
+ *    头像渲染失败 + 泄露内部仓库名）
+ *
+ * 路由定义在 export default 之前，符合常规 ES 模块约定。
+ */
 uploads.post('/avatar', authMiddleware, async (c) => {
   const user = c.get('user');
-  const formData = await c.req.formData();
-  const file = formData.get('file') as File | null;
 
-  if (!file) {
-    return c.json({ success: false, error: { message: 'No file uploaded', code: 'BAD_REQUEST' } }, 400);
+  // Content-Length 早期预检
+  const early = earlySizeReject(c, MAX_IMAGE_SIZE);
+  if (early) return early;
+
+  const formData = await c.req.formData();
+  const file = formData.get('file');
+  if (!file || !(file instanceof File)) {
+    return c.json({ success: false, error: { message: 'No file uploaded or invalid file field', code: 'BAD_REQUEST' } }, 400);
   }
 
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
@@ -480,19 +574,27 @@ uploads.post('/avatar', authMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'File content does not match an allowed image type', code: 'BAD_REQUEST' } }, 400);
   }
 
-  const base64 = encodeBase64(buffer);
-  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const ext = file.name.split('.').pop() || 'png';
-  const filename = `avatars/${dateStr}_${user.userId}.${ext}`;
+  // 扩展名严格白名单校验（拒绝含 `/` 的污染扩展名）
+  const extInfo = safeImageExt(file.name);
+  if ('error' in extInfo) {
+    return c.json({ success: false, error: { message: extInfo.error, code: 'BAD_REQUEST' } }, 400);
+  }
 
-  // Save to GitHub (same as image upload)
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  const storedFilename = `${dateStr}_${user.userId}.${extInfo.ext}`;
+  // 把头像统一存放在 uploads/avatar/<userId>/ 目录下，便于按用户聚合管理与批量删除
+  const githubPath = `uploads/avatar/${user.userId}/${storedFilename}`;
+
+  const base64 = encodeBase64(buffer);
+
   try {
     const githubResponse = await fetchWithTimeout(
-      `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${filename}`,
+      `https://api.github.com/repos/${c.env.JUDGE_REPO}/contents/${githubPath}`,
       {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${c.env.GITHUB_TOKEN}`,
+          Accept: 'application/vnd.github.v3+json',
           'User-Agent': 'OJ-System',
           'Content-Type': 'application/json',
         },
@@ -504,13 +606,20 @@ uploads.post('/avatar', authMiddleware, async (c) => {
     );
 
     if (!githubResponse.ok) {
-      const err = await githubResponse.json();
-      console.error('GitHub upload error:', err);
+      const err = await githubResponse.text();
+      console.error('GitHub upload error:', githubResponse.status, err.slice(0, 200));
       return c.json({ success: false, error: { message: 'Failed to upload avatar', code: 'INTERNAL_ERROR' } }, 500);
     }
 
-    const githubData = (await githubResponse.json()) as { content: { download_url: string } };
-    const avatarUrl = githubData.content.download_url;
+    // 写入 uploads 表（file_type='avatar'）便于审计、列表展示与批量清理
+    const result = await c.env.DB.prepare(
+      'INSERT INTO uploads (user_id, filename, original_name, file_type, mime_type, size_bytes, github_path, is_public) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(user.userId, storedFilename, file.name, 'avatar', file.type, file.size, githubPath, 1).run();
+    const uploadId = result.meta.last_row_id;
+
+    // 使用代理 URL：GitHub 私有仓库的 raw download_url 浏览器无法匿名访问，
+    // 改走 /api/v1/uploads/download/:id 由 Worker 携带 GITHUB_TOKEN 代理下载。
+    const avatarUrl = `/api/v1/uploads/download/${uploadId}`;
 
     // Update user's avatar_url
     await c.env.DB.prepare('UPDATE users SET avatar_url = ? WHERE id = ?').bind(avatarUrl, user.userId).run();

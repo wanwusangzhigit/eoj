@@ -4,6 +4,7 @@ import { authMiddleware } from '../middleware/auth';
 
 import { captchaMiddleware } from '../middleware/captcha';
 import { sendNotification, NotificationType } from '../utils/notify';
+import { sanitizePlainText, sanitizeRichText } from '../utils/sanitize';
 
 const discussions = new Hono<AppType>();
 
@@ -147,9 +148,13 @@ discussions.post('/', authMiddleware, captchaMiddleware('discussion'), async (c)
     return c.json({ success: false, error: { message: 'category must be one of: question, share, general', code: 'BAD_REQUEST' } }, 400);
   }
 
+  // 审计 #H-18: 服务端净化（保留 Markdown 代码块）。
+  const cleanTitle = sanitizePlainText(title, 200);
+  const cleanContent = sanitizeRichText(content);
+
   const result = await c.env.DB.prepare(
     'INSERT INTO discussions (problem_id, user_id, title, content, category) VALUES (?, ?, ?, ?, ?)'
-  ).bind(problem_id || null, user.userId, title, content, category || 'question').run();
+  ).bind(problem_id || null, user.userId, cleanTitle, cleanContent, category || 'question').run();
 
   const discussionId = result.meta.last_row_id;
 
@@ -187,8 +192,8 @@ discussions.put('/:id', authMiddleware, async (c) => {
   const updates: string[] = [];
   const binds: any[] = [];
 
-  if (title !== undefined) { updates.push('title = ?'); binds.push(title); }
-  if (content !== undefined) { updates.push('content = ?'); binds.push(content); }
+  if (title !== undefined) { updates.push('title = ?'); binds.push(sanitizePlainText(title, 200)); }
+  if (content !== undefined) { updates.push('content = ?'); binds.push(sanitizeRichText(content)); }
   if (category !== undefined) { updates.push('category = ?'); binds.push(category); }
 
   if (updates.length > 0) {
@@ -255,7 +260,7 @@ discussions.post('/:id/replies', authMiddleware, async (c) => {
     }
   }
 
-  const trimmed = content.trim();
+  const trimmed = sanitizeRichText(content).trim();
   await c.env.DB.prepare(
     'INSERT INTO discussion_replies (discussion_id, user_id, content, parent_id) VALUES (?, ?, ?, ?)'
   ).bind(id, user.userId, trimmed, parentReply ? parentReply.id : null).run();

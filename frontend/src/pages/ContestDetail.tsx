@@ -142,6 +142,7 @@ export default function ContestDetail() {
 
   const isHost = user?.id === 1 || user?.role === 'admin' || user?.role === 'super_admin'
     || (Array.isArray(user?.permissions) && user.permissions.includes('contest_admin'))
+    || (Array.isArray(user?.contest_admin_for) && user.contest_admin_for.includes(Number(id)))
     || (isTeamMatch && isTeamManager);
 
   const handlePublishAnnouncement = async () => {

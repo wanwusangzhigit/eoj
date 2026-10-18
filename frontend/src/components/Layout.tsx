@@ -13,6 +13,7 @@ import { api } from '../api/client';
 import { getSSRGlobal } from '../ssr/hydrate';
 import SafeHTML from './SafeHTML';
 import { t } from '../i18n';
+import { applyThemeAttributes } from '../utils/siteTheme';
 import './Layout.css';
 
 const FOOTER_INTERNAL_LINKS = [
@@ -50,7 +51,9 @@ export default function Layout({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    document.documentElement.setAttribute('data-theme-style', config.site.theme);
+    // notebook 主题：同时写入 data-theme-style="default" + data-theme-flavor="notebook"，
+    // 复用 default 全部组件 CSS，仅做差异化视觉覆盖。
+    applyThemeAttributes(document.documentElement, config.site.theme);
   }, [theme, config.site.theme]);
 
   useEffect(() => {

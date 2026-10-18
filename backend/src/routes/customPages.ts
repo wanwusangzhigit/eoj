@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import { sanitizePlainText, sanitizeRichText } from '../utils/sanitize';
 
 const customPages = new Hono<AppType>();
 
@@ -50,7 +51,8 @@ customPages.post('/', authMiddleware, adminMiddleware, async (c) => {
   if (title.length > 200) {
     return c.json({ success: false, error: { message: 'title too long', code: 'BAD_REQUEST' } }, 400);
   }
-  const content = (body.content || '').toString().substring(0, 50000);
+  // 审计 #H-18: 服务端净化（保留 Markdown 代码块），剥离 <script>/<iframe>、on* 事件等危险模式。
+  const content = sanitizeRichText((body.content || '').toString()).slice(0, 50000);
 
   const existing = await c.env.DB.prepare('SELECT id FROM custom_pages WHERE slug = ?').bind(slug).first();
   if (existing) {
@@ -59,7 +61,7 @@ customPages.post('/', authMiddleware, adminMiddleware, async (c) => {
 
   const result = await c.env.DB.prepare(
     'INSERT INTO custom_pages (slug, title, content, show_in_footer, enabled, created_by) VALUES (?, ?, ?, ?, ?, ?)'
-  ).bind(slug, title, content, body.show_in_footer ? 1 : 0, body.enabled === false ? 0 : 1, user.userId).run();
+  ).bind(slug, sanitizePlainText(title, 200), content, body.show_in_footer ? 1 : 0, body.enabled === false ? 0 : 1, user.userId).run();
 
   return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Page created' } }, 201);
 });
@@ -85,8 +87,8 @@ customPages.put('/:id', authMiddleware, adminMiddleware, async (c) => {
     updates.push('slug = ?');
     binds.push(slug);
   }
-  if (body.title !== undefined) { updates.push('title = ?'); binds.push(String(body.title).trim()); }
-  if (body.content !== undefined) { updates.push('content = ?'); binds.push(String(body.content).substring(0, 50000)); }
+  if (body.title !== undefined) { updates.push('title = ?'); binds.push(sanitizePlainText(String(body.title), 200)); }
+  if (body.content !== undefined) { updates.push('content = ?'); binds.push(sanitizeRichText(String(body.content)).slice(0, 50000)); }
   if (body.show_in_footer !== undefined) { updates.push('show_in_footer = ?'); binds.push(body.show_in_footer ? 1 : 0); }
   if (body.enabled !== undefined) { updates.push('enabled = ?'); binds.push(body.enabled ? 1 : 0); }
 

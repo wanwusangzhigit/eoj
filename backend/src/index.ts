@@ -106,6 +106,9 @@ app.use('/api/*', async (c, next) => {
   await next();
   if (c.req.method === 'GET' && c.res.status === 200) {
     const path = c.req.path;
+    // 审计 #H-20: 若 handler 已显式设置 Cache-Control（如 /uploads/download/:id 按
+    // 文件公开/私有分支），则保留 handler 的值，不在此处覆盖。
+    if (c.res.headers.get('Cache-Control')) return;
     // 仅缓存公开、非 admin/internal/auth 接口;
     // 进一步对个性化接口(/me、/users/:id、/notifications、/messages、/audit、
     // /user/settings、/submissions?me=1 等)使用 private 指令,避免共享缓存(如

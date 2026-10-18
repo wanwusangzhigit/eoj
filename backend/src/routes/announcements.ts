@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { AppType } from '../types';
 import { authMiddleware, adminMiddleware } from '../middleware/auth';
 import { escapeLikeWildcard } from '../utils/helpers';
+import { sanitizePlainText, sanitizeRichText } from '../utils/sanitize';
 
 const announcements = new Hono<AppType>();
 
@@ -80,7 +81,7 @@ announcements.post('/', authMiddleware, adminMiddleware, async (c) => {
 
   const result = await c.env.DB.prepare(
     'INSERT INTO site_announcements (title, content, is_pinned, status, created_by) VALUES (?, ?, ?, ?, ?)'
-  ).bind(title, content, isPinned, 'published', user.userId).run();
+  ).bind(sanitizePlainText(title, 200), sanitizeRichText(content), isPinned, 'published', user.userId).run();
 
   return c.json({ success: true, data: { id: result.meta.last_row_id, message: 'Announcement published' } }, 201);
 });
@@ -106,8 +107,8 @@ announcements.put('/:id', authMiddleware, adminMiddleware, async (c) => {
 
   const updates: string[] = [];
   const binds: any[] = [];
-  if (title !== undefined) { updates.push('title = ?'); binds.push(title); }
-  if (content !== undefined) { updates.push('content = ?'); binds.push(content); }
+  if (title !== undefined) { updates.push('title = ?'); binds.push(sanitizePlainText(title, 200)); }
+  if (content !== undefined) { updates.push('content = ?'); binds.push(sanitizeRichText(content)); }
   if (isPinned !== undefined) { updates.push('is_pinned = ?'); binds.push(isPinned); }
   if (status !== undefined && ['published', 'draft'].includes(status)) { updates.push('status = ?'); binds.push(status); }
 

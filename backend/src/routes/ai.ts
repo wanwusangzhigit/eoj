@@ -727,6 +727,45 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
     }, 400);
   }
 
+  // 审计 #H-19: Prompt Injection 防御——客户端可任意指定 msg.role 与 msg.content,
+  // 直接拼入对话上下文会让攻击者伪造 `system` 消息覆盖系统提示词、伪造 `tool` 消息
+  // 欺骗模型「工具已返回某结果」,从而绕过 ai_system_prompt 的安全约束。
+  // 这里强制 role 白名单（仅允许 user/assistant）、content 强制字符串 + 长度上限，
+  // 并且只取标准字段(role/content),其余一律丢弃。
+  const MAX_AI_MESSAGE_LEN = 16000;
+  const MAX_AI_MESSAGES = 50;
+  const ALLOWED_AI_ROLES = new Set(['user', 'assistant']);
+  if (messages.length > MAX_AI_MESSAGES) {
+    return c.json({
+      success: false,
+      error: { message: `Too many messages (max ${MAX_AI_MESSAGES})`, code: 'BAD_REQUEST' },
+    }, 400);
+  }
+  const sanitizedMessages: { role: 'user' | 'assistant'; content: string }[] = [];
+  for (const m of messages as any[]) {
+    if (!m || typeof m !== 'object') continue;
+    const role = String(m.role || '').toLowerCase();
+    if (!ALLOWED_AI_ROLES.has(role)) {
+      // 静默丢弃非 user/assistant 的消息（含 system/tool/function），而不是报错——
+      // 报错会让攻击者通过响应区分「role 字段被检查」的事实；丢弃符合最小信息泄漏原则。
+      continue;
+    }
+    const content = typeof m.content === 'string' ? m.content : JSON.stringify(m.content ?? '');
+    if (content.length > MAX_AI_MESSAGE_LEN) {
+      return c.json({
+        success: false,
+        error: { message: `Message too long (max ${MAX_AI_MESSAGE_LEN} chars)`, code: 'BAD_REQUEST' },
+      }, 400);
+    }
+    sanitizedMessages.push({ role: role as 'user' | 'assistant', content });
+  }
+  if (sanitizedMessages.length === 0) {
+    return c.json({
+      success: false,
+      error: { message: 'No valid messages provided', code: 'BAD_REQUEST' },
+    }, 400);
+  }
+
   const matchedModel = clientModel
     ? modelsConfig.find((m) => m.model === clientModel && m.enabled)
     : undefined;
@@ -746,7 +785,8 @@ ai.post('/chat', authMiddleware, createRateLimiter('aiChat', 10, 600_000), async
   if (context) {
     conversationMessages.push({ role: 'system', content: `Context:\n${context}` });
   }
-  for (const msg of messages) {
+  // 审计 #H-19: 仅使用经白名单净化后的 messages，避免 prompt injection。
+  for (const msg of sanitizedMessages) {
     conversationMessages.push({ role: msg.role, content: msg.content });
   }
 

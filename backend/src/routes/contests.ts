@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { AppType } from '../types';
-import { authMiddleware, optionalAuthMiddleware, contestAdminMiddleware, adminMiddleware } from '../middleware/auth';
+import { authMiddleware, optionalAuthMiddleware, contestAdminMiddleware, perContestAdminMiddleware, adminMiddleware } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rateLimit';
 import { computeContestRatingChanges, RatingParticipant, INITIAL_RATING } from '../utils/rating';
 import { sendNotification, NotificationType } from '../utils/notify';
@@ -499,7 +499,7 @@ contests.post('/:id/clone', authMiddleware, contestAdminMiddleware, async (c) =>
 });
 
 // Update contest (admin only)
-contests.put('/:id', authMiddleware, contestAdminMiddleware, async (c) => {
+contests.put('/:id', authMiddleware, perContestAdminMiddleware(), async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id')!);
   const body = await c.req.json();
@@ -1594,7 +1594,7 @@ contests.get('/:id/announcements', optionalAuthMiddleware, async (c) => {
 });
 
 // POST /contests/:id/announcements — 发布公告(主办方/admin)
-contests.post('/:id/announcements', authMiddleware, contestAdminMiddleware, async (c) => {
+contests.post('/:id/announcements', authMiddleware, perContestAdminMiddleware(), async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
   const body = await c.req.json();
@@ -1617,7 +1617,7 @@ contests.post('/:id/announcements', authMiddleware, contestAdminMiddleware, asyn
 });
 
 // PUT /contests/:id/announcements/:announcementId — 编辑公告(主办方/admin)
-contests.put('/:id/announcements/:announcementId', authMiddleware, contestAdminMiddleware, async (c) => {
+contests.put('/:id/announcements/:announcementId', authMiddleware, perContestAdminMiddleware(), async (c) => {
   const id = parseInt(c.req.param('id') || '0');
   const announcementId = parseInt(c.req.param('announcementId') || '0');
   const body = await c.req.json();
@@ -1645,7 +1645,7 @@ contests.put('/:id/announcements/:announcementId', authMiddleware, contestAdminM
 });
 
 // DELETE /contests/:id/announcements/:announcementId — 删除公告(主办方/admin)
-contests.delete('/:id/announcements/:announcementId', authMiddleware, contestAdminMiddleware, async (c) => {
+contests.delete('/:id/announcements/:announcementId', authMiddleware, perContestAdminMiddleware(), async (c) => {
   const id = parseInt(c.req.param('id') || '0');
   const announcementId = parseInt(c.req.param('announcementId') || '0');
 
@@ -1736,7 +1736,7 @@ contests.post('/:id/clarifications', authMiddleware, async (c) => {
 });
 
 // PUT /contests/:id/clarifications/:clarificationId — 主办方回答
-contests.put('/:id/clarifications/:clarificationId', authMiddleware, contestAdminMiddleware, async (c) => {
+contests.put('/:id/clarifications/:clarificationId', authMiddleware, perContestAdminMiddleware(), async (c) => {
   const user = c.get('user');
   const id = parseInt(c.req.param('id') || '0');
   const clarificationId = parseInt(c.req.param('clarificationId') || '0');
@@ -1765,6 +1765,113 @@ contests.put('/:id/clarifications/:clarificationId', authMiddleware, contestAdmi
   ).bind(body.answer.trim(), user.userId, clarificationId, id).run();
 
   return c.json({ success: true, data: { message: 'Answer submitted' } });
+});
+
+// ============================================================
+// 按比赛粒度的管理员授权(user_contest_admin)
+//   - GET    /contests/:id/admins           列出该场比赛的所有 per-contest 管理员
+//   - POST   /contests/:id/admins           为该场比赛添加 per-contest 管理员
+//   - DELETE /contests/:id/admins/:userId   移除该场比赛的某个 per-contest 管理员
+//
+// 权限模型:
+//   - 全局 contest_admin / super_admin / admin role:可读写(admins)
+//   - 该场比赛的 per-contest admin:可读(GET),不可改写(避免互相踢人放大权限)
+//   - 普通用户:无权访问
+//
+// 注意:这些接口只管理 user_contest_admin 表;不影响全局 contest_admin 用户。
+// 全局 contest_admin 用户依然拥有对全部比赛的访问权,无需在此列出。
+// ============================================================
+
+// GET /contests/:id/admins — 列出 per-contest admins
+contests.get('/:id/admins', authMiddleware, perContestAdminMiddleware(), async (c) => {
+  const id = parseInt(c.req.param('id') || '0');
+  const rows = await c.env.DB.prepare(
+    `SELECT u.id, u.username, u.avatar_url, u.role, uca.created_at AS granted_at
+     FROM user_contest_admin uca
+     JOIN users u ON u.id = uca.user_id
+     WHERE uca.contest_id = ?
+     ORDER BY uca.created_at ASC`
+  ).bind(id).all();
+  return c.json({
+    success: true,
+    data: {
+      admins: rows.results,
+      // 当前用户对该比赛的 admin 类型,前端用于决定是否显示"管理面板"
+      viewer_kind: c.get('user').userId === 1
+        || c.get('user').role === 'admin'
+        || c.get('user').role === 'super_admin'
+        || (c.get('user').permissions || []).includes('contest_admin')
+        ? 'global'
+        : 'scoped',
+    },
+  });
+});
+
+// POST /contests/:id/admins — 添加 per-contest admin
+// 仅全局 contest_admin / admin / super_admin 可调用(per-contest admin 不能再授权他人)
+contests.post('/:id/admins', authMiddleware, contestAdminMiddleware, async (c) => {
+  const id = parseInt(c.req.param('id') || '0');
+  const body = await c.req.json();
+  const userId = Number(body.userId);
+  if (!userId || Number.isNaN(userId)) {
+    return c.json({ success: false, error: { message: 'Invalid userId', code: 'BAD_REQUEST' } }, 400);
+  }
+  if (userId === 1) {
+    return c.json({ success: false, error: { message: 'Super admin already has all permissions', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const user: any = await c.env.DB.prepare('SELECT id, role FROM users WHERE id = ?').bind(userId).first();
+  if (!user) {
+    return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
+  }
+  if (user.role === 'admin' || user.role === 'super_admin') {
+    return c.json({ success: false, error: { message: 'User already has global admin privileges', code: 'BAD_REQUEST' } }, 400);
+  }
+
+  const contest: any = await c.env.DB.prepare('SELECT id FROM contests WHERE id = ?').bind(id).first();
+  if (!contest) {
+    return c.json({ success: false, error: { message: 'Contest not found', code: 'NOT_FOUND' } }, 404);
+  }
+
+  try {
+    await c.env.DB.prepare(
+      'INSERT INTO user_contest_admin (user_id, contest_id) VALUES (?, ?)'
+    ).bind(userId, id).run();
+  } catch (e: any) {
+    // 唯一约束冲突=已授权,幂等返回成功
+    if (String(e?.message || '').toLowerCase().includes('unique')) {
+      return c.json({ success: true, data: { message: 'Already an admin' } });
+    }
+    throw e;
+  }
+
+  // 通知被授权用户
+  try {
+    await sendNotification(
+      c.env.DB,
+      userId,
+      NotificationType.SYSTEM,
+      '您已被指定为比赛管理员',
+      `您已获得比赛 #${id} 的管理权限。`,
+      `/match/${id}`,
+    );
+  } catch { /* 通知失败不影响授权 */ }
+
+  return c.json({ success: true, data: { message: 'Admin added' } }, 201);
+});
+
+// DELETE /contests/:id/admins/:userId — 移除 per-contest admin
+// 仅全局 contest_admin / admin / super_admin 可调用
+contests.delete('/:id/admins/:userId', authMiddleware, contestAdminMiddleware, async (c) => {
+  const id = parseInt(c.req.param('id') || '0');
+  const userId = parseInt(c.req.param('userId') || '0');
+  if (!userId) {
+    return c.json({ success: false, error: { message: 'Invalid userId', code: 'BAD_REQUEST' } }, 400);
+  }
+  await c.env.DB.prepare(
+    'DELETE FROM user_contest_admin WHERE contest_id = ? AND user_id = ?'
+  ).bind(id, userId).run();
+  return c.json({ success: true, data: { message: 'Admin removed' } });
 });
 
 export default contests;

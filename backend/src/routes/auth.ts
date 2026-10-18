@@ -834,8 +834,8 @@ auth.post('/reset-password', createRateLimiter('resetPassword', 5, 300_000), asy
 
   // Update user's password
   const result = await c.env.DB.prepare(
-    'UPDATE users SET password_hash = ? WHERE email = ?'
-  ).bind(passwordHash, record.email).run();
+    'UPDATE users SET password_hash = ?, token_invalid_before = ? WHERE email = ?'
+  ).bind(passwordHash, Math.floor(Date.now() / 1000), record.email).run();
 
   if (result.meta.changes === 0) {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
@@ -892,6 +892,18 @@ auth.get('/me', async (c) => {
     user.permissions = [];
   }
 
+  // 按比赛粒度授权(user_contest_admin):返回当前用户被授权管理 contest_id 列表。
+  // 前端 ContestDetail 据此判断是否展示"管理面板"——即便用户没有全局 contest_admin
+  // 也能在自己被指派的比赛里看到管理操作。失败时返回空数组(向后兼容旧客户端)。
+  try {
+    const gr = await c.env.DB.prepare(
+      'SELECT contest_id FROM user_contest_admin WHERE user_id = ? ORDER BY contest_id ASC'
+    ).bind(user.id).all();
+    user.contest_admin_for = (gr.results as any[]).map((r) => r.contest_id);
+  } catch {
+    user.contest_admin_for = [];
+  }
+
   return c.json({ success: true, data: { user } });
 });
 
@@ -935,7 +947,23 @@ auth.post('/exchange', createRateLimiter('oauthExchange', 10, 60_000), async (c)
 });
 
 // POST /auth/logout — 清除认证 cookie。SSR 必需:前端无法用 JS 删除 httpOnly cookie。
+// 审计 #H-17: 同时在服务端吊销该用户已签发的所有 JWT，防止退出后旧 token 仍可调用需要鉴权的接口。
+// （需要 authMiddleware 才能拿到 user，但因 SSR 也允许通过 cookie 调用，这里手动解析 token。）
 auth.post('/logout', async (c) => {
+  // 解析当前用户(可选鉴权语义):若未登录则只清 cookie 直接返回。
+  const token = getAuthTokenFromRequest(c);
+  if (token) {
+    try {
+      const { verifyJWT } = await import('../utils/jwt');
+      const payload = await verifyJWT(token, c.env.JWT_SECRET, (c.env as any).JWT_SECRET_PREVIOUS);
+      if (payload?.userId) {
+        // 服务端吊销:把 token_invalid_before 设为当前时间，使所有 iat < now 的 token 失效。
+        await c.env.DB.prepare(
+          'UPDATE users SET token_invalid_before = ? WHERE id = ?'
+        ).bind(Math.floor(Date.now() / 1000), payload.userId).run().catch(() => {});
+      }
+    } catch { /* ignore — 即便 DB 异常也要清 cookie */ }
+  }
   clearAuthCookie(c);
   return c.json({ success: true, data: { message: 'Logged out' } });
 });
