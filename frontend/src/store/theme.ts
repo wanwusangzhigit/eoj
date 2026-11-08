@@ -35,9 +35,9 @@ function resolveInitialTheme(): 'dark' | 'light' {
     if (v === 'dark' || v === 'light') return v;
   } catch { /* ignore */ }
 
-  // 4. 系统偏好
-  if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
-  return 'light';
+  // 4. 无显式选择时返回与 SSR 一致的确定性默认。系统偏好在 hydration 完成后
+  //    由 applySystemThemeIfAuto 应用;初始渲染读 matchMedia 会导致 #418 水合失败。
+  return 'dark';
 }
 
 function persistTheme(theme: 'dark' | 'light') {
@@ -117,18 +117,21 @@ export const useThemeStore = create<ThemeState>((set) => ({
   },
 }));
 
-// 跟随系统主题(仅客户端,且仅当用户未显式选择时)
+// 跟随系统主题(仅客户端,且仅当用户未显式选择时)。
+// 必须在 hydration 完成后调用(App.tsx mount effect),否则会重现 SSR/客户端初始渲染不一致。
+export function applySystemThemeIfAuto() {
+  if (typeof window === 'undefined' || !window.matchMedia) return;
+  let manual: string | null = null;
+  try {
+    manual = readBrowserCookie('theme') || localStorage.getItem('theme');
+  } catch { /* ignore */ }
+  if (manual === 'dark' || manual === 'light') return;
+  const next = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  applyThemeAttr(next);
+  useThemeStore.setState({ theme: next });
+}
+
 if (typeof window !== 'undefined' && window.matchMedia) {
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
-  mq.addEventListener('change', (e) => {
-    let manual: string | null = null;
-    try {
-      manual = readBrowserCookie('theme') || localStorage.getItem('theme');
-    } catch { /* ignore */ }
-    if (manual !== 'dark' && manual !== 'light') {
-      const next = e.matches ? 'dark' : 'light';
-      applyThemeAttr(next);
-      useThemeStore.setState({ theme: next });
-    }
-  });
+  mq.addEventListener('change', () => applySystemThemeIfAuto());
 }

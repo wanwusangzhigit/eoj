@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { ThumbsUp, Eye, Clock, ChevronRight, ArrowLeft, Trash2, Edit3, Code, CheckCircle } from 'lucide-react';
-import { renderMarkdown } from '../utils/markdown';
 import SafeHTML from '../components/SafeHTML';
 import { useToastStore } from '../store/toast';
 import { t } from '../i18n';
@@ -312,7 +311,7 @@ export default function SolutionDetail() {
             <div className="solution-content">
               <SafeHTML
                 className="markdown-content"
-                html={renderMarkdown(solution.content || '')}
+                markdown text={solution.content || ''}
               />
             </div>
           </>

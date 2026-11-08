@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { FileText, AlertCircle, ArrowLeft } from 'lucide-react';
-import { renderMarkdown } from '../utils/markdown';
 import SafeHTML from '../components/SafeHTML';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { t } from '../i18n';
@@ -61,7 +60,7 @@ export default function CustomPage() {
         <FileText size={20} className="custom-page-icon" />
         <h1>{page.title}</h1>
       </div>
-      <SafeHTML className="custom-page-content" html={renderMarkdown(page.content || '')} />
+      <SafeHTML className="custom-page-content" markdown text={page.content || ''} />
       <div className="custom-page-footer">
         <Link to="/" className="btn btn-secondary btn-sm"><ArrowLeft size={14} /> {t('common.back')}</Link>
       </div>

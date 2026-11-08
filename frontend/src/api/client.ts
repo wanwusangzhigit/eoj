@@ -1293,11 +1293,11 @@ class ApiClient {
 
   // ─── 权限组 ──────────────────────────────────────────
   async getPermissionGroups() {
-    return this.request<{ groups: PermissionGroup[] }>('/permission-groups/');
+    return this.request<{ groups: PermissionGroup[] }>('/permission-groups');
   }
 
   async createPermissionGroup(data: { name: string; description?: string; permissions: string[]; color?: string; sort_order?: number }) {
-    return this.request<{ id: number; message: string }>('/permission-groups/', {
+    return this.request<{ id: number; message: string }>('/permission-groups', {
       method: 'POST',
       body: JSON.stringify(data),
     });

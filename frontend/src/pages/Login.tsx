@@ -385,7 +385,6 @@ export default function Login() {
                       }
                     }}
                     placeholder={captchaType === 'math' ? t('login.captchaMathPlaceholder') : t('login.captchaPlaceholder')}
-                    required
                     maxLength={captchaAnswerLen}
                     style={{width: captchaType === 'math' ? '120px' : '80px', textAlign:'center', letterSpacing: captchaType === 'math' ? '2px' : '4px', fontWeight:'bold'}}
                     inputMode={captchaType === 'math' ? 'numeric' : 'text'}

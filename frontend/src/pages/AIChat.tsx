@@ -3,7 +3,6 @@ import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
 import { useThemeStore } from '../store/theme';
-import { renderMarkdown } from '../utils/markdown';
 import SafeHTML from '../components/SafeHTML';
 import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -474,7 +473,7 @@ export default function AIChat() {
                       <SafeHTML
                         className={`markdown-content ai-markdown markdown-theme-${theme}${loading && idx === messages.length - 1 ? ' ai-streaming' : ''}`}
                         data-code-theme={theme}
-                        html={renderMarkdown(msg.content)}
+                        markdown text={msg.content}
                       />
                     ) : loading && idx === messages.length - 1 ? (
                       <div className="ai-thinking">

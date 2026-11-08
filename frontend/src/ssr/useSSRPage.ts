@@ -1,5 +1,5 @@
-import { useRef, useEffect } from 'react';
-import { consumeSSRPageData } from './hydrate';
+import { useContext, useRef, useEffect } from 'react';
+import { SSREnvelopeContext, consumeSSRPageData } from './hydrate';
 
 /**
  * 在页面顶层调用,一次性读取 SSR 注入的本页数据。
@@ -19,9 +19,16 @@ import { consumeSSRPageData } from './hydrate';
  * - SSR 未注入时返回 null,页面走原有的客户端拉取逻辑
  */
 export function useSSRPage<T = unknown>(pageKey: string): T | null {
+  // 服务端渲染时 envelope 由 entry-server 通过 context 传入:页面首屏就能拿到 loader
+  // 的结果。否则服务端只会渲染出 loading 骨架,而客户端 hydrate 的首帧已经有真实
+  // 数据(从注入的 JSON 里取),两边不一致 → React #418。
+  // 这里只读取、不删除:同一份 envelope 之后还要序列化给客户端。
+  const envelope = useContext(SSREnvelopeContext);
   const ref = useRef<T | null>(undefined);
   if (ref.current === undefined) {
-    ref.current = consumeSSRPageData(pageKey) as T | null;
+    ref.current = envelope
+      ? (((envelope.page[pageKey] as T | undefined) ?? null) as T | null)
+      : (consumeSSRPageData(pageKey) as T | null);
   }
   // eslint-disable-next-line react-hooks/refs -- intentional: SSR data must be read during render to avoid hydration mismatch
   return ref.current;

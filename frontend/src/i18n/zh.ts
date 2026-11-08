@@ -492,6 +492,11 @@ const zh = {
     problemManagement: '题目管理',
     addTestcases: '测试用例',
     userManagement: '用户管理',
+    usersSubtitle: '管理用户角色、个人权限、所属权限组与封禁状态。支持批量操作。',
+    selectUsersFirst: '请先选择用户',
+    batchBanDone: '已封禁 {done}/{total} 个用户',
+    batchUnbanDone: '已解封 {done}/{total} 个用户',
+    batchSetRoleDone: '已设置 {done}/{total} 个用户为 {role}',
     totalUsers: '总用户数',
     totalProblems: '总题目数',
     totalSubmissions: '总提交数',
@@ -1917,6 +1922,10 @@ const zh = {
     perm_list: '题单',
     perm_ticket: '工单',
     perm_upload: '上传',
+    nav: '权限组',
+    notAssigned: '未分配',
+    assign: '分配组',
+    userGroupsUpdated: '已更新用户权限组',
   },
   // 密码重置 / 找回密码
   passwordReset: {

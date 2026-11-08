@@ -155,7 +155,7 @@ export default function AdminUsers() {
   const saveGroups = async (userId: number) => {
     try {
       await api.updateUserGroups(userId, draftGroupIds);
-      addToast('success', '已更新用户权限组');
+      addToast('success', t('permissionGroups.userGroupsUpdated'));
       setEditingGroupsFor(null);
       const r = await api.getUserGroups(userId);
       setUserGroups((prev) => ({ ...prev, [userId]: r.groups }));
@@ -194,7 +194,7 @@ export default function AdminUsers() {
 
   const batchBan = async (ban: boolean) => {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) { addToast('error', '请先选择用户'); return; }
+    if (ids.length === 0) { addToast('error', t('admin.selectUsersFirst')); return; }
     let done = 0;
     for (const id of ids) {
       try {
@@ -202,14 +202,14 @@ export default function AdminUsers() {
         done++;
       } catch { /* skip failed */ }
     }
-    addToast('success', `已${ban ? '封禁' : '解封'} ${done}/${ids.length} 个用户`);
+    addToast('success', t(ban ? 'admin.batchBanDone' : 'admin.batchUnbanDone').replace('{done}', String(done)).replace('{total}', String(ids.length)));
     setSelectedIds(new Set());
     refresh();
   };
 
   const batchSetRole = async (role: string) => {
     const ids = Array.from(selectedIds);
-    if (ids.length === 0) { addToast('error', '请先选择用户'); return; }
+    if (ids.length === 0) { addToast('error', t('admin.selectUsersFirst')); return; }
     let done = 0;
     for (const id of ids) {
       try {
@@ -217,7 +217,7 @@ export default function AdminUsers() {
         done++;
       } catch { /* skip failed */ }
     }
-    addToast('success', `已设置 ${done}/${ids.length} 个用户为 ${role}`);
+    addToast('success', t('admin.batchSetRoleDone').replace('{done}', String(done)).replace('{total}', String(ids.length)).replace('{role}', role));
     setSelectedIds(new Set());
     refresh();
   };
@@ -231,7 +231,7 @@ export default function AdminUsers() {
             {t('admin.userManagement')}
           </h1>
           <span className="admin-page-subtitle">
-            管理用户角色、个人权限、所属权限组与封禁状态。支持批量操作。
+            {t('admin.usersSubtitle')}
           </span>
         </div>
       </div>
@@ -380,11 +380,11 @@ export default function AdminUsers() {
             {u.id !== 1 && perms.isSuperAdmin && (
               <div className="user-permissions" style={{ borderTop: '1px dashed var(--border)', marginTop: 8, paddingTop: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, fontSize: 12, color: 'var(--text-muted)' }}>
-                  <ShieldCheck size={12} /> 权限组
+                  <ShieldCheck size={12} /> {t('permissionGroups.nav')}
                 </div>
                 {editingGroupsFor === u.id ? (
                   <div className="permission-editor" style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
-                    {allGroups.length === 0 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>加载中...</span>}
+                    {allGroups.length === 0 && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('permissionGroups.loading')}</span>}
                     {allGroups.map((g) => (
                       <label key={g.id} className="permission-checkbox" style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}>
                         <input
@@ -406,9 +406,9 @@ export default function AdminUsers() {
                           {g.name}
                         </span>
                       ))
-                      : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>未分配</span>
+                      : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{t('permissionGroups.notAssigned')}</span>
                     }
-                    <button className="btn btn-secondary btn-xs" onClick={() => startEditGroups(u.id)}>分配组</button>
+                    <button className="btn btn-secondary btn-xs" onClick={() => startEditGroups(u.id)}>{t('permissionGroups.assign')}</button>
                   </div>
                 )}
               </div>

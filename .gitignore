@@ -8,6 +8,7 @@ backend/.wrangler
 frontend/pnpm-lock.yaml
 backend/.env
 backend/wrangler.toml.prod
+backend/wrangler.prod.toml
 .env
 __pycache__/
 .atomcode
@@ -21,3 +22,16 @@ CHANGELOG.md
 AGENTS.md
 skills-lock.json
 backend/.wrangler.bak
+
+# ── AI 助手 / 本地工具配置（不入库）──
+.qoder/
+.cursor/
+.continue/
+skills/
+**/skills/
+
+# ── 构建产物（不入库）──
+dist/
+build/
+frontend/dist-dev/
+backend/tsconfig.tsbuildinfo

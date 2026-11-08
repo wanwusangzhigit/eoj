@@ -137,10 +137,11 @@ cd backend && npm run db:migrate:local
 
 ```
 backend/
-  src/index.ts        # Hono 入口、路由、catch-all SSR 入口
+  src/index.ts        # Hono 入口、全局中间件、catch-all SSR 入口
   src/ssr.ts          # SSR 渲染管线 + Worker 全局 polyfill
   src/loaders.ts      # route → pageKey loader 映射(SSR 数据注入依据)
-  src/routes/         # 各业务模块路由
+  src/routes/         # 路由注册层(index.ts 统一挂载) + 按域分组的业务模块
+                      #   core/ community/ admin/ system/
   migrations/         # D1 SQL 迁移
 frontend/
   src/pages/          # 页面组件

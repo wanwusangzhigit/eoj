@@ -10,7 +10,6 @@ import { t } from '../i18n';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuthStore } from '../store/auth';
 import { useToastStore } from '../store/toast';
-import { renderMarkdown } from '../utils/markdown';
 import SafeHTML from '../components/SafeHTML';
 import { useSSRPage } from '../ssr/useSSRPage';
 import './Blogs.css';
@@ -175,7 +174,7 @@ export default function BlogDetail() {
         <div className="article-layout">
           <div className="article-layout-main">
             <ReadingProgress containerRef={contentRef} />
-            <SafeHTML className="article-content" ref={contentRef} html={renderMarkdown(blog.content || '')} />
+            <SafeHTML className="article-content" ref={contentRef} markdown text={blog.content || ''} />
           </div>
           <ArticleToc containerRef={contentRef} />
         </div>
@@ -257,7 +256,7 @@ export default function BlogDetail() {
                       <span>{t('blogs.replyingTo').replace('{0}', `@${c.parent_username || ''}`)}</span>
                     </div>
                   )}
-                  <SafeHTML className="comment-text" html={renderMarkdown(c.content || '')} />
+                  <SafeHTML className="comment-text" markdown text={c.content || ''} />
                   <div className="comment-actions">
                     {user && (
                       <button className="comment-action-btn" onClick={() => handleReply(c)}>

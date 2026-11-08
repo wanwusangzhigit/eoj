@@ -1,42 +1,7 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 import { AppType } from './types';
-import auth from './routes/auth';
-import problems from './routes/problems';
-import submissions from './routes/submissions';
-import rankings from './routes/rankings';
-import users from './routes/users';
-import internal from './routes/internal';
-import admin from './routes/admin';
-import permissionGroups from './routes/permissionGroups';
-import contests from './routes/contests';
-import tickets from './routes/tickets';
-import problemLists from './routes/problemLists';
-import solutions from './routes/solutions';
-import discussions from './routes/discussions';
-import settings from './routes/settings';
-import uploads from './routes/uploads';
-import ai from './routes/ai';
-import audit from './routes/audit';
-import tags from './routes/tags';
-import ratings from './routes/ratings';
-import training from './routes/training';
-import notifications from './routes/notifications';
-import messages from './routes/messages';
-import teams from './routes/teams';
-import blogs from './routes/blogs';
-import captcha from './routes/captcha';
-import notes from './routes/notes';
-import achievements from './routes/achievements';
-import search from './routes/search';
-import templates from './routes/templates';
-import userSettings from './routes/userSettings';
-import collections from './routes/collections';
-import announcements from './routes/announcements';
-import rss from './routes/rss';
-import codeShares from './routes/codeShares';
-import friendLinks from './routes/friendLinks';
-import customPages from './routes/customPages';
+import { registerRoutes } from './routes';
 import { seedDatabase } from './seed';
 import { auditMiddleware, banCheckMiddleware } from './middleware/audit';
 import { renderSSR, shouldSSR } from './ssr';
@@ -122,9 +87,14 @@ app.use('/api/*', async (c, next) => {
         || path.startsWith('/api/v1/users/')      // 用户主页包含个人统计
         || path.startsWith('/api/v1/templates')    // 代码模板按用户存储
         || path.startsWith('/api/v1/notes');       // 笔记按用户存储
+      // 权限组/用户列表按调用者身份鉴权(非管理员取不到),且后台增删改后立刻重取同一个
+      // URL(ban、改角色、改组都会 refresh()):带 max-age 会让改动在前 10 秒里"看起来
+      // 没生效",也不该进共享缓存。
+      const noStore = path.startsWith('/api/v1/permission-groups')
+        || path === '/api/v1/users/list';
       c.res.headers.set(
         'Cache-Control',
-        isPersonalized ? 'private, max-age=10' : 'public, max-age=10, s-maxage=30'
+        noStore ? 'private, no-store' : isPersonalized ? 'private, max-age=10' : 'public, max-age=10, s-maxage=30'
       );
     }
   }
@@ -193,42 +163,7 @@ api.get('/health', async (c) => {
   }
 });
 
-api.route('/auth', auth);
-api.route('/problems', problems);
-api.route('/submissions', submissions);
-api.route('/rankings', rankings);
-api.route('/users', users);
-api.route('/admin', admin);
-api.route('/permission-groups', permissionGroups);
-api.route('/internal', internal);
-api.route('/contests', contests);
-api.route('/tickets', tickets);
-api.route('/lists', problemLists);
-api.route('/solutions', solutions);
-api.route('/discussions', discussions);
-api.route('/uploads', uploads);
-api.route('/settings', settings);
-api.route('/ai', ai);
-api.route('/audit', audit);
-api.route('/tags', tags);
-api.route('/ratings', ratings);
-api.route('/training', training);
-api.route('/notifications', notifications);
-api.route('/messages', messages);
-api.route('/teams', teams);
-api.route('/blogs', blogs);
-api.route('/captcha', captcha);
-api.route('/notes', notes);
-api.route('/achievements', achievements);
-api.route('/search', search);
-api.route('/templates', templates);
-api.route('/user/settings', userSettings);
-api.route('/collections', collections);
-api.route('/announcements', announcements);
-api.route('/rss', rss);
-api.route('/shares', codeShares);
-api.route('/friend-links', friendLinks);
-api.route('/pages', customPages);
+registerRoutes(api);
 
 app.route('/api/v1', api);
 
@@ -338,6 +273,12 @@ app.get('/__seed', async (c) => {
 });
 
 app.all('*', async (c) => {
+  // 未匹配的 /api/* 请求不应回退到 SPA 壳:前端 fetch 期望 JSON,
+  // 拿到 index.html 会导致解析失败。这里与 app.notFound() 保持同一错误形状。
+  if (c.req.path.startsWith('/api/')) {
+    return c.json({ success: false, error: { message: 'Resource not found', code: 'NOT_FOUND' } }, 404);
+  }
+
   const request = c.req.raw;
   const assets = (c.env as any).ASSETS;
 
