@@ -110,7 +110,12 @@ export function sanitizePlainText(input: unknown, maxLen?: number): string {
   if (input === null || input === undefined) return '';
   let s = typeof input === 'string' ? input : String(input);
   // 先剥离任何标签（防止 <script> 等被原样渲染）
-  s = s.replace(/<[^>]*>/g, '');
+  // 多次替换直到收敛，避免“替换后重新拼出标签”的不完整净化问题。
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(/<[^>]*>/g, '');
+  } while (s !== prev);
   // 转义 HTML 特殊字符
   s = s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
