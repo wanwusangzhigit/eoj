@@ -7,17 +7,29 @@
  * 此组件强制这道工序,把净化步骤紧贴在 DOM 注入之前,便于静态分析(CodeQL)
  * 追踪污点流,消除「DOM text reinterpreted as HTML」类的 XSS 误报与漏报。
  *
+ * SSR / 水合
+ * ----------
+ * Cloudflare Workers 没有 DOM,`dompurify` 的默认导出在那里是一个 factory
+ * 函数而非已初始化实例(没有 `.sanitize`),`marked` 依赖的净化链路同样不可用。
+ * 因此富文本只在浏览器挂载后渲染:
+ *  - 服务端渲染与客户端 hydrate 首帧都输出**转义后的纯文本**(React 自动转义,
+ *    不存在 XSS),两端 DOM 完全一致,避免 React #418 水合错误;
+ *  - `useEffect` 触发后再调用 `renderMarkdown()` / `DOMPurify.sanitize()` 注入 HTML。
+ *
  * 用法
  * ----
  *   import SafeHTML from '../components/SafeHTML';
  *
- *   // 1) 直接渲染已净化的 HTML 字符串(例如 renderMarkdown 的输出已自带净化)
- *      <SafeHTML html={renderMarkdown(content)} />
+ *   // 1) 渲染 markdown 源文本(组件内部完成 marked + DOMPurify)
+ *      <SafeHTML className="markdown-content" markdown text={problem.description} />
  *
- *   // 2) 渲染未净化的富文本(配置 sanitize=true,组件内部用 DOMPurify 再过滤一遍)
+ *   // 2) 渲染已净化的 HTML 字符串
+ *      <SafeHTML html={sanitizedHtml} />
+ *
+ *   // 3) 渲染未净化的富文本(配置 sanitize=true,组件内部用 DOMPurify 再过滤一遍)
  *      <SafeHTML html={announcementHtml} sanitize />
  *
- *   // 3) 自定义 DOMPurify 配置
+ *   // 4) 自定义 DOMPurify 配置
  *      <SafeHTML html={rawHtml} sanitize config={{ ALLOWED_TAGS: ['b', 'i'] }} />
  *
  * 为什么不直接复用 dangerouslySetInnerHTML
@@ -29,38 +41,40 @@
  *   都集中在此组件,既便于审计,也让静态分析在单一节点验证净化逻辑。
  */
 
+import { useEffect, useState, type CSSProperties, type ElementType } from 'react';
 import DOMPurify, { type Config as DOMPurifyConfig } from 'dompurify';
-import type { CSSProperties, ElementType } from 'react';
+import { renderMarkdown } from '../utils/markdown';
 
 export interface SafeHTMLProps {
-  /** 要注入的 HTML。若 sanitize=false,调用方须保证此字符串已通过 DOMPurify 净化。 */
-  html: string;
-  /** 为 true 时,组件在此处用 DOMPurify 再次过滤一遍;默认 false(renderMarkdown 已净化)。 */
+  /** 要注入的 HTML。markdown=true 时忽略。 */
+  html?: string;
+  /** markdown 源文本,仅在 markdown=true 时使用。 */
+  text?: string | null;
+  /** 为 true 时用 renderMarkdown(text) 生成 HTML(内部已净化)。默认 false。 */
+  markdown?: boolean;
+  /** 为 true 时,组件在此处用 DOMPurify 再次过滤一遍;默认 false。 */
   sanitize?: boolean;
   /** 透传给 DOMPurify.sanitize 的配置,仅在 sanitize=true 时生效。 */
   config?: DOMPurifyConfig;
   /** 容器的标签名(默认 div);例如 'span' / 'p' / 'article'。 */
   as?: ElementType;
-  /** 容器的 className。 */
   className?: string;
-  /** 容器的 id。 */
   id?: string;
-  /** 容器的内联样式。 */
   style?: CSSProperties;
   /** 透传给容器的其他任意 HTML 属性(例如 data-* / dir / lang)。 */
   [key: string]: unknown;
 }
 
 /**
- * 安全地把字符串渲染为 HTML。组件本身只是一个语义清晰的封装:
- * - sanitize=true 时强制经过 DOMPurify.sanitize;
- * - sanitize=false 时认为调用方已自行净化(典型例子:renderMarkdown 的输出)。
- *
- * 不接受以任何方式绕过净化的"原始"字符串——若上层忘记 sanitize,
- * 该字符串将以原样注入并触发 CodeQL 警告,提醒开发者补上净化。
+ * 安全地把字符串渲染为 HTML。
+ * - SSR / hydrate 首帧:输出纯文本,服务端不触碰 DOMPurify 与 marked;
+ * - 挂载后:markdown=true 走 renderMarkdown,sanitize=true 走 DOMPurify.sanitize,
+ *   其余认为调用方已自行净化。
  */
 export default function SafeHTML({
   html,
+  text,
+  markdown = false,
   sanitize = false,
   config,
   as: Component = 'div',
@@ -69,7 +83,29 @@ export default function SafeHTML({
   style,
   ...rest
 }: SafeHTMLProps) {
-  const safeHtml = sanitize ? DOMPurify.sanitize(html, config) : html;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setMounted(true);
+  }, []);
+
+  const source = markdown ? (text ?? '') : (html ?? '');
+
+  // 服务端与客户端首帧保持完全一致:纯文本由 React 自动转义,不会注入 HTML。
+  if (!mounted) {
+    return (
+      <Component className={className} id={id} style={style} {...rest}>
+        {source}
+      </Component>
+    );
+  }
+
+  const safeHtml = markdown
+    ? renderMarkdown(text ?? '')
+    : sanitize
+      ? DOMPurify.sanitize(html ?? '', config)
+      : (html ?? '');
+
   return (
     <Component
       className={className}

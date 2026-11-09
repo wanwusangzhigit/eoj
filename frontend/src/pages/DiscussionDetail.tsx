@@ -3,7 +3,6 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { useAuthStore } from '../store/auth';
 import { MessageSquare, Eye, Clock, ChevronRight, Trash2, Edit3, Send, Pin, CornerUpLeft, CornerUpRight, ThumbsUp, X } from 'lucide-react';
-import { renderMarkdown } from '../utils/markdown';
 import SafeHTML from '../components/SafeHTML';
 import { t } from '../i18n';
 import { useToastStore } from '../store/toast';
@@ -237,7 +236,7 @@ export default function DiscussionDetail() {
           <>
             <SafeHTML
               className="discussion-content"
-              html={renderMarkdown(discussion.content)}
+              markdown text={discussion.content}
             />
 
             {(isOwner || isAdmin) && (
@@ -348,7 +347,7 @@ export default function DiscussionDetail() {
                   )}
                   <SafeHTML
                     className="reply-content"
-                    html={renderMarkdown(reply.content)}
+                    markdown text={reply.content}
                   />
                   <div className="comment-actions">
                     {user && (

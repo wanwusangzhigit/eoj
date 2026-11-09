@@ -5,7 +5,10 @@ export interface SiteConfig {
     description: string;
     icon: string;
     favicon: string;
-    theme: 'default' | 'classic' | 'flat' | 'aurora';
+    // 'notebook' 复用 default 的组件样式（按钮/卡片/表单），仅在调色板、字体、Hero 处理上做差异化覆盖。
+    // 运行时会同时设置 data-theme-style="default" + data-theme-flavor="notebook"，
+    // 让所有 [data-theme-style="default"] 选择器自动命中，再用 [data-theme-flavor="notebook"] 微调。
+    theme: 'default' | 'classic' | 'flat' | 'aurora' | 'notebook';
   };
   footer: {
     enabled: boolean;

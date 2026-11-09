@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/auth';
 import { api } from '../api/client';
 import { t } from '../i18n';
+import { consumeStashedRedirect } from '../utils/redirect';
 import './AuthCallback.css';
 
 const errorKeyMap: Record<string, string> = {
@@ -45,7 +46,11 @@ export default function AuthCallback() {
         if (cancelled) return;
         await fetchUser();
         if (cancelled) return;
-        navigate('/', { replace: true });
+        // 取回登录前在 Login.tsx 中 stash 的回跳目标（取出即消费，不会重复跳转）。
+        // 由于后端 OAuth callback 的 return_url 只承载 origin（normalizeReturnOrigin 会丢弃 path），
+        // 跨 OAuth 流程的 path 级回跳完全由前端 sessionStorage 承接。
+        const next = consumeStashedRedirect() || '/';
+        navigate(next, { replace: true });
       } catch {
         if (!cancelled) setRuntimeError(t('authCallback.authFailed'));
       }

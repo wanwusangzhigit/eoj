@@ -241,3 +241,83 @@
   background: var(--bg-tertiary);
   color: var(--text-primary);
 }
+
+/* ═══════════════════════════════════════════════════
+   Notebook Theme Overrides（登录页算法笔记本风格）
+   ═══════════════════════════════════════════════════
+
+   登录页是访客第一次接触站点的地方。notebook 主题在这里要传达
+   "这是一本为你准备的算法笔记本"——而不是"企业级 SaaS 登录入口"。
+
+   处理要点：
+   1. 标题加大、走宋体（与首页统一识别）
+   2. 去掉 hero-icon 的圆形填充背景，改为虚线圆框
+   3. 登录卡片用虚线边框，与其他页面卡片呼应
+   4. GitHub/CpOAuth 按钮去掉强对比，更像"签名"而非"按钮"
+*/
+
+[data-theme-flavor="notebook"] .login-hero h1 {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  padding-bottom: 12px;
+  /* 与首页 hero 一致的手绘波浪线下划线 */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 8' preserveAspectRatio='none'><path d='M0,4 Q20,0 40,4 T80,4 T120,4 T160,4 T200,4 T240,4' stroke='%232D5F87' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 50% 100%;
+  background-size: 200px 8px;
+  display: inline-block;
+  margin: 0 auto 16px;
+}
+
+[data-theme-flavor="notebook"] .hero-subtitle {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 16px;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+
+/* hero-icon：去掉填充背景，改为虚线圆框——像笔记扉页的装饰章 */
+[data-theme-flavor="notebook"] .hero-icon {
+  background: transparent;
+  border: 1px dashed var(--accent);
+  color: var(--accent);
+  border-radius: 50%;            /* 改为圆形，更像印章 */
+  width: 88px;
+  height: 88px;
+}
+
+/* 第三方登录按钮：保留品牌色但弱化，更像签名而非按钮 */
+[data-theme-flavor="notebook"] .btn-github {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: border-color var(--transition), background var(--transition);
+}
+[data-theme-flavor="notebook"] .btn-github:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+}
+
+/* 登录表单卡片：虚线边框，与首页 .home-card 风格一致 */
+[data-theme-flavor="notebook"] .login-form-card,
+[data-theme-flavor="notebook"] .login-card {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+/* Mobile：保持波浪线但缩小 */
+@media (max-width: 600px) {
+  [data-theme-flavor="notebook"] .login-hero h1 {
+    font-size: 30px;
+    background-size: 140px 6px;
+  }
+}

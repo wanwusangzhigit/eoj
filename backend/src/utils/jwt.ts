@@ -2,12 +2,17 @@ import { Jwt } from 'hono/utils/jwt';
 
 import { UserPayload } from '../types';
 
+// 审计 #H-17: 在 payload 中显式写入 iat，作为 JWT 服务端吊销基准。
+// Hono 的 Jwt.sign 不会自动注入 iat；verify 也仅在 iat 存在时校验，
+// 所以我们需要在签名时显式写入，verifyJWT 之后由中间件比对
+// users.token_invalid_before 来实现吊销语义。
 export async function signJWT(payload: object, secret: string, expiresInSeconds: number = 60 * 60 * 24 * 7): Promise<string> {
   if (!secret) {
     throw new Error('JWT_SECRET is not configured');
   }
+  const now = Math.floor(Date.now() / 1000);
   return await Jwt.sign(
-    { ...payload, exp: Math.floor(Date.now() / 1000) + expiresInSeconds },
+    { ...payload, iat: now, exp: now + expiresInSeconds },
     secret,
     'HS256'
   );
@@ -17,7 +22,14 @@ async function tryVerify(token: string, secret: string): Promise<UserPayload | n
   try {
     const payload = (await Jwt.verify(token, secret, 'HS256')) as any;
     if (payload && payload.userId) {
-      return { id: payload.userId, userId: payload.userId, username: payload.username, role: payload.role, permissions: payload.permissions || [] };
+      return {
+        id: payload.userId,
+        userId: payload.userId,
+        username: payload.username,
+        role: payload.role,
+        permissions: payload.permissions || [],
+        iat: typeof payload.iat === 'number' ? payload.iat : undefined,
+      };
     }
     return null;
   } catch {

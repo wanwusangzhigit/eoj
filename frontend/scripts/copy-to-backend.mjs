@@ -88,6 +88,15 @@ if (fs.existsSync(serverDstDir)) {
     if (fs.statSync(p).isFile() && p.endsWith('.js')) {
       let content = fs.readFileSync(p, 'utf-8');
       const changes = [];
+      // 0. Cloudflare Workers 兼容:react-dom/server 内部使用 `Buffer.byteLength`
+      //    等 Node 内置全局,但 Workers 即便启用 nodejs_compat 也不会自动暴露
+      //    `Buffer` 作为全局。这里在 bundle 顶部注入 polyfill,把 node:buffer
+      //    导出的 Buffer 挂到 globalThis,保证模块加载期能解析。
+      //    用注释占位避免重复注入。
+      if (content.startsWith('import') && !content.includes('/* eojs Buffer polyfill */')) {
+        content = 'import{Buffer as _eojsBuffer}from"node:buffer";/* eojs Buffer polyfill */globalThis.Buffer||(globalThis.Buffer=_eojsBuffer);\n' + content;
+        changes.push('Buffer polyfill');
+      }
       // 1. 提取 createRequire 别名:`import { createRequire as Alias }from"node:module"`
       const aliasPattern = /import\s*\{[^}]*createRequire\s+as\s+([A-Za-z_$][\w$]*)\s*}/;
       const aliasMatch = content.match(aliasPattern);

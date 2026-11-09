@@ -9,7 +9,7 @@ import { RequireSuperAdmin, RequirePermission } from './components/RequireSuperA
 import { t } from './i18n';
 import { useAuthStore } from './store/auth';
 import { useSettingsStore } from './store/settings';
-import { useThemeStore } from './store/theme';
+import { useThemeStore, applySystemThemeIfAuto } from './store/theme';
 import { api } from './api/client';
 import { applyThemeAccent, applyCustomCss, applyUserTheme } from './utils/theme';
 import { getSSRGlobal } from './ssr/hydrate';
@@ -124,6 +124,8 @@ function App({ ssrLocation }: { ssrLocation?: string } = {}) {
       applyThemeAccent(useSettingsStore.getState().settings.theme_accent);
     };
     applyTheme();
+    // 未显式选过主题的新访客:hydration 完成后应用系统深浅偏好(初始渲染读它会 #418)
+    applySystemThemeIfAuto();
   }, []);
 
   // 用户级主题:登录后从 user_settings 恢复用户保存的深浅主题、自定义 CSS 与主题外观

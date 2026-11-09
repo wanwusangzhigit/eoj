@@ -760,3 +760,218 @@
   color: var(--text-muted, #aaa);
   flex-shrink: 0;
 }
+
+/* ═══════════════════════════════════════════════════
+   Notebook Theme Overrides（算法笔记本主题专属）
+   ═══════════════════════════════════════════════════
+
+   notebook 主题在 global.css 已通过 data-theme-flavor 选择器覆盖了
+   调色板、字体、卡片边框等核心 token。这里针对首页 hero 与卡片标题
+   做进一步精修：
+
+   1. Hero：去掉 default 主题的强对比大色块，改成"翻开笔记第一页"——
+      温暖纸色背景 + 大号宋体标题 + 一条手绘风下划线 SVG（不是渐变阴影）。
+   2. 卡片标题：宋体加重，去掉左边的色块装饰（让标题本身承担识别）。
+   3. 公告条：从 accent-light 背景改为更克制的"批注"——左边朱砂红竖线。
+   4. 每日一题：把卡片改成"今日提要"的笔记本条目，配宋体序号。
+*/
+
+/* ── Hero：纸色背景 + 手绘下划线 ── */
+[data-theme-flavor="notebook"] .home-hero {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  padding: 32px 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 一条非常淡的网格背景，像方格笔记本的第一页。
+   仅在 hero 区域显示，避免全屏噪点干扰阅读。 */
+[data-theme-flavor="notebook"] .home-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(45, 95, 135, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(45, 95, 135, 0.04) 1px, transparent 1px);
+  background-size: 28px 28px;
+  pointer-events: none;
+  z-index: 0;
+}
+[data-theme-flavor="notebook"] .home-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* 标题：大号宋体 + 一条手绘风下划线 SVG（通过 background-image 实现，避免增加 DOM） */
+[data-theme-flavor="notebook"] .home-title {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  padding-bottom: 10px;
+  /* 手绘波浪线下划线：用 SVG data-uri，2x 高度限制在标题底部 */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 8' preserveAspectRatio='none'><path d='M0,4 Q20,0 40,4 T80,4 T120,4 T160,4 T200,4 T240,4' stroke='%232D5F87' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 160px 8px;
+}
+
+[data-theme-flavor="notebook"] .home-date {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+[data-theme-flavor="notebook"] .home-welcome {
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* ── 快捷入口卡片：保持 dashed 边框，去掉 hover 时的填充背景 ── */
+[data-theme-flavor="notebook"] .home-stat-card {
+  background: transparent;
+  border: 1px dashed var(--border);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+[data-theme-flavor="notebook"] .home-stat-card:hover {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--accent-light);
+  color: var(--text-primary);
+}
+
+/* ── 公告：左边朱砂红竖线 + 浅纸色底，像老师在笔记上写批注 ── */
+[data-theme-flavor="notebook"] .home-announcement {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-left: 3px solid var(--error);
+  padding: 12px 16px 12px 18px;
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+/* ── 一言/Hitokoto：宋体斜体，像题写在笔记本扉页的格言 ── */
+[data-theme-flavor="notebook"] .home-hitokoto {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  font-family: var(--font-display);
+}
+[data-theme-flavor="notebook"] .hitokoto-text {
+  font-family: var(--font-display);
+  font-style: italic;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+}
+[data-theme-flavor="notebook"] .hitokoto-from {
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+}
+
+/* ── 每日一题：作为"今日提要"的笔记本条目 ── */
+[data-theme-flavor="notebook"] .home-daily-problem {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  margin: 0;
+}
+[data-theme-flavor="notebook"] .home-daily-problem:hover {
+  border-color: var(--accent);
+  box-shadow: none;
+}
+[data-theme-flavor="notebook"] .home-daily-problem .daily-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  padding: 2px 8px;
+  border-radius: var(--radius);
+}
+[data-theme-flavor="notebook"] .home-daily-problem .daily-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+/* ── 推荐卡片：去掉填充，靠虚线边框分层 ── */
+[data-theme-flavor="notebook"] .home-recommend-section {
+  padding: 16px 20px;
+}
+[data-theme-flavor="notebook"] .home-recommend-header h2,
+[data-theme-flavor="notebook"] .home-recommend-header h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  padding-left: 0;
+}
+/* 去掉 default 主题 h2::before 的色块装饰，让宋体字形本身承担识别 */
+[data-theme-flavor="notebook"] .home-recommend-header h2::before,
+[data-theme-flavor="notebook"] .home-card-header h2::before {
+  display: none !important;
+}
+[data-theme-flavor="notebook"] .recommend-card,
+[data-theme-flavor="notebook"] .home-item {
+  background: transparent;
+  border: none;
+  border-left: 2px solid transparent;
+  border-radius: 0;
+  padding-left: 12px;
+  transition: border-color var(--transition), background var(--transition);
+}
+[data-theme-flavor="notebook"] .recommend-card:hover,
+[data-theme-flavor="notebook"] .home-item:hover {
+  background: var(--accent-light);
+  border-left: 2px solid var(--accent);
+}
+[data-theme-flavor="notebook"] .recommend-card-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+/* ── 卡片头部：去掉 default 的左色块装饰 ── */
+[data-theme-flavor="notebook"] .home-card-header {
+  background: transparent;
+  padding: 14px 18px 10px;
+  border-bottom: 1px dashed var(--border);
+}
+[data-theme-flavor="notebook"] .home-card-header h2 {
+  padding-left: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+}
+[data-theme-flavor="notebook"] .home-card-header h2 svg {
+  color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+/* ── 排行榜前三名：保留金色但降到茶金色 ── */
+[data-theme-flavor="notebook"] .home-item-rank {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+/* ── Mobile：notebook 在小屏上保留 hero 内边距，但关闭网格背景 ── */
+@media (max-width: 768px) {
+  [data-theme-flavor="notebook"] .home-hero {
+    padding: 24px 20px;
+  }
+  [data-theme-flavor="notebook"] .home-hero::before {
+    display: none;
+  }
+  [data-theme-flavor="notebook"] .home-title {
+    font-size: 26px;
+    background-size: 120px 6px;
+  }
+}

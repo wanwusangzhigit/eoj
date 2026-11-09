@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { MessageSquare, Send, ArrowLeft, Plus, Search, X } from 'lucide-react';
 import { t } from '../i18n';
@@ -31,10 +31,11 @@ export default function Messages() {
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [searchParams] = useSearchParams();
+
   // New conversation target (from query string ?target=UserId)
   const [targetUserId, setTargetUserId] = useState<number | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const target = params.get('target');
+    const target = searchParams.get('target');
     return target ? parseInt(target) : null;
   });
 

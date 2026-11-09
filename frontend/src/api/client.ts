@@ -1293,11 +1293,11 @@ class ApiClient {
 
   // ─── 权限组 ──────────────────────────────────────────
   async getPermissionGroups() {
-    return this.request<{ groups: PermissionGroup[] }>('/permission-groups/');
+    return this.request<{ groups: PermissionGroup[] }>('/permission-groups');
   }
 
   async createPermissionGroup(data: { name: string; description?: string; permissions: string[]; color?: string; sort_order?: number }) {
-    return this.request<{ id: number; message: string }>('/permission-groups/', {
+    return this.request<{ id: number; message: string }>('/permission-groups', {
       method: 'POST',
       body: JSON.stringify(data),
     });
@@ -2747,6 +2747,23 @@ class ApiClient {
   }
   async deleteContestAnnouncement(contestId: number, announcementId: number) {
     return this.request<{ message: string }>(`/contests/${contestId}/announcements/${announcementId}`, { method: 'DELETE' });
+  }
+
+  // ── Per-contest admin grants (user_contest_admin) ──
+  // 列出对该比赛拥有 per-contest 管理权的用户(不含全局 contest_admin / 角色 admin)
+  async getContestAdmins(contestId: number) {
+    return this.request<{
+      admins: { id: number; username: string; avatar_url: string | null; role: string; granted_at: string }[];
+      viewer_kind: 'global' | 'scoped';
+    }>(`/contests/${contestId}/admins`);
+  }
+  // 授予 per-contest 管理权(仅全局 contest_admin / admin / super_admin 可调用)
+  async addContestAdmin(contestId: number, userId: number) {
+    return this.request<{ message: string }>(`/contests/${contestId}/admins`, { method: 'POST', body: JSON.stringify({ userId }) });
+  }
+  // 撤销 per-contest 管理权(仅全局 contest_admin / admin / super_admin 可调用)
+  async removeContestAdmin(contestId: number, userId: number) {
+    return this.request<{ message: string }>(`/contests/${contestId}/admins/${userId}`, { method: 'DELETE' });
   }
 
   // ── Contest clarifications (赛时私密答疑) ──

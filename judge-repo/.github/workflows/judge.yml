@@ -132,6 +132,12 @@ jobs:
             sudo apt-get install -y --no-install-recommends -qq \
               build-essential git protobuf-compiler
             git clone --depth 1 --branch 3.4 https://github.com/google/nsjail.git /tmp/nsjail-src
+            # nsjail 3.4 的 Makefile 用 -Werror 把警告当错误。新 runner 的
+            # GCC/glibc 会对 cmdline.cc 里 `is_root_rw ? 0 : MS_RDONLY` 这类
+            # enum/int 条件表达式报 -Wextra 警告,导致 make 停在 cmdline.o
+            # (Error 1),整次判题回退成 system_error。这里只把 -Werror 降级为
+            # 普通警告,不改变编译产物的行为。
+            sed -i 's/-Wall -Wextra -Werror/-Wall -Wextra/' /tmp/nsjail-src/Makefile
             make -C /tmp/nsjail-src -j2
             sudo cp /tmp/nsjail-src/nsjail /usr/local/bin/
             rm -rf /tmp/nsjail-src

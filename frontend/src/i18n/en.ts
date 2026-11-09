@@ -481,6 +481,11 @@ const en: Translations = {
     problemManagement: 'Problem Management',
     addTestcases: 'Add Testcases',
     userManagement: 'User Management',
+    usersSubtitle: 'Manage user roles, personal permissions, permission group membership and ban status. Batch operations supported.',
+    selectUsersFirst: 'Please select users first',
+    batchBanDone: 'Banned {done}/{total} users',
+    batchUnbanDone: 'Unbanned {done}/{total} users',
+    batchSetRoleDone: 'Set {done}/{total} users to {role}',
     totalUsers: 'Total Users',
     totalProblems: 'Total Problems',
     totalSubmissions: 'Total Submissions',
@@ -1898,6 +1903,10 @@ const en: Translations = {
     perm_list: 'Lists',
     perm_ticket: 'Tickets',
     perm_upload: 'Uploads',
+    nav: 'Permission Groups',
+    notAssigned: 'Not assigned',
+    assign: 'Assign Groups',
+    userGroupsUpdated: 'User permission groups updated',
   },
   // Password reset / forgot password
   passwordReset: {

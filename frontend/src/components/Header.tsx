@@ -7,6 +7,7 @@ import { t } from '../i18n';
 import { api, type SearchSuggestion } from '../api/client';
 import { useSiteConfig } from '../hooks/useSiteConfig';
 import { highlightText } from '../utils/highlight';
+import { safeRedirect } from '../utils/redirect';
 import {
   LogOut, User, Shield, Code2, ListChecks, Trophy, Target, Heart,
   Menu, X, Sun, Moon, Swords, Ticket, BookOpen, MessageSquare, Home,
@@ -42,6 +43,12 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
   const getUploadEnabled = useSettingsStore((s) => s.getUploadEnabled);
   const navigate = useNavigate();
   const location = useLocation();
+  // 构造带 redirect 的登录链接：用户从任意页点点登录后，登录成功会回到当前页。
+  // 当前页若本身属于登录流程（被 safeRedirect 拒绝），则退化为纯 /login。
+  const loginLink = (() => {
+    const r = safeRedirect(location.pathname + location.search);
+    return r ? `/login?redirect=${encodeURIComponent(r)}` : '/login';
+  })();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isClassic = config.site.theme === 'classic';
   const isFlat = config.site.theme === 'flat';
@@ -285,7 +292,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
                 </button>
               </div>
             ) : (
-              <Link to="/login" className="header-login-btn">
+              <Link to={loginLink} className="header-login-btn">
                 <User size={14} />
                 {t('nav.login')}
               </Link>
@@ -380,7 +387,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
                 </button>
               </div>
             ) : (
-              <Link to="/login" className="header-login-btn">
+              <Link to={loginLink} className="header-login-btn">
                 <User size={14} />
                 {t('nav.login')}
               </Link>
@@ -526,7 +533,7 @@ export default function Header({ onMenuClick, unreadMsg = 0 }: HeaderProps) {
               </div>
             </>
           ) : (
-            <Link to="/login" className="btn btn-primary btn-sm">
+            <Link to={loginLink} className="btn btn-primary btn-sm">
               <User size={14} />
               {t('nav.login')}
             </Link>

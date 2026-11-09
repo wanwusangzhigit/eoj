@@ -9,6 +9,10 @@ interface User {
   permissions?: string[];
   avatar_url?: string;
   created_at?: string;
+  // 按比赛粒度的 admin 授权 contest_id 列表(/me 与 SSR 注入均会填充)。
+  // ContestDetail 据此判断是否显示"管理面板"——即便没有全局 contest_admin
+  // 也能在自己被指派的比赛里看到管理操作。
+  contest_admin_for?: number[];
 }
 
 interface AuthState {

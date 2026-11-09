@@ -10,6 +10,7 @@
  *
  * 这样的设计最小侵入:页面结构不变,只是在 useState 初始值位置注入 SSR 数据。
  */
+import { createContext } from 'react';
 
 export interface SSRGlobalData {
   // 站点级数据:每次请求都加载
@@ -92,6 +93,15 @@ export function consumeSSRData(): SSRDataEnvelope | null {
  * 页面通过 useSSRInitialData 读取。
  */
 let cachedEnvelope: SSRDataEnvelope | null = null;
+
+/**
+ * 服务端渲染专用的请求级 envelope 通道。
+ *
+ * 不能复用上面的模块级 cachedEnvelope:SSR bundle 在 workerd 里是常驻 isolate,
+ * 模块状态会跨请求残留(A 用户的 envelope 渲染进 B 用户的 HTML)。React context
+ * 随每次 render 新建,天然按请求隔离。
+ */
+export const SSREnvelopeContext = createContext<SSRDataEnvelope | null>(null);
 
 export function setSSRCache(envelope: SSRDataEnvelope | null): void {
   cachedEnvelope = envelope;
