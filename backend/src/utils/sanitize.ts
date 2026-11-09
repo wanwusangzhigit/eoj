@@ -89,7 +89,12 @@ export function sanitizeRichText(input: unknown): string {
   work = work.replace(DANGEROUS_VOID_REGEX, '');
 
   // 剥离事件处理属性
-  work = work.replace(ON_ATTR_REGEX, '');
+  // 迭代到稳定态：避免多字符匹配删除后重新拼接出新的 on* 属性。
+  let prevWork: string;
+  do {
+    prevWork = work;
+    work = work.replace(ON_ATTR_REGEX, '');
+  } while (work !== prevWork);
 
   // 剥离危险 URL 协议（替换为同文档锚点，保留 href 属性结构以免破坏布局）
   work = work.replace(DANGEROUS_URL_REGEX, (_, attr, quote) => `${attr}=${quote}#${quote}`);
