@@ -119,7 +119,7 @@ export async function auditMiddleware(c: Context<AppType>, next: Next) {
 
 /**
  * IP/Device ban check middleware - blocks requests from banned IPs or devices
- * Super admins (role='super_admin' or userId=1) are exempt to prevent lockout
+ * Super admins (userId=1, 与 superAdminMiddleware 一致) are exempt to prevent lockout
  *
  * 审计 #H-14: banned_ips.ip / banned_devices.device_fingerprint 现在存哈希值,
  * 这里检查时也必须先对当前请求 IP/指纹哈希后再比对。
@@ -136,7 +136,7 @@ export async function banCheckMiddleware(c: Context<AppType>, next: Next) {
       const token = authHeader.slice(7);
       const { verifyJWT } = await import('../utils/jwt');
       const payload = await verifyJWT(token, c.env.JWT_SECRET);
-      if (payload && (payload.role === 'super_admin' || payload.userId === 1)) {
+      if (payload && payload.userId === 1) {
         isSuperAdmin = true;
       }
     } catch { /* invalid token, proceed with ban checks */ }
