@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { AppType } from '../../types';
-import { authMiddleware, adminMiddleware, superAdminMiddleware } from '../../middleware/auth';
+import { authMiddleware, adminMiddleware, superAdminMiddleware, isAdmin } from '../../middleware/auth';
+import { recordAuditLog } from '../../middleware/audit';
 import { escapeLikeWildcard, safeParseInt } from '../../utils/helpers';
 import { validatePassword, validateUrl } from '../../utils/validator';
 import * as bcrypt from 'bcryptjs';
@@ -64,7 +65,8 @@ users.put('/:id/role', authMiddleware, adminMiddleware, async (c) => {
     return c.json({ success: false, error: { message: 'Cannot modify super admin role', code: 'FORBIDDEN' } }, 403);
   }
 
-  const isSuperAdmin = currentUser.userId === 1 || currentUser.role === 'super_admin';
+  // 与后端 superAdminMiddleware / 前端 usePermissions 一致:超管只认 id=1。
+  const isSuperAdmin = currentUser.userId === 1;
 
   // 普通管理员禁止授予/撤销 super_admin 角色
   if (role === 'super_admin' && !isSuperAdmin) {
@@ -116,9 +118,13 @@ users.put('/:id/permissions', authMiddleware, superAdminMiddleware, async (c) =>
 });
 
 // ─── 用户权限组成员关系 ──────────────────────────────
-// 查询某用户的组列表(admin 可见;用户自己也可查询自己的组以显示权限来源)
-users.get('/:id/groups', authMiddleware, adminMiddleware, async (c) => {
+// 查询某用户的组列表(本人可查自己的权限来源;其余仅管理员可见)
+users.get('/:id/groups', authMiddleware, async (c) => {
   const userId = safeParseInt(c.req.param('id'), 0);
+  const caller = c.get('user');
+  if (caller.userId !== userId && !isAdmin(caller)) {
+    return c.json({ success: false, error: { message: 'Forbidden: admin only', code: 'FORBIDDEN' } }, 403);
+  }
   const rows = await c.env.DB.prepare(
     `SELECT g.id, g.name, g.description, g.permissions, g.is_system, g.color, g.sort_order, ug.created_at AS joined_at
      FROM user_permission_groups ug
@@ -174,6 +180,8 @@ users.put('/:id/groups', authMiddleware, superAdminMiddleware, async (c) => {
     ...groupIds.map((gid) => c.env.DB.prepare('INSERT INTO user_permission_groups (user_id, group_id) VALUES (?, ?)').bind(userId, gid)),
   ];
   await c.env.DB.batch(stmts);
+  const actor = c.get('user');
+  await recordAuditLog(c, `USER_GROUPS_SET ${JSON.stringify({ userId, groupIds })}`, actor?.userId, actor?.username);
   return c.json({ success: true, data: { message: 'Groups updated' } });
 });
 
@@ -200,7 +208,7 @@ users.put('/:id/ban', authMiddleware, adminMiddleware, async (c) => {
 
   // (M6)防止管理员互相封禁造成管理混乱:
   //  - 普通管理员不能封禁/解封超级管理员或其他管理员
-  //  - 只有超级管理员本人(userId===1)或 super_admin 角色才能封禁其他管理员
+  //  - 只有超级管理员本人(userId===1)才能封禁其他管理员
   // 解封(unban)操作允许普通 admin 执行(降低运维门槛)
   if (banned) {
     const target: any = await c.env.DB.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
@@ -208,7 +216,7 @@ users.put('/:id/ban', authMiddleware, adminMiddleware, async (c) => {
       return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
     }
     const targetIsAdmin = target.role === 'admin' || target.role === 'super_admin';
-    const callerIsSuperAdmin = currentUser.userId === 1 || currentUser.role === 'super_admin';
+    const callerIsSuperAdmin = currentUser.userId === 1;
     if (targetIsAdmin && !callerIsSuperAdmin) {
       return c.json({ success: false, error: { message: 'Only super admin can ban other admins', code: 'FORBIDDEN' } }, 403);
     }

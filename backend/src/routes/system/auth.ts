@@ -7,6 +7,7 @@ import * as bcrypt from 'bcryptjs';
 import { createRateLimiter } from '../../middleware/rateLimit';
 import { captchaMiddleware } from '../../middleware/captcha';
 import { setAuthCookie, clearAuthCookie, getAuthTokenFromRequest } from '../../utils/cookie';
+import { getEffectivePermissions } from '../../utils/permissions';
 
 const auth = new Hono<AppType>();
 
@@ -884,13 +885,10 @@ auth.get('/me', async (c) => {
     return c.json({ success: false, error: { message: 'User not found', code: 'NOT_FOUND' } }, 404);
   }
 
-  // permissions 在 DB 中存储为 JSON 字符串,解析为数组返回,与登录接口保持一致
-  try {
-    const parsed = user.permissions ? JSON.parse(user.permissions) : [];
-    user.permissions = Array.isArray(parsed) ? parsed : [];
-  } catch {
-    user.permissions = [];
-  }
+  // 返回「个人权限 ∪ 权限组权限」的最终结果,与 authMiddleware 完全一致。
+  // 前端 usePermissions 依赖该字段做后台菜单与路由门禁;若只返回个人权限,
+  // 通过权限组获得授权的 role='user' 用户会被整个管理后台拦在门外。
+  user.permissions = await getEffectivePermissions(c.env.DB, payload.userId, user.permissions);
 
   // 按比赛粒度授权(user_contest_admin):返回当前用户被授权管理 contest_id 列表。
   // 前端 ContestDetail 据此判断是否展示"管理面板"——即便用户没有全局 contest_admin

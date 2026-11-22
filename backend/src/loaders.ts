@@ -16,6 +16,7 @@
 import type { Hono } from 'hono';
 import type { AppType } from './types';
 import { verifyJWT } from './utils/jwt';
+import { getEffectivePermissions } from './utils/permissions';
 import { getAuthTokenFromRequest, readCookie } from './utils/cookie';
 
 export interface LoaderCtx {
@@ -937,12 +938,9 @@ export async function buildGlobalData(ctx: LoaderCtx) {
             'SELECT id, username, avatar_url, role, permissions, created_at FROM users WHERE id = ?',
           ).bind(ctx.user!.userId).first();
           if (!row) return null;
-          try {
-            const parsed = row.permissions ? JSON.parse(row.permissions) : [];
-            row.permissions = Array.isArray(parsed) ? parsed : [];
-          } catch {
-            row.permissions = [];
-          }
+          // 与 authMiddleware、/auth/me 共用同一份有效权限计算,保证 SSR 首屏
+          // 注入的 user.permissions 也包含权限组授予的权限。
+          row.permissions = await getEffectivePermissions(ctx.env.DB, ctx.user!.userId, row.permissions);
           return row;
         })()
       : null,

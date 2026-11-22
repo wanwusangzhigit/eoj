@@ -91,7 +91,9 @@ app.use('/api/*', async (c, next) => {
       // URL(ban、改角色、改组都会 refresh()):带 max-age 会让改动在前 10 秒里"看起来
       // 没生效",也不该进共享缓存。
       const noStore = path.startsWith('/api/v1/permission-groups')
-        || path === '/api/v1/users/list';
+        || path === '/api/v1/users/list'
+        // 用户-组关系改完后前端会立刻重取,不能留 10 秒的 max-age
+        || /^\/api\/v1\/users\/\d+\/groups$/.test(path);
       c.res.headers.set(
         'Cache-Control',
         noStore ? 'private, no-store' : isPersonalized ? 'private, max-age=10' : 'public, max-age=10, s-maxage=30'

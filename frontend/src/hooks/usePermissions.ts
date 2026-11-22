@@ -6,7 +6,10 @@ export type Permission = typeof ALL_PERMISSIONS[number];
 export function usePermissions() {
   const { user } = useAuthStore();
 
-  const isSuperAdmin = user?.id === 1 || user?.role === 'super_admin';
+  // 超管唯一判定:users.id === 1,与后端 superAdminMiddleware 严格对齐。
+  // role='super_admin' 只是高权限管理员角色(仍拥有全部细粒度权限),
+  // 早期前端把两者都当超管,导致这类用户能看到超管按钮/菜单却处处 403。
+  const isSuperAdmin = user?.id === 1;
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   // Full admin or super admin has all permissions

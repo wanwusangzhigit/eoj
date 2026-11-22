@@ -15,8 +15,8 @@ function AccessDenied() {
 }
 
 /**
- * 超级管理员守卫:仅允许 user.id === 1 或 role === 'super_admin' 通过。
- * 用于 SQL 编辑器等高危功能。
+ * 超级管理员守卫:仅允许 user.id === 1 通过(与后端 superAdminMiddleware 一致)。
+ * 用于 SQL 编辑器等高危功能。role='super_admin' 只是高权限管理员角色,不是超管。
  *
  * 注意:此处不调用任何 hook 之外的副作用,内部仅依赖 usePermissions,
  * 把 children 在条件外渲染,符合 React Hooks 规则。
@@ -29,7 +29,7 @@ export function RequireSuperAdmin({ children }: { children: ReactNode }) {
 
 /**
  * 通用权限守卫:满足以下任一条件即可访问:
- *  - 当前用户是超级管理员(userId===1 或 role==='super_admin')
+ *  - 当前用户是超级管理员(userId===1)
  *  - 当前用户是管理员角色(role==='admin' 或 'super_admin'),等价于原 hasAllPermissions
  *  - 拥有 requirePermissions 中的任一具体权限(如 'contest_admin')
  *

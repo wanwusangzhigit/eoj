@@ -1,6 +1,7 @@
 import { Context, Next } from 'hono';
 import { AppType } from '../types';
 import { getAuthTokenFromRequest } from '../utils/cookie';
+import { getEffectivePermissions } from '../utils/permissions';
 
 export async function authMiddleware(c: Context<AppType>, next: Next) {
   // SSR 时代:优先读 httpOnly cookie(浏览器自动携带),然后回退到 Authorization 头
@@ -39,30 +40,12 @@ export async function authMiddleware(c: Context<AppType>, next: Next) {
     if (row.banned === 1) {
       return c.json({ success: false, error: { message: 'Account banned', code: 'ACCOUNT_BANNED' } }, 403);
     }
-    // 用 DB 中的最新值覆盖 token 内的权限声明
+    // 用 DB 中的最新值覆盖 token 内的权限声明。个人权限与组权限统一由
+    // getEffectivePermissions 计算,避免与 /auth/me、SSR 全局数据出现不一致。
     payload.role = row.role || payload.role;
-    let dbPermissions: string[] = payload.permissions || [];
-    try {
-      const parsed = row.permissions ? JSON.parse(row.permissions) : [];
-      if (Array.isArray(parsed)) dbPermissions = parsed;
-    } catch { /* 保留 token 内的 permissions */ }
-    // 合并用户所属权限组的 permissions(并集)
-    try {
-      const gr = await c.env.DB.prepare(
-        `SELECT g.permissions FROM user_permission_groups ug
-         JOIN permission_groups g ON g.id = ug.group_id
-         WHERE ug.user_id = ?`
-      ).bind(payload.userId).all();
-      const groupPerms = new Set<string>(dbPermissions);
-      for (const r of gr.results as any[]) {
-        try {
-          const p = r?.permissions ? JSON.parse(r.permissions) : [];
-          if (Array.isArray(p)) p.forEach((x: string) => groupPerms.add(x));
-        } catch { /* ignore malformed group */ }
-      }
-      dbPermissions = Array.from(groupPerms);
-    } catch { /* 组表不存在/查询失败:退化为仅个人权限,保持兼容 */ }
-    payload.permissions = dbPermissions;
+    payload.permissions = await getEffectivePermissions(
+      c.env.DB, payload.userId, row.permissions, payload.permissions || [],
+    );
     // 按比赛粒度授权列表:挂在 payload 上供后续 handler 使用。
     // 注意:数组里只含本次请求时刻的授权快照——若 handler 内执行增删后需要新值,请自行重查。
     try {
@@ -107,28 +90,9 @@ export async function optionalAuthMiddleware(c: Context<AppType>, next: Next) {
             }
           }
           payload.role = row.role || payload.role;
-          let dbPermissions: string[] = payload.permissions || [];
-          try {
-            const parsed = row.permissions ? JSON.parse(row.permissions) : [];
-            if (Array.isArray(parsed)) dbPermissions = parsed;
-          } catch { /* ignore */ }
-          // 合并用户所属权限组的 permissions(并集)
-          try {
-            const gr = await c.env.DB.prepare(
-              `SELECT g.permissions FROM user_permission_groups ug
-               JOIN permission_groups g ON g.id = ug.group_id
-               WHERE ug.user_id = ?`
-            ).bind(payload.userId).all();
-            const groupPerms = new Set<string>(dbPermissions);
-            for (const r of gr.results as any[]) {
-              try {
-                const p = r?.permissions ? JSON.parse(r.permissions) : [];
-                if (Array.isArray(p)) p.forEach((x: string) => groupPerms.add(x));
-              } catch { /* ignore */ }
-            }
-            dbPermissions = Array.from(groupPerms);
-          } catch { /* ignore */ }
-          payload.permissions = dbPermissions;
+          payload.permissions = await getEffectivePermissions(
+            c.env.DB, payload.userId, row.permissions, payload.permissions || [],
+          );
           // 按比赛粒度授权(可选鉴权下也填充,前端 SSR/CSR 可统一使用)
           try {
             const cr = await c.env.DB.prepare(
